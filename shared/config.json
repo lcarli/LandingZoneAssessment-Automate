@@ -1,0 +1,9 @@
+{
+    "ContractType": "EnterpriseAgreement",  // Options: EnterpriseAgreement, MicrosoftCustomerAgreement, CloudSolutionProvider
+    "DesignAreas": {
+        "Billing": true,
+        "Security": false,
+        "Networking": true,
+        "OtherArea": false
+    }
+}

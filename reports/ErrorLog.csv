@@ -1,0 +1,2 @@
+"QuestionID","QuestionText","FunctionName","ErrorMessage"
+"C2.6","Ensure that sufficient capacity and SKUs are available and the attained capacity can be understood and monitored","Test-EnsureCapacityAndSKUs","Cannot index into a null array."
