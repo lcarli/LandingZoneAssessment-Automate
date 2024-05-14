@@ -14,7 +14,7 @@ This project provides a framework to evaluate Azure configurations using checkli
 
 Click the button below to deploy the resources to Azure.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Flcarli%2FLandingZoneAssessment-Automate%2Fmain%2Farm%2Fmain.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Flcarli%2FLandingZoneAssessment-Automate%2Fblob%2Fmain%2Farm%2Fmain.json)
 
 ## How to Use
 
