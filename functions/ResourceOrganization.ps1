@@ -192,7 +192,7 @@ function Test-GroupSubscriptionsUnderManagementGroups {
 
     try {
         # Retrieve subscriptions and management groups
-        $subscriptions = Get-AzSubscription
+        $subscriptions = Get-AzSubscription -TenantId $TenantId
         $managementGroups = Get-AzManagementGroup
 
         # Check if subscriptions are grouped under management groups
@@ -200,11 +200,15 @@ function Test-GroupSubscriptionsUnderManagementGroups {
         foreach ($sub in $subscriptions) {
             foreach ($mg in $managementGroups) {
                 $mgSubscriptions = Get-AzManagementGroupSubscription -GroupName $mg.Name
-                if ($mgSubscriptions | Where-Object { $_.SubscriptionId -eq $sub.Id }) {
-                    $subscriptionsInManagementGroups++
+                foreach ($mgSub in $mgSubscriptions) {
+                    # Extract the subscription ID from the full resource ID
+                    $subscriptionId = ($mgSub.Id -split "/")[-1]
+                    if ($subscriptionId -eq $sub.Id) {
+                        $subscriptionsInManagementGroups++
+                    }
                 }
             }
-        }
+        }        
 
         if ($subscriptionsInManagementGroups -eq $subscriptions.Count) {
             $status = [Status]::Implemented
