@@ -53,10 +53,12 @@ function Test-ManagementGroupsForPoliciesAndRBAC {
         if ($policiesApplied -and $rbacApplied) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } elseif ($policiesApplied -or $rbacApplied) {
+        }
+        elseif ($policiesApplied -or $rbacApplied) {
             $status = [Status]::PartialImplemented
             $estimatedPercentageApplied = 50
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -73,10 +75,10 @@ function Test-ManagementGroupsForPoliciesAndRBAC {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
@@ -106,10 +108,12 @@ function Test-CreateSeparatePlatformSubscriptions {
         if ($managementSubscription.Count -gt 0 -and $connectivitySubscription.Count -gt 0 -and $identitySubscription.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } elseif ($managementSubscription.Count -gt 0 -or $connectivitySubscription.Count -gt 0 -or $identitySubscription.Count -gt 0) {
+        }
+        elseif ($managementSubscription.Count -gt 0 -or $connectivitySubscription.Count -gt 0 -or $identitySubscription.Count -gt 0) {
             $status = [Status]::PartialImplemented
             $estimatedPercentageApplied = 50
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -126,10 +130,10 @@ function Test-CreateSeparatePlatformSubscriptions {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
@@ -151,7 +155,8 @@ function Test-UseSubscriptionsAsUnitOfManagement {
         if ($subscriptions.Count -gt 3) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -168,10 +173,10 @@ function Test-UseSubscriptionsAsUnitOfManagement {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
@@ -204,10 +209,12 @@ function Test-GroupSubscriptionsUnderManagementGroups {
         if ($subscriptionsInManagementGroups -eq $subscriptions.Count) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } elseif ($subscriptionsInManagementGroups -gt 0) {
+        }
+        elseif ($subscriptionsInManagementGroups -gt 0) {
             $status = [Status]::PartialImplemented
             $estimatedPercentageApplied = ($subscriptionsInManagementGroups / $subscriptions.Count) * 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -224,10 +231,10 @@ function Test-GroupSubscriptionsUnderManagementGroups {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
@@ -249,7 +256,8 @@ function Test-AutomateSubscriptionCreation {
         if ($runbook.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -266,10 +274,10 @@ function Test-AutomateSubscriptionCreation {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
@@ -284,40 +292,100 @@ function Test-EnsureCapacityAndSKUs {
     Write-Host "Checking if sufficient capacity and SKUs are available and the attained capacity can be understood and monitored..."
 
     $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
     $weight = 4  # Weight from the Excel sheet
     $score = 0
+    $pointsTotal = 5  # Total number of points being checked
+    $pointsImplemented = 0  # Counter for implemented points
 
     try {
         # Retrieve all subscriptions
-        $subscriptions = Get-AzSubscription -TenantId $tenantId
+        $subscriptions = Get-AzSubscription -TenantId $TenantId
 
         $resources = @()
+        $reservationGroups = @()
+        $dashboards = @()
+        $alerts = @()
+        $quotas = @()
+        $policies = @()
+        $requiredServicesAvailable = $true
+
         foreach ($subscription in $subscriptions) {
             Set-AzContext -SubscriptionId $subscription.Id
+
+            # Collect virtual machines
             $resources += Get-AzResource -ResourceType "Microsoft.Compute/virtualMachines"
+
+            # Collect capacity reservations
+            $reservationGroups += Get-AzCapacityReservationGroup
+
+            # Collect custom dashboards and alerts
+            $dashboards += Get-AzPortalDashboard
+            $alerts += Get-AzMetricAlertRuleV2
+
+            # Collect resource groups and their locations
+            $resourceGroups = Get-AzResourceGroup
+            $locations += $resourceGroups.Location | Select-Object -Unique
+
+            # Collect quotas and policies
+            foreach ($location in $locations) {
+                $skus = Get-ResourceSkus -Location $location
+                $quotas += $skus
+                if ($skus.Count -eq 0) {
+                    $requiredServicesAvailable = $false
+                }
+            }
+            $policies += Get-AzPolicyAssignment
         }
 
         if ($resources.Count -eq 0) {
             Write-Host "No virtual machines found in the subscriptions."
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
-        } else {
-            # Take the first virtual machine resource
-            $resource = $resources[0]
+        }
+        else {
+            # Check for capacity reservations
+            if ($reservationGroups.Count -gt 0) {
+                $vmsAssociated = 0
+                foreach ($group in $reservationGroups) {
+                    $vmsAssociated += $group.VirtualMachinesAssociated.Count
+                }
+                if ($vmsAssociated -gt 0) {
+                    $pointsImplemented++
+                }
+            }
 
-            # Retrieve usage details for capacity and SKUs
-            $capacity = @()
-            $metrics = Get-AzMetric -ResourceId $resource.Id -MetricName "Percentage CPU"
-            $capacity += $metrics.Data
+            # Check for custom dashboards and alerts
+            if (($dashboards.Count -gt 0) -and ($alerts.Count -gt 0)) {
+                $pointsImplemented++
+            }
 
-            # Check if capacity and SKUs are sufficient and monitored
-            if ($capacity.Count -gt 0) {
+            # Check for quota increases
+            if ($quotas.Count -gt 0) {
+                $pointsImplemented++
+            }
+
+            # Check for Azure Policy
+            if ($policies.Count -gt 0) {
+                $pointsImplemented++
+            }
+
+            # Check for required services and features in deployment regions
+            if ($requiredServicesAvailable) {
+                $pointsImplemented++
+            }
+
+            # Calculate the implementation percentage
+            $estimatedPercentageApplied = ($pointsImplemented / $pointsTotal) * 100
+
+            # Determine implementation status
+            if ($estimatedPercentageApplied -eq 100) {
                 $status = [Status]::Implemented
-                $estimatedPercentageApplied = 100
-            } else {
+            }
+            elseif ($estimatedPercentageApplied -gt 0) {
+                $status = [Status]::PartialImplemented
+            }
+            else {
                 $status = [Status]::NotImplemented
-                $estimatedPercentageApplied = 0
             }
         }
 
@@ -325,7 +393,7 @@ function Test-EnsureCapacityAndSKUs {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "C2.6" -QuestionText "Ensure that sufficient capacity and SKUs are available and the attained capacity can be understood and monitored" -FunctionName "Test-EnsureCapacityAndSKUs" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "C3.1" -QuestionText "Ensure that sufficient capacity and SKUs are available and the attained capacity can be understood and monitored" -FunctionName "Test-EnsureCapacityAndSKUs" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -333,13 +401,39 @@ function Test-EnsureCapacityAndSKUs {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
+# Helper function to get resource SKUs with retries
+function Get-ResourceSkus {
+    param (
+        [string]$Location,
+        [int]$MaxRetries = 3,
+        [int]$DelaySeconds = 5
+    )
+    
+    $attempts = 0
+    $result = @()
+    while ($attempts -lt $MaxRetries) {
+        try {
+            $result = Get-AzComputeResourceSku -Location $Location
+            break
+        }
+        catch {
+            Write-Host "Attempt $($attempts + 1) failed: $_.Exception.Message"
+            $attempts++
+            if ($attempts -lt $MaxRetries) {
+                Write-Host "Retrying in $DelaySeconds seconds..."
+                Start-Sleep -Seconds $DelaySeconds
+            }
+        }
+    }
+    return $result
+}
 
 
 #endregion

@@ -27,8 +27,7 @@ param (
 
 # Execute Initialize.ps1 to set up the environment
 Write-Host "Initializing environment..."
-#Connect-AzAccount -Tenant 'a0fdaeda-034b-4ecd-8043-658e1f0aa1ef'
-Initialize-Connect
+Initialize-Environment
 
 # Function to handle the function execution
 function Test-Custom {
