@@ -38,7 +38,8 @@ function Test-ManagementGroupsForPoliciesAndRBAC {
         $rbacApplied = $false
 
         foreach ($mg in $managementGroups) {
-            $policies = Get-AzPolicyAssignment -Scope "/providers/Microsoft.Management/managementGroups/$($mg.Name)"
+            $policies = Get-AzPolicyAssignment -Scope "/providers/Microsoft.Management/managementGroups/$($mg.Name)
+            "
             $rbac = Get-AzRoleAssignment -Scope "/providers/Microsoft.Management/managementGroups/$($mg.Name)"
 
             if ($policies.Count -gt 0) {
@@ -288,33 +289,43 @@ function Test-EnsureCapacityAndSKUs {
     $score = 0
 
     try {
-        # Retrieve the first resource group
-        $resourceGroups = Get-AzResourceGroup
-        $resourceGroupName = $resourceGroups[0].ResourceGroupName
+        # Retrieve all subscriptions
+        $subscriptions = Get-AzSubscription -TenantId $tenantId
 
-        # Retrieve usage details for capacity and SKUs
-        $resources = Get-AzResource -ResourceGroupName $resourceGroupName -ResourceType "Microsoft.Compute/virtualMachines"
-        $capacity = @()
-
-        foreach ($resource in $resources) {
-            $metrics = Get-AzMetric -ResourceId $resource.Id -MetricName "Percentage CPU"
-            $capacity += $metrics.Data
+        $resources = @()
+        foreach ($subscription in $subscriptions) {
+            Set-AzContext -SubscriptionId $subscription.Id
+            $resources += Get-AzResource -ResourceType "Microsoft.Compute/virtualMachines"
         }
 
-        # Check if capacity and SKUs are sufficient and monitored
-        if ($capacity.Count -gt 0) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } else {
+        if ($resources.Count -eq 0) {
+            Write-Host "No virtual machines found in the subscriptions."
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
+        } else {
+            # Take the first virtual machine resource
+            $resource = $resources[0]
+
+            # Retrieve usage details for capacity and SKUs
+            $capacity = @()
+            $metrics = Get-AzMetric -ResourceId $resource.Id -MetricName "Percentage CPU"
+            $capacity += $metrics.Data
+
+            # Check if capacity and SKUs are sufficient and monitored
+            if ($capacity.Count -gt 0) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            }
         }
 
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Write-Errors -QuestionID "C2.6" -QuestionText "Ensure that sufficient capacity and SKUs are available and the attained capacity can be understood and monitored" -FunctionName "Test-EnsureCapacityAndSKUs" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "C2.6" -QuestionText "Ensure that sufficient capacity and SKUs are available and the attained capacity can be understood and monitored" -FunctionName "Test-EnsureCapacityAndSKUs" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -328,6 +339,7 @@ function Test-EnsureCapacityAndSKUs {
         Score                     = $score
     }
 }
+
 
 
 #endregion

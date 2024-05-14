@@ -22,17 +22,13 @@ param (
 . "$PSScriptRoot/../functions/Billing.ps1"
 . "$PSScriptRoot/../functions/IAM.ps1"
 . "$PSScriptRoot/../functions/ResourceOrganization.ps1"
+. "$PSScriptRoot/../scripts/Initialize.ps1"
 
 
 # Execute Initialize.ps1 to set up the environment
-$initializeScript = "$PSScriptRoot/../scripts/Initialize.ps1"
-if (Test-Path $initializeScript) {
-    Write-Host "Initializing environment..."
-    . $initializeScript
-} else {
-    Write-Host "Initialize.ps1 not found. Ensure the script exists in the /scripts directory."
-    exit
-}
+Write-Host "Initializing environment..."
+#Connect-AzAccount -Tenant 'a0fdaeda-034b-4ecd-8043-658e1f0aa1ef'
+Initialize-Connect
 
 # Function to handle the function execution
 function Test-Custom {

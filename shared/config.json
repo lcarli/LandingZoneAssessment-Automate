@@ -1,4 +1,5 @@
 {
+    "TenantId": "a0fdaeda-034b-4ecd-8043-658e1f0aa1ef",
     "ContractType": "EnterpriseAgreement",  // Options: EnterpriseAgreement, MicrosoftCustomerAgreement, CloudSolutionProvider
     "DesignAreas": {
         "Billing": true,

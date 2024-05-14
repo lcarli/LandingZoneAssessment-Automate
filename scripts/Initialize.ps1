@@ -12,7 +12,7 @@
     lramoscostah@microsoft.com
 #>
 
-function Connect-AzAccount {
+function Initialize-Connect {
     <#
     .SYNOPSIS
         Conectar ao Azure.
@@ -27,6 +27,11 @@ function Connect-AzAccount {
         A função requer que o módulo Az esteja instalado e configurado.
     #>
     Write-Host "Conectando ao Azure..."
-    Connect-AzAccount
+    $configPath = "$PSScriptRoot/../shared/config.json"
+    $config = Get-Content -Path $configPath | ConvertFrom-Json
+    $TenantId = $config.TenantId
+    Set-Variable -Name "TenantId" -Value $TenantId -Scope Global
+
+    Connect-AzAccount -Tenant $TenantId
 }
 

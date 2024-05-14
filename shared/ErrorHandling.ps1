@@ -12,7 +12,7 @@
     lramoscostah@microsoft.com
 #>
 
-function Write-Errors {
+function Log-Error {
     param (
         [string]$QuestionID,
         [string]$QuestionText,
