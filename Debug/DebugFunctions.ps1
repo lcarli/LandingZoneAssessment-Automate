@@ -30,7 +30,7 @@ Write-Host "Initializing environment..."
 Initialize-Environment
 
 # Function to handle the function execution
-function Test-Custom {
+function Assess-Custom {
     param (
         [string]$functionName
     )
@@ -51,8 +51,8 @@ function Test-Custom {
 
 # Main script
 if (-not $FunctionName) {
-    Write-Host "Please provide the function name as a parameter. Example: .\DebugFunctions.ps1 -FunctionName 'Test-EANotificationContacts'"
+    Write-Host "Please provide the function name as a parameter. Example: .\DebugFunctions.ps1 -FunctionName 'Assess-EANotificationContacts'"
     exit
 } else {
-    Test-Custom -functionName $FunctionName
+    Assess-Custom -functionName $FunctionName
 }

@@ -4,7 +4,7 @@
     "DesignAreas": {
         "Billing": true,
         "Security": false,
-        "Networking": true,
+        "Networking": false,
         "OtherArea": false
     }
 }

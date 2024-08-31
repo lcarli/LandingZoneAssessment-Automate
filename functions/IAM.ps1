@@ -17,10 +17,34 @@ Import-Module "$PSScriptRoot/../shared/Enums.ps1"
 Import-Module "$PSScriptRoot/../shared/ErrorHandling.ps1"
 
 
+function Invoke-IAMAssessment {
+    Write-Host "Evaluating the IAM design area..."
+
+    $results = @()
+
+    # Call individual assessment functions
+    $results += Assess-EnforceRBACModel
+    $results += Assess-IdentityNetworkSegmentation
+    $results += Assess-AzureADOnlyGroups
+    $results += Assess-CustomRoleDefinitionsPIM
+    $results += Assess-AADDiagnosticLogs
+    $results += Assess-CustomRBACRoles
+    $results += Assess-SeparatePrivilegedAdminAccounts
+    $results += Assess-DomainControllerInAzure
+    $results += Assess-AzureADApplicationProxy
+    $results += Assess-UseManagedIdentities
+    $results += Assess-IdentityNetworkSegmentation
+
+    # Return the results
+    return $results
+}
+
+
+
 #region begin Planning for identity and access management
 
 # B1.1 - Enforce a RBAC model
-function Test-EnforceRBACModel {
+function Assess-EnforceRBACModel {
     Write-Host "Checking if a RBAC model is enforced for management groups, subscriptions, and resource groups..."
 
     $status = [Status]::Unknown
@@ -38,7 +62,8 @@ function Test-EnforceRBACModel {
         if ($managementGroupRoles.Count -gt 0 -and $subscriptionRoles.Count -gt 0 -and $resourceGroupRoles.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -47,7 +72,7 @@ function Test-EnforceRBACModel {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B1.1" -QuestionText "Enforce a RBAC model" -FunctionName "Test-EnforceRBACModel" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B1.1" -QuestionText "Enforce a RBAC model" -FunctionName "Assess-EnforceRBACModel" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -55,15 +80,15 @@ function Test-EnforceRBACModel {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
 # B1.5 - Enforce MFA, Azure AD Conditional Access policies
-function Test-EnforceMFAConditionalAccess {
+function Assess-EnforceMFAConditionalAccess {
     Write-Host "Checking if MFA and Azure AD Conditional Access policies are enforced..."
 
     $status = [Status]::Unknown
@@ -81,7 +106,8 @@ function Test-EnforceMFAConditionalAccess {
         if ($mfaEnabled.Count -gt 0 -and $conditionalAccessPolicies.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -90,7 +116,7 @@ function Test-EnforceMFAConditionalAccess {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B1.5" -QuestionText "Enforce MFA, Azure AD Conditional Access policies" -FunctionName "Test-EnforceMFAConditionalAccess" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B1.5" -QuestionText "Enforce MFA, Azure AD Conditional Access policies" -FunctionName "Assess-EnforceMFAConditionalAccess" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -98,15 +124,15 @@ function Test-EnforceMFAConditionalAccess {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
 # B1.6 - "Azure AD only" groups for Azure control plane
-function Test-AzureADOnlyGroups {
+function Assess-AzureADOnlyGroups {
     Write-Host "Checking if 'Azure AD only' groups are used for Azure control plane..."
 
     $status = [Status]::Unknown
@@ -124,7 +150,8 @@ function Test-AzureADOnlyGroups {
         if ($azureControlPlaneGroups.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -133,7 +160,7 @@ function Test-AzureADOnlyGroups {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B1.6" -QuestionText "'Azure AD only' groups for Azure control plane" -FunctionName "Test-AzureADOnlyGroups" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B1.6" -QuestionText "'Azure AD only' groups for Azure control plane" -FunctionName "Assess-AzureADOnlyGroups" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -141,15 +168,15 @@ function Test-AzureADOnlyGroups {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
 # B1.7 - Custom Role Definitions + AAD PIM for Azure roles
-function Test-CustomRoleDefinitionsPIM {
+function Assess-CustomRoleDefinitionsPIM {
     Write-Host "Checking if Custom Role Definitions and AAD PIM are used for Azure roles..."
 
     $status = [Status]::Unknown
@@ -167,7 +194,8 @@ function Test-CustomRoleDefinitionsPIM {
         if ($customRoles.Count -gt 0 -and $pimEnabled.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -176,7 +204,7 @@ function Test-CustomRoleDefinitionsPIM {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B1.7" -QuestionText "Custom Role Definitions + AAD PIM for Azure roles" -FunctionName "Test-CustomRoleDefinitionsPIM" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B1.7" -QuestionText "Custom Role Definitions + AAD PIM for Azure roles" -FunctionName "Assess-CustomRoleDefinitionsPIM" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -184,16 +212,16 @@ function Test-CustomRoleDefinitionsPIM {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
 
 # B1.8 - AAD Diagnostic Logs
-function Test-AADDiagnosticLogs {
+function Assess-AADDiagnosticLogs {
     Write-Host "Checking if AAD Diagnostic Logs are integrated with the platform-centric log solution..."
 
     $status = [Status]::Unknown
@@ -211,7 +239,8 @@ function Test-AADDiagnosticLogs {
         if ($logsConfigured.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -220,7 +249,7 @@ function Test-AADDiagnosticLogs {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B1.8" -QuestionText "AAD Diagnostic Logs" -FunctionName "Test-AADDiagnosticLogs" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B1.8" -QuestionText "AAD Diagnostic Logs" -FunctionName "Assess-AADDiagnosticLogs" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -228,16 +257,16 @@ function Test-AADDiagnosticLogs {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
 
 # B1.9 - Custom RBAC Roles and Usage
-function Test-CustomRBACRoles {
+function Assess-CustomRBACRoles {
     Write-Host "Checking if custom RBAC roles are defined and used within the Azure AD environment..."
 
     $status = [Status]::Unknown
@@ -252,7 +281,8 @@ function Test-CustomRBACRoles {
         if ($customRoles.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -261,7 +291,7 @@ function Test-CustomRBACRoles {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B1.9" -QuestionText "Custom RBAC Roles and Usage" -FunctionName "Test-CustomRBACRoles" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B1.9" -QuestionText "Custom RBAC Roles and Usage" -FunctionName "Assess-CustomRBACRoles" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -269,16 +299,16 @@ function Test-CustomRBACRoles {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
 
 # B1.10 - Separate privileged admin accounts for Azure administration
-function Test-SeparatePrivilegedAdminAccounts {
+function Assess-SeparatePrivilegedAdminAccounts {
     Write-Host "Checking if separate privileged admin accounts are used for Azure administration..."
 
     $status = [Status]::Unknown
@@ -297,7 +327,8 @@ function Test-SeparatePrivilegedAdminAccounts {
         if ($separateAdminAccounts.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -306,7 +337,7 @@ function Test-SeparatePrivilegedAdminAccounts {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B1.10" -QuestionText "Separate privileged admin accounts for Azure administration" -FunctionName "Test-SeparatePrivilegedAdminAccounts" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B1.10" -QuestionText "Separate privileged admin accounts for Azure administration" -FunctionName "Assess-SeparatePrivilegedAdminAccounts" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -314,10 +345,10 @@ function Test-SeparatePrivilegedAdminAccounts {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
@@ -326,7 +357,7 @@ function Test-SeparatePrivilegedAdminAccounts {
 #region Authentication Inside the Landing Zone
 
 # B2.1 - Domain Controller in Azure or AADDS services
-function Test-DomainControllerInAzure {
+function Assess-DomainControllerInAzure {
     param (
         [string]$ResourceGroupName
     )
@@ -345,14 +376,16 @@ function Test-DomainControllerInAzure {
         # Check for domain controllers in specified resource group or in all resource groups
         if ($PSBoundParameters.ContainsKey('ResourceGroupName')) {
             $domainControllers = Get-AzVM -ResourceGroupName $ResourceGroupName | Where-Object { $_.OsProfile.ComputerName -match "DC" }
-        } else {
+        }
+        else {
             $domainControllers = Get-AzVM | Where-Object { $_.OsProfile.ComputerName -match "DC" }
         }
 
         if ($aadds.Count -gt 0 -or $domainControllers.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -361,7 +394,7 @@ function Test-DomainControllerInAzure {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B2.1" -QuestionText "Domain Controller in Azure or AADDS services" -FunctionName "Test-DomainControllerInAzure" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B2.1" -QuestionText "Domain Controller in Azure or AADDS services" -FunctionName "Assess-DomainControllerInAzure" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -369,16 +402,16 @@ function Test-DomainControllerInAzure {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
 
 # B2.2 - Use Azure AD Application Proxy for Intranet apps
-function Test-AzureADApplicationProxy {
+function Assess-AzureADApplicationProxy {
     Write-Host "Checking if Azure AD Application Proxy is used for Intranet apps..."
 
     $status = [Status]::Unknown
@@ -394,7 +427,8 @@ function Test-AzureADApplicationProxy {
         if ($appProxyConnectors.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -403,7 +437,7 @@ function Test-AzureADApplicationProxy {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B2.2" -QuestionText "Use Azure AD Application Proxy for Intranet apps" -FunctionName "Test-AzureADApplicationProxy" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B2.2" -QuestionText "Use Azure AD Application Proxy for Intranet apps" -FunctionName "Assess-AzureADApplicationProxy" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -411,16 +445,16 @@ function Test-AzureADApplicationProxy {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
 
 # B2.3 - Use Managed Identities to authenticate to Azure resources
-function Test-UseManagedIdentities {
+function Assess-UseManagedIdentities {
     Write-Host "Checking if managed identities are used to authenticate to Azure resources..."
 
     $status = [Status]::Unknown
@@ -436,7 +470,8 @@ function Test-UseManagedIdentities {
         if ($managedIdentities.Count -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -445,7 +480,7 @@ function Test-UseManagedIdentities {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B2.3" -QuestionText "Use Managed Identities to authenticate to Azure resources" -FunctionName "Test-UseManagedIdentities" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B2.3" -QuestionText "Use Managed Identities to authenticate to Azure resources" -FunctionName "Assess-UseManagedIdentities" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -453,16 +488,16 @@ function Test-UseManagedIdentities {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 
 
 # B2.4 - Identity network segmentation and connectivity with AD
-function Test-IdentityNetworkSegmentation {
+function Assess-IdentityNetworkSegmentation {
     Write-Host "Checking if identity network segmentation and connectivity with AD is implemented..."
 
     $status = [Status]::Unknown
@@ -479,7 +514,8 @@ function Test-IdentityNetworkSegmentation {
         if ($subscriptions.Count -gt 1 -and $vNets.Count -gt 1) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
         }
@@ -488,7 +524,7 @@ function Test-IdentityNetworkSegmentation {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "B2.4" -QuestionText "Identity network segmentation and connectivity with AD" -FunctionName "Test-IdentityNetworkSegmentation" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "B2.4" -QuestionText "Identity network segmentation and connectivity with AD" -FunctionName "Assess-IdentityNetworkSegmentation" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -496,10 +532,10 @@ function Test-IdentityNetworkSegmentation {
 
     # Return result object
     return [PSCustomObject]@{
-        Status                    = $status
+        Status                     = $status
         EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                    = $weight
-        Score                     = $score
+        Weight                     = $weight
+        Score                      = $score
     }
 }
 

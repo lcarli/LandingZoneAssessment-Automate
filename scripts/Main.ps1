@@ -13,11 +13,10 @@
 #>
 
 # Import necessary modules
-Import-Module "$PSScriptRoot/Initialize.ps1"
-Import-Module "$PSScriptRoot/../functions/Billing.ps1"
-Import-Module "$PSScriptRoot/../functions/Security.ps1"
-Import-Module "$PSScriptRoot/../functions/Networking.ps1"
-Import-Module "$PSScriptRoot/../functions/OtherArea.ps1"
+. "$PSScriptRoot/Initialize.ps1"
+. "$PSScriptRoot/../functions/Billing.ps1"
+. "$PSScriptRoot/../functions/IAM.ps1"
+. "$PSScriptRoot/../functions/ResourceOrganization.ps1"
 
 # Load configuration file
 $configPath = "$PSScriptRoot/../shared/config.json"
@@ -31,19 +30,27 @@ function Main {
     $contractType = $config.ContractType
     Write-Host "Contract Type: $contractType"
 
+
+    //create a customobject with design areas with empty values
+    $eneralResult = [PSCustomObject]@{
+        Billing = @{}
+        Security =  @{}
+        Networking =  @{}
+    }
+
+
+
     $designAreas = $config.DesignAreas
-    if ($designAreas.Billing) {
-        Invoke-Billing -ContractType $contractType
+    if ($designAreas.Billing) {     
+        $generalResult.Billing = Invoke-BillingAssessment -ContractType $contractType
     }
-    if ($designAreas.Security) {
-        Invoke-Security -ContractType $contractType
+    if ($designAreas.IAM) {
+        $generalResult.IAM = Invoke-IAMAssessment -ContractType $contractType
     }
-    if ($designAreas.Networking) {
-        Invoke-Networking -ContractType $contractType
+    if ($designAreas.ResourceOrganization) {
+        $generalResult.ResourceOrganization = Invoke-ResourceOrganizationAssessment -ContractType $contractType
     }
-    if ($designAreas.OtherArea) {
-        Invoke-OtherArea -ContractType $contractType
-    }
+
 
     # Generate report
     Generate-Report

@@ -16,27 +16,35 @@
 Import-Module "$PSScriptRoot/../shared/Enums.ps1"
 Import-Module "$PSScriptRoot/../shared/ErrorHandling.ps1"
 
-function Invoke-Billing {
+function Invoke-BillingAssessment {
     Write-Host "Evaluating the Billing design area..."
 
+    $results = @()
+
     # Call individual assessment functions
-    $resultA1_1 = Test-EANotificationContacts
-    $resultA1_2 = Test-NumberOfDepartments
+    $results += Assess-EANotificationContacts
+    $results += Assess-NumberOfDepartments
+    $results += Assess-NumberAndTypeOfEAAccount
+    $results += Assess-AuditIntervalEAEnrolment
+    $results += Assess-DevTestSubscriptionCostOptimize
+    $results += Assess-AssignBudgetPerAccount
+    $results += Assess-EnableViewCharges
+    $results += Assess-MapOrganizationBilling
+    $results += Assess-SetupCostReporting
+    $results += Assess-EnsureLighthouse
+    $results += Assess-DiscussSupportCSP
 
-    # Print results (or store them for report generation)
-    Write-Host "A1.1 - EA Notification Contacts Assessment:"
-    Write-Host $resultA1_1
+    # Return the results
 
-    Write-Host "A1.2 - Number of Departments Assessment:"
-    Write-Host $resultA1_2
+
+   return $results
 }
-
 
 #region begin A1-A
 
 
 # A1.1 - EA notification contacts
-function Test-EANotificationContacts {
+function Assess-EANotificationContacts {
     Write-Host "Checking EA notification contacts..."
 
     $status = [Status]::Unknown
@@ -78,7 +86,7 @@ function Test-EANotificationContacts {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.1" -QuestionText "EA notification contacts" -FunctionName "Test-EANotificationContacts" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.1" -QuestionText "EA notification contacts" -FunctionName "Assess-EANotificationContacts" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -95,7 +103,7 @@ function Test-EANotificationContacts {
 
 
 # A1.2 - Number of Departments
-function Test-NumberOfDepartments {
+function Assess-NumberOfDepartments {
     Write-Host "Checking the number of departments..."
 
     $status = [Status]::Unknown
@@ -120,7 +128,7 @@ function Test-NumberOfDepartments {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.2" -QuestionText "Number of Departments" -FunctionName "Test-NumberOfDepartments" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.2" -QuestionText "Number of Departments" -FunctionName "Assess-NumberOfDepartments" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -136,7 +144,7 @@ function Test-NumberOfDepartments {
 }
 
 # A1.3 - Number and type of EA Account
-function Test-NumberAndTypeOfEAAccount {
+function Assess-NumberAndTypeOfEAAccount {
     Write-Host "Checking Number and Type of EA Account..."
 
     $status = [Status]::Unknown
@@ -161,7 +169,7 @@ function Test-NumberAndTypeOfEAAccount {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.3" -QuestionText "Number and type of EA Account" -FunctionName "Test-NumberAndTypeOfEAAccount" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.3" -QuestionText "Number and type of EA Account" -FunctionName "Assess-NumberAndTypeOfEAAccount" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -178,7 +186,7 @@ function Test-NumberAndTypeOfEAAccount {
 
 
 # A1.4 - Audit Interval for the EA Enrolment via Cost management & Billing
-function Test-AuditIntervalEAEnrolment {
+function Assess-AuditIntervalEAEnrolment {
     Write-Host "Checking Audit Interval for the EA Enrolment via Cost management & Billing..."
 
     $status = [Status]::CheckManually
@@ -192,7 +200,7 @@ function Test-AuditIntervalEAEnrolment {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.4" -QuestionText "Audit Interval for the EA Enrolment via Cost management & Billing" -FunctionName "Test-AuditIntervalEAEnrolment" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.4" -QuestionText "Audit Interval for the EA Enrolment via Cost management & Billing" -FunctionName "Assess-AuditIntervalEAEnrolment" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -209,7 +217,7 @@ function Test-AuditIntervalEAEnrolment {
 
 
 # A1.5 - Make Use of Dev/Test EA subscription cost optimize
-function Test-DevTestSubscriptionCostOptimize {
+function Assess-DevTestSubscriptionCostOptimize {
     Write-Host "Checking Dev/Test EA subscription cost optimization..."
 
     $status = [Status]::Unknown
@@ -235,7 +243,7 @@ function Test-DevTestSubscriptionCostOptimize {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.5" -QuestionText "Make Use of Dev/Test EA subscription cost optimize" -FunctionName "Test-DevTestSubscriptionCostOptimize" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.5" -QuestionText "Make Use of Dev/Test EA subscription cost optimize" -FunctionName "Assess-DevTestSubscriptionCostOptimize" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -252,7 +260,7 @@ function Test-DevTestSubscriptionCostOptimize {
 
 
 # A1.6 - Assign Budget per account / Department to establish alerts
-function Test-AssignBudgetPerAccount {
+function Assess-AssignBudgetPerAccount {
     Write-Host "Checking budget assignments per account/department and alert establishment..."
 
     $status = [Status]::Unknown
@@ -292,7 +300,7 @@ function Test-AssignBudgetPerAccount {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.6" -QuestionText "Assign Budget per account / Department to establish alerts" -FunctionName "Test-AssignBudgetPerAccount" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.6" -QuestionText "Assign Budget per account / Department to establish alerts" -FunctionName "Assess-AssignBudgetPerAccount" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -309,7 +317,7 @@ function Test-AssignBudgetPerAccount {
 
 
 # A1.7 - Enable both DA View Charges and AO View Charges
-function Test-EnableViewCharges {
+function Assess-EnableViewCharges {
     Write-Host "Checking if both DA View Charges and AO View Charges are enabled..."
 
     $status = [Status]::Unknown
@@ -340,7 +348,7 @@ function Test-EnableViewCharges {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.7" -QuestionText "Enable both DA View Charges and AO View Charges" -FunctionName "Test-EnableViewCharges" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.7" -QuestionText "Enable both DA View Charges and AO View Charges" -FunctionName "Assess-EnableViewCharges" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -360,7 +368,7 @@ function Test-EnableViewCharges {
 #region begin A1-B
 
 # A1.2 - Map your organization/billing to your agreement billing structure
-function Test-MapOrganizationBilling {
+function Assess-MapOrganizationBilling {
     Write-Host "Checking if organization/billing is mapped to your agreement billing structure..."
 
     $status = [Status]::Unknown
@@ -385,7 +393,7 @@ function Test-MapOrganizationBilling {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.2" -QuestionText "Map your organization/billing to your agreement billing structure" -FunctionName "Test-MapOrganizationBilling" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.2" -QuestionText "Map your organization/billing to your agreement billing structure" -FunctionName "Assess-MapOrganizationBilling" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -401,7 +409,7 @@ function Test-MapOrganizationBilling {
 }
 
 # A1.6 - Setup cost reporting with Azure Cost Management
-function Test-SetupCostReporting {
+function Assess-SetupCostReporting {
     Write-Host "Checking if cost reporting is set up with Azure Cost Management..."
 
     $status = [Status]::Unknown
@@ -426,7 +434,7 @@ function Test-SetupCostReporting {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.6" -QuestionText "Setup cost reporting with Azure Cost Management" -FunctionName "Test-SetupCostReporting" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.6" -QuestionText "Setup cost reporting with Azure Cost Management" -FunctionName "Assess-SetupCostReporting" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -445,7 +453,7 @@ function Test-SetupCostReporting {
 #region begion A1-C
 
 # A1.1 - Ensure that Azure Lighthouse is used for admin control
-function Test-EnsureLighthouse {
+function Assess-EnsureLighthouse {
     Write-Host "Checking if Azure Lighthouse is used for admin control..."
 
     $status = [Status]::Unknown
@@ -470,7 +478,7 @@ function Test-EnsureLighthouse {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.1" -QuestionText "Ensure that Azure Lighthouse is used for admin control" -FunctionName "Test-EnsureLighthouse" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.1" -QuestionText "Ensure that Azure Lighthouse is used for admin control" -FunctionName "Assess-EnsureLighthouse" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
@@ -488,7 +496,7 @@ function Test-EnsureLighthouse {
 
 
 # A1.2 - Discuss support with CSP partner
-function Test-DiscussSupportCSP {
+function Assess-DiscussSupportCSP {
     Write-Host "Checking if support with CSP partner is discussed..."
 
     $status = [Status]::CheckManually
@@ -502,7 +510,7 @@ function Test-DiscussSupportCSP {
         $score = ($weight * $estimatedPercentageApplied) / 100
     }
     catch {
-        Log-Error -QuestionID "A1.2" -QuestionText "Discuss support with CSP partner" -FunctionName "Test-DiscussSupportCSP" -ErrorMessage $_.Exception.Message
+        Log-Error -QuestionID "A1.2" -QuestionText "Discuss support with CSP partner" -FunctionName "Assess-DiscussSupportCSP" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0

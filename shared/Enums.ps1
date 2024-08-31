@@ -19,4 +19,5 @@ enum Status {
     Unknown
     CheckManually
     NotApplicable
+    Error
 }

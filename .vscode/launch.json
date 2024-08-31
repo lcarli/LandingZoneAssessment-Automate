@@ -6,7 +6,7 @@
             "request": "launch",
             "name": "Debug DebugFunctions.ps1",
             "script": "${workspaceFolder}/Debug/DebugFunctions.ps1",
-            "args": ["-FunctionName", "Test-GroupSubscriptionsUnderManagementGroups"],
+            "args": ["-FunctionName", "Assess-ManagementGroupRBACAuthorization"],
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false
         }
