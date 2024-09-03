@@ -31,8 +31,8 @@ function Main {
     Write-Host "Contract Type: $contractType"
 
 
-    //create a customobject with design areas with empty values
-    $eneralResult = [PSCustomObject]@{
+    # create a customobject with design areas with empty values
+    $generalResult = [PSCustomObject]@{
         Billing = @{}
         Security =  @{}
         Networking =  @{}
