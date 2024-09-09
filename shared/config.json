@@ -3,8 +3,12 @@
     "ContractType": "EnterpriseAgreement",  // Options: EnterpriseAgreement, MicrosoftCustomerAgreement, CloudSolutionProvider
     "DesignAreas": {
         "Billing": true,
+        "IAM": false,
+        "ResourceOrganization": false,
+        "Network": false,
+        "Governance": false,
         "Security": false,
-        "Networking": false,
-        "OtherArea": false
+        "DevOps": false,
+        "Management": false
     }
 }
