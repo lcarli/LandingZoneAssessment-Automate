@@ -1,3 +1,5 @@
+# Management.ps1
+
 <#
 .SYNOPSIS
     Functions related to Management assessment.
@@ -21,11 +23,5 @@ function Invoke-ManagementAssessment {
 
     $results = @()
 
-    # Call individual assessment functions
-
-
-    # Return the results
-
-
-   return $results
+    return $results
 }

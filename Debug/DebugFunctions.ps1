@@ -19,10 +19,9 @@ param (
 )
 
 # Import the necessary modules
-. "$PSScriptRoot/../functions/Billing.ps1"
-. "$PSScriptRoot/../functions/IAM.ps1"
-. "$PSScriptRoot/../functions/ResourceOrganization.ps1"
+. "$PSScriptRoot/../functions/AzureBillingandMicrosoftEntraIDTenants.ps1"
 . "$PSScriptRoot/../scripts/Initialize.ps1"
+. "$PSScriptRoot/../shared/ErrorHandling.ps1"
 
 
 # Execute Initialize.ps1 to set up the environment
