@@ -41,7 +41,7 @@
         "name": "[parameters('storageAccountName')]",
         "properties": {
           "indexDocument": "index.html",
-          "errorDocument404Path": "404.html"
+          "errorDocument404Path": "404.html" //asads
         }
       }
     ],

@@ -21,8 +21,12 @@ function Get-AzModules {
         'Az.Monitor',
         'Az.PolicyInsights',
         'Az.Portal',
-        'Az.ResourceGraph'
+        'Az.ResourceGraph',
+        'Az.ManagedServices',
+        'Az.CostManagement',
+        'Microsoft.Graph'
     )
+
 
     foreach ($module in $requiredModules) {
         if (-not (Get-Module -ListAvailable -Name $module)) {
@@ -64,8 +68,7 @@ function Initialize-Connect {
     }
 
     try {
-        $Credential = Get-Credential
-        Connect-AzAccount -Tenant $TenantId -Credential $Credential
+        Connect-AzAccount -Tenant $TenantId
         Write-Host "Connected to Azure successfully."
     } catch {
         Write-Host "Error connecting to Azure: $_.Exception.Message"

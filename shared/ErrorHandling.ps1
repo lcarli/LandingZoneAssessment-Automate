@@ -12,7 +12,7 @@
     lramoscostah@microsoft.com
 #>
 
-function Log-Error {
+function Write-ErrorLog {
     param (
         [string]$QuestionID,
         [string]$QuestionText,
@@ -28,7 +28,7 @@ function Log-Error {
         ErrorMessage  = $ErrorMessage
     }
 
-    if (-not (Assess-Path -Path $errorLogPath)) {
+    if (-not (Test-Path -Path $errorLogPath)) {
         $errorEntry | Export-Csv -Path $errorLogPath -NoTypeInformation -Append
     } else {
         $errorEntry | Export-Csv -Path $errorLogPath -NoTypeInformation -Append

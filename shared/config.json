@@ -1,10 +1,14 @@
 {
     "TenantId": "a0fdaeda-034b-4ecd-8043-658e1f0aa1ef",
-    "ContractType": "EnterpriseAgreement",  // Options: EnterpriseAgreement, MicrosoftCustomerAgreement, CloudSolutionProvider
+    "ContractType": "EnterpriseAgreement",  // Options: EnterpriseAgreement, MicrosoftCustomerAgreement, CloudSolutionProvider, MicrosoftEntraIDTenants
     "DesignAreas": {
         "Billing": true,
+        "IAM": false,
+        "ResourceOrganization": false,
+        "Network": false,
+        "Governance": false,
         "Security": false,
-        "Networking": false,
-        "OtherArea": false
+        "DevOps": false,
+        "Management": false
     }
 }

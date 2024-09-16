@@ -22,8 +22,8 @@
 $configPath = "$PSScriptRoot/../shared/config.json"
 $config = Get-Content -Path $configPath | ConvertFrom-Json
 
-# Connect to Azure
-Connect-AzAccount
+#Initialize environment
+Initialize-Environment
 
 # Main function
 function Main {
@@ -31,13 +31,16 @@ function Main {
     Write-Host "Contract Type: $contractType"
 
 
-    # create a customobject with design areas with empty values
     $generalResult = [PSCustomObject]@{
         Billing = @{}
+        IAM =  @{}
+        ResourceOrganization =  @{}
+        Network =  @{}
+        Governance =  @{}
         Security =  @{}
-        Networking =  @{}
+        DevOps =  @{}
+        Management =  @{}
     }
-
 
 
     $designAreas = $config.DesignAreas
@@ -50,11 +53,42 @@ function Main {
     if ($designAreas.ResourceOrganization) {
         $generalResult.ResourceOrganization = Invoke-ResourceOrganizationAssessment -ContractType $contractType
     }
+    if ($designAreas.Network) {
+        $generalResult.Network = Invoke-NetworkAssessment -ContractType $contractType
+    }
+    if ($designAreas.Governance) {     
+        $generalResult.Governance = Invoke-GovernanceAssessment -ContractType $contractType
+    }
+    if ($designAreas.Security) {
+        $generalResult.Security = Invoke-SecurityAssessment -ContractType $contractType
+    }
+    if ($designAreas.DevOps) {
+        $generalResult.DevOps = Invoke-DevOpsAssessment -ContractType $contractType
+    }
+    if ($designAreas.Management) {
+        $generalResult.Management = Invoke-ManagementAssessment -ContractType $contractType
+    }
 
 
-    # Generate report
-    Generate-Report
+    Export-Report -generalResult $generalResult
 }
+
+
+function Export-Report {
+    param (
+        [Parameter(Mandatory=$true)]
+        [PSCustomObject]$generalResult
+    )
+
+    # Create CSV file
+    $csvPath = "$PSScriptRoot/../reports/report.csv"
+    $generalResult | ConvertTo-Csv -NoTypeInformation | Out-File -FilePath $csvPath
+
+    # Create JSON file
+    $jsonPath = "$PSScriptRoot/../reports/report.json"
+    $generalResult | ConvertTo-Json | Out-File -FilePath $jsonPath
+}
+
 
 # Call the main function
 Main

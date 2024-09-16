@@ -14,10 +14,17 @@
 
 enum Status {
     Implemented
-    PartialImplemented
+    PartiallyImplemented
     NotImplemented
     Unknown
-    CheckManually
+    ManualVerificationRequired
     NotApplicable
     Error
+}
+
+enum ContractType {
+    EnterpriseAgreement
+    MicrosoftCustomerAgreement
+    CloudSolutionProvider
+    MicrosoftEntraIDTenants
 }
