@@ -6,7 +6,7 @@
             "request": "launch",
             "name": "Debug DebugFunctions.ps1",
             "script": "${workspaceFolder}/Debug/DebugFunctions.ps1",
-            "args": ["-FunctionName", "Test-QuestionA0401"],
+            "args": ["-FunctionName", "Test-QuestionB0305"],
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false
         }

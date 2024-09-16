@@ -20,6 +20,7 @@ param (
 
 # Import the necessary modules
 . "$PSScriptRoot/../functions/AzureBillingandMicrosoftEntraIDTenants.ps1"
+. "$PSScriptRoot/../functions/IdentityandAccessManagement.ps1"
 . "$PSScriptRoot/../scripts/Initialize.ps1"
 . "$PSScriptRoot/../shared/ErrorHandling.ps1"
 
@@ -29,7 +30,7 @@ Write-Host "Initializing environment..."
 Initialize-Environment
 
 # Function to handle the function execution
-function Assess-Custom {
+function Test-Custom {
     param (
         [string]$functionName
     )
@@ -53,5 +54,5 @@ if (-not $FunctionName) {
     Write-Host "Please provide the function name as a parameter. Example: .\DebugFunctions.ps1 -FunctionName 'Assess-EANotificationContacts'"
     exit
 } else {
-    Assess-Custom -functionName $FunctionName
+    Test-Custom -functionName $FunctionName
 }

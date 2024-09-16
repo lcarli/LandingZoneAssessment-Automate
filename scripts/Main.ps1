@@ -22,8 +22,8 @@
 $configPath = "$PSScriptRoot/../shared/config.json"
 $config = Get-Content -Path $configPath | ConvertFrom-Json
 
-# Connect to Azure
-Connect-AzAccount
+#Initialize environment
+Initialize-Environment
 
 # Main function
 function Main {

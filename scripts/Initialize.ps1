@@ -23,7 +23,8 @@ function Get-AzModules {
         'Az.Portal',
         'Az.ResourceGraph',
         'Az.ManagedServices',
-        'Az.CostManagement'
+        'Az.CostManagement',
+        'Microsoft.Graph'
     )
 
 
