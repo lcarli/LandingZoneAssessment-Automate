@@ -459,8 +459,8 @@ function Test-QuestionB0305 {
 
             # Store user principal names from the role assignments
             foreach ($assignment in $roleAssignments) {
-                if ($assignment.PrincipalType -eq "User") {
-                    $uniqueUsers += $assignment.PrincipalId  # Use PrincipalId to pass to Get-MgUserAuthenticationMethod
+                if ($assignment.ObjectType -eq "User") {
+                    $uniqueUsers += $assignment.ObjectId  # Use PrincipalId to pass to Get-MgUserAuthenticationMethod
                 }
             }
 

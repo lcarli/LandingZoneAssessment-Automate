@@ -68,14 +68,6 @@ function Initialize-Connect {
     }
 
     try {
-        Connect-AzAccount -Tenant $TenantId
-        Write-Host "Connected to Azure successfully."
-    } catch {
-        Write-Host "Error connecting to Azure: $_.Exception.Message"
-        return
-    }
-
-    try {
         $azContext = Get-AzContext
         if ($null -eq $azContext) {
             Write-Host "No existing Azure connection found. Connecting..."
@@ -92,6 +84,22 @@ function Initialize-Connect {
         } catch {
             Write-Host "Error connecting to Azure: $_.Exception.Message"
         }
+    }
+
+
+    # Check if the user is already connected to Microsoft Graph
+    try {
+        $graphContext = Get-MgContext
+        if (-not $graphContext) {
+            Write-Host "You are not connected to Microsoft Graph. Please sign in."
+            Connect-MgGraph
+        } else {
+            Write-Host "You are already connected to Microsoft Graph."
+        }
+    }
+    catch {
+        Write-Host "You are not connected to Microsoft Graph. Please sign in."
+        Connect-MgGraph
     }
 }
 
