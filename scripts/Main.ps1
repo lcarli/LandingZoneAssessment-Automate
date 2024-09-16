@@ -17,13 +17,15 @@
 . "$PSScriptRoot/../functions/Billing.ps1"
 . "$PSScriptRoot/../functions/IAM.ps1"
 . "$PSScriptRoot/../functions/ResourceOrganization.ps1"
+. "$PSScriptRoot/../scripts/Initialize.ps1"
 
 # Load configuration file
 $configPath = "$PSScriptRoot/../shared/config.json"
 $config = Get-Content -Path $configPath | ConvertFrom-Json
 
+Initialize-Environment
 # Connect to Azure
-Connect-AzAccount
+# Connect-AzAccount
 
 # Main function
 function Main {

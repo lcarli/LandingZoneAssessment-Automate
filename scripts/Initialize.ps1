@@ -64,8 +64,9 @@ function Initialize-Connect {
     }
 
     try {
-        $Credential = Get-Credential
-        Connect-AzAccount -Tenant $TenantId -Credential $Credential
+        Write-Host "Authenticating to Azure... $TenantId "
+        # $Credential = Get-Credential
+        Connect-AzAccount -Tenant $TenantId 
         Write-Host "Connected to Azure successfully."
     } catch {
         Write-Host "Error connecting to Azure: $_.Exception.Message"
