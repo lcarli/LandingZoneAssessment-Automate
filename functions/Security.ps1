@@ -1,3 +1,5 @@
+# Security.ps1
+
 <#
 .SYNOPSIS
     Functions related to Security assessment.
@@ -21,11 +23,5 @@ function Invoke-SecurityAssessment {
 
     $results = @()
 
-    # Call individual assessment functions
-
-
-    # Return the results
-
-
-   return $results
+    return $results
 }
