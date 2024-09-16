@@ -39,3 +39,22 @@ function Set-WeightValue {
     
     return $weight
 }
+
+function Invoke-AzGraphQueryWithPagination {
+    param (
+        [string]$Query,
+        [int]$PageSize = 1000
+    )
+
+    $results = @()
+    $skipToken = $null
+
+    do {
+        $response = Search-AzGraph -Query "$Query" -First $PageSize -SkipToken $skipToken
+        $results += $response.Data
+        $skipToken = $response.SkipToken
+    } while ($skipToken)
+
+    return $results
+}
+

@@ -6,7 +6,7 @@
         "Billing": true,
         "IAM": false,
         "ResourceOrganization": false,
-        "Network": false,
+        "Network": true,
         "Governance": false,
         "Security": false,
         "DevOps": false,

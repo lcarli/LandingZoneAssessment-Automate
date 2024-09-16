@@ -29,7 +29,7 @@ function Invoke-NetworkTopologyandConnectivityAssessment {
     return $results
 }
 
-function Test-QuestionD0105 {
+function Test-QuestionResourceGraph {
     [cmdletbinding()]
     param(
         [Parameter(ValueFromPipeline=$true)]
@@ -43,18 +43,25 @@ function Test-QuestionD0105 {
     $score = 0
 
     try {
-
-
-        if ($numberOfTenants -eq 1) {
-
+        $queryResults = Invoke-AzGraphQueryWithPagination -Query "$($checklistItem.graph)" -PageSize 1000
+        if ($queryResults.count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
         }
         else {
-
-            if ($estimatedPercentageApplied -eq 0) {
-                $status = [Status]::NotImplemented
+            if ($queryResults.Compliant -contains 0) {
+                if ($queryResults.Compliant -contains 1){
+                    $status = [Status]::PartiallyImplemented
+                }
+                else {
+                    $status = [Status]::NotImplemented
+                }
+                $compliantCount = $($queryResults.Compliant | Where-Object { $_ -eq 1 }).Count
+                $estimatedPercentageApplied = (($compliantCount / $($queryResults.Compliant).Count) * 100)
             }
             else {
-                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = 100
+                $status = [Status]::Implemented
             }
         }
 
@@ -73,5 +80,6 @@ function Test-QuestionD0105 {
         EstimatedPercentageApplied = $estimatedPercentageApplied
         Weight                     = $weight
         Score                      = $score
+        RawData                    = $queryResults
     }
 }
