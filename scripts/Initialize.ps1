@@ -52,8 +52,6 @@ function Get-AzModules {
     }
 }
 
-
-
 function Initialize-Connect {
     Write-Host "Connecting to Azure..."
     $configPath = "$PSScriptRoot/../shared/config.json"
