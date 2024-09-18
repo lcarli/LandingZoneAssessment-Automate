@@ -28,7 +28,6 @@ function Invoke-NetworkTopologyandConnectivityAssessment {
 
     $results = @()
 
-
     $virtualWANPresent = (Search-AzGraph -Query "Resources | where type =~ 'Microsoft.Network/virtualWans' | project name").Count -gt 0
     $azureFirewallPresent = (Search-AzGraph -Query "Resources | where type =~ 'Microsoft.Network/azureFirewalls' | project name").Count -gt 0
 
@@ -165,7 +164,7 @@ function Test-QuestionD0102 {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
         } 
-        elseif($expressRouteGatewayPresent -or $vpnGatewayPresent -or $azureFirewallPresent -or $nvaPresent -or $privateDnsResolverPresent) {
+        elseif ($expressRouteGatewayPresent -or $vpnGatewayPresent -or $azureFirewallPresent -or $nvaPresent -or $privateDnsResolverPresent) {
             $trueCount = 0
             if ($expressRouteGatewayPresent -or $vpnGatewayPresent) {
                 $trueCount++
