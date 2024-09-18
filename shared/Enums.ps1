@@ -19,6 +19,7 @@ enum Status {
     Unknown
     ManualVerificationRequired
     NotApplicable
+    NotDeveloped
     Error
 }
 
