@@ -19,23 +19,28 @@ Import-Module "$PSScriptRoot/../shared/Enums.ps1"
 Import-Module "$PSScriptRoot/../shared/ErrorHandling.ps1"
 
 function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ContractType,
+        [Parameter(Mandatory = $true)]
+        [PSCustomObject]$AzData
+    )
+
     Write-Host "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..."
 
     $results = @()
-    # Load configuration from config.json
-    $config = Get-Content -Path "$PSScriptRoot/../config.json" | ConvertFrom-Json
 
-    if ($config.ContractType -eq "MicrosoftEntraIDTenants") {
+    if ($ContractType -eq "MicrosoftEntraIDTenants") {
         $results += Test-QuestionA0101
         $results += Test-QuestionA0102
         $results += Test-QuestionA0103
     }
-    elseif ($config.ContractType -eq "CloudSolutionProvider") {
+    elseif ($ContractType -eq "CloudSolutionProvider") {
         $results += Test-QuestionA0201
         $results += Test-QuestionA0202
         $results += Test-QuestionA0203
     }
-    elseif ($config.ContractType -eq "EnterpriseAgreement") {
+    elseif ($ContractType -eq "EnterpriseAgreement") {
         $results += Test-QuestionA0301
         $results += Test-QuestionA0302
         $results += Test-QuestionA0304

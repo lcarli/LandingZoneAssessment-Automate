@@ -21,6 +21,8 @@ param (
 # Import the necessary modules
 . "$PSScriptRoot/../functions/AzureBillingandMicrosoftEntraIDTenants.ps1"
 . "$PSScriptRoot/../functions/IdentityandAccessManagement.ps1"
+. "$PSScriptRoot/../functions/NetworkTopologyandConnectivity.ps1"
+. "$PSScriptRoot/../functions/Management.ps1"
 . "$PSScriptRoot/../scripts/Initialize.ps1"
 . "$PSScriptRoot/../shared/ErrorHandling.ps1"
 
