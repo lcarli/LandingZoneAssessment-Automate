@@ -41,7 +41,10 @@ function Invoke-NetworkTopologyandConnectivityAssessment {
     #Hub and Spoke subcategory
     else {
         #Exception for D01.01 since there's 2 of them in the checklist
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.01") -and ($_.subcategory -eq "Hub and spoke") }) | Test-QuestionD0101
+        $d0101Results += ($Checklist.items | Where-Object { ($_.id -eq "D01.01") -and ($_.subcategory -eq "Hub and spoke") }) | Test-QuestionD0101
+        $results += $d0101Results
+
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.02") }) | Test-QuestionD0102 -rawDataD0101 $($d0101Results.rawData)
 
         $graphItems = $Checklist.items | Where-Object { ($_.category -eq "Network Topology and Connectivity") -and ($_.subcategory -eq "Hub and spoke") -and $_.graph } | ForEach-Object {
             $results += $_ | Test-QuestionAzureResourceGraph
@@ -122,6 +125,75 @@ function Test-QuestionD0101 {
             "VnetSpecialSubnets"          = $vnetSpecialSubnets
             "VnetDevicesWithIPForwarding" = $vnetDevicesWithIPForwarding
         }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
+
+    return $result
+}
+
+function Test-QuestionD0102 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem, 
+        [Object]$rawDataD0101
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    # 
+    try {
+        $estimatedPercentageApplied = 0
+        $hubVirtualNetworkId = $rawDataD0101.MaxPeeringsVnet.id
+        $resourceGraphQuery = "Resources | where type in~ ('Microsoft.Network/expressRouteGateways', 'Microsoft.Network/vpnGateways', 'Microsoft.Network/azureFirewalls', 'Microsoft.Network/networkInterfaces', 'Microsoft.Network/privateDnsResolvers') | where properties.virtualNetwork.id == '$hubVirtualNetworkId' | project type, name, properties.enableIPForwarding"
+        $resources = Search-AzGraph -Query $resourceGraphQuery
+        $expressRouteGatewayPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/expressRouteGateways' } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
+        $vpnGatewayPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/vpnGateways' } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
+        $azureFirewallPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/azureFirewalls' } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
+        $nvaPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/networkInterfaces' -and $_.properties.enableIPForwarding } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
+        $privateDnsResolverPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/privateDnsResolvers' } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
+
+        if (($expressRouteGatewayPresent -or $vpnGatewayPresent) -and ($azureFirewallPresent -or $nvaPresent) -and $privateDnsResolverPresent) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } 
+        elseif($expressRouteGatewayPresent -or $vpnGatewayPresent -or $azureFirewallPresent -or $nvaPresent -or $privateDnsResolverPresent) {
+            $trueCount = 0
+            if ($expressRouteGatewayPresent -or $vpnGatewayPresent) {
+                $trueCount++
+            }
+            if ($azureFirewallPresent -or $nvaPresent) {
+                $trueCount++
+            }
+            if ($privateDnsResolverPresent) {
+                $trueCount++
+            }
+
+            $estimatedPercentageApplied = ($trueCount / 3) * 100
+            $status = [Status]::PartiallyImplemented
+        }
+        else {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        }
+
+        $rawData = @{
+            "HubVirtualNetworkId"        = $hubVirtualNetworkId
+            "ExpressRouteGatewayPresent" = $expressRouteGatewayPresent
+            "VpnGatewayPresent"          = $vpnGatewayPresent
+            "AzureFirewallPresent"       = $azureFirewallPresent
+            "NvaPresent"                 = $nvaPresent
+            "PrivateDnsResolverPresent"  = $privateDnsResolverPresent
+        }
+
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
