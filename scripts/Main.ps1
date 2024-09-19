@@ -17,21 +17,19 @@
 . "$PSScriptRoot/../functions/Billing.ps1"
 . "$PSScriptRoot/../functions/IAM.ps1"
 . "$PSScriptRoot/../functions/ResourceOrganization.ps1"
-. "$PSScriptRoot/../scripts/Initialize.ps1"
+. "$PSScriptRoot/../functions/NetworkTopologyandConnectivity.ps1"
 
 # Load configuration file
 $configPath = "$PSScriptRoot/../shared/config.json"
 $config = Get-Content -Path $configPath | ConvertFrom-Json
 
+#Initialize environment
 Initialize-Environment
-# Connect to Azure
-# Connect-AzAccount
 
 # Main function
 function Main {
     $contractType = $config.ContractType
     Write-Host "Contract Type: $contractType"
-
 
     $generalResult = [PSCustomObject]@{
         Billing = @{}
@@ -44,8 +42,8 @@ function Main {
         Management =  @{}
     }
 
-
     $designAreas = $config.DesignAreas
+
     if ($designAreas.Billing) {     
         $generalResult.Billing = Invoke-BillingAssessment -ContractType $contractType
     }
@@ -56,7 +54,7 @@ function Main {
         $generalResult.ResourceOrganization = Invoke-ResourceOrganizationAssessment -ContractType $contractType
     }
     if ($designAreas.Network) {
-        $generalResult.Network = Invoke-NetworkAssessment -ContractType $contractType
+        $generalResult.Network = Invoke-NetworkTopologyandConnectivityAssessment -Checklist $checklist
     }
     if ($designAreas.Governance) {     
         $generalResult.Governance = Invoke-GovernanceAssessment -ContractType $contractType
@@ -71,10 +69,8 @@ function Main {
         $generalResult.Management = Invoke-ManagementAssessment -ContractType $contractType
     }
 
-
     Export-Report -generalResult $generalResult
 }
-
 
 function Export-Report {
     param (

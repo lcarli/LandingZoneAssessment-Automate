@@ -14,7 +14,7 @@
 
 enum Status {
     Implemented
-    PartialImplemented
+    PartiallyImplemented
     NotImplemented
     Unknown
     ManualVerificationRequired
