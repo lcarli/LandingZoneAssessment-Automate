@@ -66,14 +66,19 @@
             <h3>Overall Checks (Per Design Area)</h3>
             <canvas id="lowRadarChart" width="100%" height="100%"></canvas>
           </div>
-
+          <div class="section chart-xx-large">
+            <h3>Details</h3>
+            <table class="fixed-header-table">
+              <tbody id="table-body-all-items"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </main>
     <!-- Embed JSON data directly in the HTML file -->
     <script>
       const categoryMapping = {
-        "Billing and Microsoft Entra ID Tenants": "Billing",
+        "Azure Billing and Microsoft Entra ID Tenants": "Billing",
         "Identity and Access Management": "IAM",
         "Network Topology and Connectivity": "Network",
         Security: "Security",
@@ -784,10 +789,138 @@
           },
         });
       }
+
+      function getCoveredItems() {
+        const coveredItems = [];
+
+        jsonCheckListData.items.forEach((checkItem) => {
+          const categoryKey = Object.keys(categoryMapping).find((key) => {
+            console.log(
+              `Comparing: ${categoryMapping[key]} with ${checkItem.category}`
+            );
+            return key === checkItem.category;
+          });
+          if (categoryKey) {
+            const reportItems =
+              jsonReportListData[categoryMapping[categoryKey]] || [];
+            const matchedItem = reportItems.find(
+              (reportItem) =>
+                reportItem.id === checkItem.id &&
+                reportItem.Status === Status.Implemented
+            );
+            if (matchedItem) {
+              coveredItems.push({
+                category: categoryKey,
+                subcategory: checkItem.subcategory,
+                status: Object.keys(Status).find(
+                  (key) => Status[key] === matchedItem.Status
+                ),
+                description: checkItem.text,
+                waf: checkItem.waf,
+                service: checkItem.service,
+                id: checkItem.id,
+                severity: checkItem.severity,
+                training: checkItem.training,
+                reference: checkItem.link,
+              });
+            } else {
+              coveredItems.push({
+                category: categoryKey,
+                subcategory: checkItem.subcategory,
+                status: "Open",
+                description: checkItem.text,
+                waf: checkItem.waf,
+                service: checkItem.service,
+                id: checkItem.id,
+                severity: checkItem.severity,
+                training: checkItem.training,
+                reference: checkItem.link,
+              });
+            }
+          }
+        });
+
+        return coveredItems;
+      }
+
+      function populateAllItemsTable() {
+        const tableBody = document.getElementById("table-body-all-items");
+        const coveredItems = getCoveredItems();
+        const categories = [
+          ...new Set(coveredItems.map((item) => item.category)),
+        ];
+
+        categories.forEach((category) => {
+          const headerRow = document.createElement("tr");
+          const headerCell = document.createElement("td");
+          headerCell.colSpan = 10;
+          headerCell.className = "collapsible";
+          headerCell.innerText = category;
+          headerCell.onclick = function () {
+            this.classList.toggle("active");
+            const content = this.parentElement.nextElementSibling;
+            if (content && content.classList.contains("content")) {
+              if (content.style.display === "table-row-group") {
+                content.style.display = "none";
+              } else {
+                content.style.display = "table-row-group";
+              }
+            }
+          };
+          headerRow.appendChild(headerCell);
+          tableBody.appendChild(headerRow);
+
+          const contentRowGroup = document.createElement("tbody");
+          contentRowGroup.className = "content";
+
+          const contentHeaderRow = document.createElement("tr");
+          const headers = [
+            "Category",
+            "Subcategory",
+            "Status",
+            "Description",
+            "WAF Category",
+            "Service",
+            "id",
+            "Severity",
+            "Training",
+            "Reference",
+          ];
+          headers.forEach((headerText) => {
+            const th = document.createElement("th");
+            th.innerText = headerText;
+            contentHeaderRow.appendChild(th);
+          });
+          contentRowGroup.appendChild(contentHeaderRow);
+
+          coveredItems
+            .filter((item) => item.category === category)
+            .forEach((item) => {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `
+            <td>${item.category}</td>
+            <td>${item.subcategory}</td>
+            <td>${item.status}</td>
+            <td>${item.description}</td>
+            <td>${item.waf}</td>
+            <td>${item.service}</td>
+            <td>${item.id}</td>
+            <td>${item.severity}</td>
+            <td><a href="${item.training}">Training</a></td>
+            <td><a href="${item.reference}">Reference</a></td>
+          `;
+              contentRowGroup.appendChild(tr);
+            });
+
+          tableBody.appendChild(contentRowGroup);
+        });
+      }
+
       // Call the function to update the WAF chart when the page loads
       window.onload = function () {
         populateTable();
         updateWAFChart();
+        populateAllItemsTable();
       };
     </script>
   </body>

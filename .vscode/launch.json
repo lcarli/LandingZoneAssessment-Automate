@@ -2,6 +2,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch Chrome against localhost",
+            "type": "chrome",
+            "request": "launch",
+            "url": "http://localhost:8080", // Change this to the URL where your HTML file is served
+            "webRoot": "${workspaceFolder}",
+            "file": "${workspaceFolder}/web/index.html" // Path to your HTML file
+        },
+        {
             "type": "PowerShell",
             "request": "launch",
             "name": "Debug DebugFunctions.ps1",
