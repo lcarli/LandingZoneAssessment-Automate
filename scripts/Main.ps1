@@ -22,7 +22,6 @@
 # Load configuration file
 $configPath = "$PSScriptRoot/../shared/config.json"
 $config = Get-Content -Path $configPath | ConvertFrom-Json
-$checklist = Get-Content -Path "$PSScriptRoot/../shared/$($config.AlzChecklist)" | ConvertFrom-Json
 
 #Initialize environment
 Initialize-Environment

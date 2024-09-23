@@ -1,35 +1,169 @@
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f4f4f4;
-}
-
 header {
-    background-color: #0078d4;
-    color: white;
-    padding: 1rem;
-    text-align: center;
+  background-color: #0078d4;
+  color: white;
+  padding: 20px;
+  text-align: center;
+  border-radius: 8px;
+  grid-column: span 4;
 }
 
 main {
-    padding: 1rem;
+  padding: 1rem;
 }
 
 h1, h2 {
-    margin: 0;
-    padding: 0.5rem 0;
+  margin: 0;
+  padding: 0.5rem 0;
 }
 
 ul {
-    list-style-type: none;
-    padding: 0;
+  list-style-type: none;
+  padding: 0;
 }
 
 li {
-    background: white;
-    margin: 0.5rem 0;
-    padding: 1rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+  background: white;
+  margin: 0.5rem 0;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: #f4f4f4;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-gap: 20px;
+}
+
+.section {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  grid-column: span 4;
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.chart-large {
+  grid-column: span 2;
+}
+
+.chart-x-large {
+  grid-column: span 3;
+}
+
+.chart-xx-large {
+  grid-column: span 4;
+}
+
+.chart-small {
+  grid-column: span 1;
+}
+
+.chart-medium {
+  grid-column: span 2;
+}
+
+.chart-medium-small {
+  grid-column: span 1;
+}
+
+table.styled-table {
+  border-collapse: collapse;
+  margin: 25px 0;
+  font-size: 18px;
+  font-family: 'Arial', sans-serif;
+  width: 100%;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+}
+
+table.styled-table thead tr {
+  background-color: #0078d4;
+  color: #ffffff;
+  text-align: left;
+}
+
+.styled-table th,
+.styled-table td {
+  padding: 12px 15px;
+}
+
+.styled-table tbody tr {
+  border-bottom: 1px solid #dddddd;
+}
+
+.styled-table tbody tr:nth-of-type(even) {
+  background-color: #f3f3f3;
+}
+
+.styled-table tbody tr:last-of-type {
+  border-bottom: 2px solid #009879;
+}
+
+.styled-table tbody tr.active-row {
+  font-weight: bold;
+  color: #009879;
+}
+
+.collapsible {
+  cursor: pointer;
+  padding: 10px;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-size: 15px;
+  background-color: #f1f1f1;
+  width: 100%;
+}
+
+.active, .collapsible:hover {
+  background-color: #ccc;
+}
+
+.content {
+  display: none;
+  overflow: hidden;
+}
+
+.content tr {
+  background-color: #f9f9f9;
+}
+
+.fixed-header-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fixed-header-table thead {
+  background-color: #f2f2f2;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.fixed-header-table th, .fixed-header-table td {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+}
+
+.fixed-header-table th {
+  background-color: #f2f2f2;
+  text-align: left;
+}
+
+.collapsible span {
+  font-weight: bold;
+  margin-right: 10px;
 }
