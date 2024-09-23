@@ -29,6 +29,11 @@ function Invoke-IdentityandAccessManagementAssessment {
     $results += Test-QuestionB0303
     $results += Test-QuestionB0304
     $results += Test-QuestionB0305
+    $results += Test-QuestionB0306
+    $results += Test-QuestionB0307
+    $results += Test-QuestionB0308
+    $results += Test-QuestionB0309
+
 
     return $results
 }
@@ -529,3 +534,268 @@ function Test-QuestionB0305 {
         Score                      = $score
     }
 }
+function Test-QuestionB0306 {
+    Write-Host "Assessing question: Enforce centralized and delegated responsibilities to manage resources deployed inside the landing zone, based on role and security requirements."
+
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $weight = 5  # Assigning high severity weight
+    $score = 0
+
+    try {
+        # Retrieve tenant information and current configurations
+        $config = Get-Content -Path "$PSScriptRoot/../shared/config.json" | ConvertFrom-Json
+        $tenantId = $config.TenantId
+
+        # Assess role assignments across management groups and subscriptions
+        $managementGroups = Get-AzManagementGroup | Where-Object { $_.TenantId -eq $tenantId }
+        $totalGroups = 0
+        $configuredGroups = 0
+        $delegatedGroups = 0
+
+        foreach ($managementGroup in $managementGroups) {
+            $totalGroups++
+            $managementGroupId = $managementGroup.Id
+
+            # Retrieve role assignments for the management group
+            $mgmtGroupRoleAssignments = Get-AzRoleAssignment -Scope "$managementGroupId"
+
+            # Check for centralized (Owner) and delegated roles (Contributor, Reader)
+            $hasOwner = $false
+            $hasDelegated = $false
+            foreach ($roleAssignment in $mgmtGroupRoleAssignments) {
+                if ($roleAssignment.RoleDefinitionName -eq "Owner") {
+                    $hasOwner = $true
+                } elseif ($roleAssignment.RoleDefinitionName -in @("Contributor", "Reader")) {
+                    $hasDelegated = $true
+                }
+            }
+
+            if ($hasOwner) {
+                $configuredGroups++
+            }
+            if ($hasDelegated) {
+                $delegatedGroups++
+            }
+        }
+
+        # Calculate percentage for management groups
+        if ($totalGroups -gt 0) {
+            $mgmtGroupPercentage = ($configuredGroups / $totalGroups) * 100
+            $delegationPercentage = ($delegatedGroups / $totalGroups) * 100
+        } else {
+            $mgmtGroupPercentage = 100
+            $delegationPercentage = 100
+        }
+
+        # Combine the results to determine the overall applied percentage
+        $estimatedPercentageApplied = [Math]::Round(($mgmtGroupPercentage + $delegationPercentage) / 2, 2)
+
+        # Determine status
+        if ($estimatedPercentageApplied -eq 100) {
+            $status = [Status]::Implemented
+        } elseif ($estimatedPercentageApplied -eq 0) {
+            $status = [Status]::NotImplemented
+        } else {
+            $status = [Status]::PartiallyImplemented
+        }
+
+        # Calculate score based on the weight and the percentage applied
+        $score = ($weight * $estimatedPercentageApplied) / 100
+
+    } catch {
+        Log-Error -QuestionID "B03.06" -QuestionText "Enforce centralized and delegated responsibilities to manage resources deployed inside the landing zone." -FunctionName "Test-QuestionB0306" -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $score = 0
+    
+    },
+
+function Test-QuestionB0307 {
+    Write-Host "Assessing question: Enforce Microsoft Entra ID Privileged Identity Management (PIM) to establish zero standing access and least privilege."
+
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $weight = 5  # Adjust as necessary
+    $score = 0
+
+    try {
+        # Connect to Microsoft Graph with appropriate scopes for PIM
+        Connect-MgGraph -Scopes "PrivilegedAccess.Read.AzureAD"
+
+        # Get all PIM roles and check for standing access
+        $pimRoles = Get-MgPrivilegedRoleAssignment | Where-Object { $_.RoleDefinitionName -in @("Global Administrator", "Privileged Role Administrator", "Security Administrator") }
+
+        if ($pimRoles.Count -eq 0) {
+            # No privileged roles found
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+        } else {
+            $totalRoles = $pimRoles.Count
+            $rolesWithNoStandingAccess = 0
+
+            foreach ($role in $pimRoles) {
+                # Check if the role assignment is configured for Just-In-Time (JIT) access
+                if ($role.IsElevated -eq $false) {
+                    $rolesWithNoStandingAccess++
+                }
+            }
+
+            # Calculate the percentage of roles with no standing access
+            if ($rolesWithNoStandingAccess -eq $totalRoles) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($rolesWithNoStandingAccess -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($rolesWithNoStandingAccess / $totalRoles) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            }
+        }
+
+        # Calculate the score
+        $score = ($weight * $estimatedPercentageApplied) / 100
+
+    } catch {
+        Log-Error -QuestionID "B03.07" -QuestionText "Enforce Microsoft Entra ID Privileged Identity Management (PIM)." -FunctionName "Test-QuestionB0307" -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $score = 0
+    }
+
+    # Return result object
+    return [PSCustomObject]@{
+        Status                     = $status.ToString()
+        EstimatedPercentageApplied = $estimatedPercentageApplied
+        Weight                     = $weight
+        Score                      = $score
+    }
+},
+
+function Test-QuestionB0308 {
+    Write-Host "Assessing question: When deploying Active Directory Domain Controllers, use a location with Availability Zones and deploy at least two VMs across these zones. If not available, deploy in an Availability Set."
+
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $weight = 5
+    $score = 0
+
+    try {
+        # Check if Availability Zones are available
+        $availabilityZones = Get-AzAvailabilityZone -Location "YourLocation" # Replace "YourLocation" with the relevant Azure region
+
+        if ($availabilityZones.Count -gt 1) {
+            # Check if at least two VMs are deployed across Availability Zones
+            $vmCount = 0
+
+            # Get all VMs in the subscription
+            $vms = Get-AzVM
+
+            foreach ($vm in $vms) {
+                if ($vm.AvailabilityZone) {
+                    $vmCount++
+                }
+            }
+
+            if ($vmCount -ge 2) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            }
+        } else {
+            # If no Availability Zones, check for Availability Set
+            $availabilitySets = Get-AzAvailabilitySet
+
+            if ($availabilitySets.Count -gt 0) {
+                # If at least one Availability Set exists, assume compliant
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            }
+        }
+
+        # Calculate the score
+        $score = ($weight * $estimatedPercentageApplied) / 100
+
+    } catch {
+        Log-Error -QuestionID "B03.08" -QuestionText "When deploying Active Directory Domain Controllers, use a location with Availability Zones and deploy at least two VMs across these zones. If not available, deploy in an Availability Set." -FunctionName "Test-QuestionB0309" -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $score = 0
+    }
+
+    # Return result object
+    return [PSCustomObject]@{
+        Status                     = $status.ToString()
+        EstimatedPercentageApplied = $estimatedPercentageApplied
+        Weight                     = $weight
+        Score                      = $score
+    }
+}
+function Test-QuestionB0309 {
+    Write-Host "Assessing question: Use Azure custom RBAC roles for key roles to provide fine-grain access across your ALZ: Azure platform owner, network management, security operations, subscription owner, application owner."
+
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $weight = 5
+    $score = 0
+
+    try {
+        # Get all custom roles in the tenant
+        $customRoles = Get-AzRoleDefinition | Where-Object { $_.IsCustom -eq $true }
+
+        # Define key roles that should be customized
+        $requiredRoles = @(
+            "Azure platform owner",
+            "Network management",
+            "Security operations",
+            "Subscription owner",
+            "Application owner"
+        )
+
+        # Check if each required role is represented in custom roles
+        $rolesFound = 0
+        foreach ($role in $requiredRoles) {
+            if ($customRoles.Name -contains $role) {
+                $rolesFound++
+            }
+        }
+
+        # Calculate the percentage of required roles found
+        if ($rolesFound -eq $requiredRoles.Count) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($rolesFound -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($rolesFound / $requiredRoles.Count) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        # Calculate the score
+        $score = ($weight * $estimatedPercentageApplied) / 100
+
+    } catch {
+        Log-Error -QuestionID "B03.9" -QuestionText "Use Azure custom RBAC roles for the following key roles: Azure platform owner, network management, security operations, subscription owner, application owner." -FunctionName "Test-QuestionB0310" -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $score = 0
+    }
+
+    # Return result object
+    return [PSCustomObject]@{
+        Status                     = $status.ToString()
+        EstimatedPercentageApplied = $estimatedPercentageApplied
+        Weight                     = $weight
+        Score                      = $score
+    }
+}
+
