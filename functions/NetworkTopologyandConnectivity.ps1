@@ -22,6 +22,7 @@ Import-Module "$PSScriptRoot/../shared/SharedFunctions.ps1"
 function Invoke-NetworkTopologyandConnectivityAssessment {
     [CmdletBinding()]
     param (
+        [Parameter(Mandatory = $true)]
         [object]$Checklist
     )
     Write-Host "Evaluating the NetworkTopologyandConnectivity design area..."

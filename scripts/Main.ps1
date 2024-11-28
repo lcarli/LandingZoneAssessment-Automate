@@ -45,28 +45,28 @@ function Main {
     $designAreas = $config.DesignAreas
 
     if ($designAreas.Billing) {     
-        $generalResult.Billing = Invoke-BillingAssessment -ContractType $contractType
+        $generalResult.Billing = Invoke-BillingAssessment -Checklist $checklist -ContractType $contractType
     }
     if ($designAreas.IAM) {
-        $generalResult.IAM = Invoke-IAMAssessment -ContractType $contractType
+        $generalResult.IAM = Invoke-IAMAssessment
     }
     if ($designAreas.ResourceOrganization) {
-        $generalResult.ResourceOrganization = Invoke-ResourceOrganizationAssessment -ContractType $contractType
+        $generalResult.ResourceOrganization = Invoke-ResourceOrganizationAssessment
     }
     if ($designAreas.Network) {
-        $generalResult.Network = Invoke-NetworkTopologyandConnectivityAssessment -Checklist $checklist
+        $generalResult.Network = Invoke-NetworkTopologyandConnectivityAssessment -Checklist $checklistPath
     }
     if ($designAreas.Governance) {     
-        $generalResult.Governance = Invoke-GovernanceAssessment -ContractType $contractType
+        $generalResult.Governance = Invoke-GovernanceAssessment -Checklist $checklistPath
     }
     if ($designAreas.Security) {
-        $generalResult.Security = Invoke-SecurityAssessment -ContractType $contractType
+        $generalResult.Security = Invoke-SecurityAssessmen
     }
     if ($designAreas.DevOps) {
-        $generalResult.DevOps = Invoke-DevOpsAssessment -ContractType $contractType
+        $generalResult.DevOps = Invoke-DevOpsAssessment
     }
     if ($designAreas.Management) {
-        $generalResult.Management = Invoke-ManagementAssessment -ContractType $contractType
+        $generalResult.Management = Invoke-ManagementAssessment
     }
 
     Export-Report -generalResult $generalResult

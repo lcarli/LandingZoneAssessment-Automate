@@ -23,7 +23,7 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
         [Parameter(Mandatory = $true)]
         [string]$ContractType,
         [Parameter(Mandatory = $true)]
-        [PSCustomObject]$AzData
+        [object]$Checklist
     )
 
     Write-Host "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..."
@@ -31,27 +31,26 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
     $results = @()
 
     if ($ContractType -eq "MicrosoftEntraIDTenants") {
-        $results += Test-QuestionA0101
-        $results += Test-QuestionA0102
-        $results += Test-QuestionA0103
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A01.01") }) | Test-QuestionA0101
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A01.02") }) | Test-QuestionA0102
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A01.03") }) | Test-QuestionA0103
     }
     elseif ($ContractType -eq "CloudSolutionProvider") {
-        $results += Test-QuestionA0201
-        $results += Test-QuestionA0202
-        $results += Test-QuestionA0203
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.01") }) | Test-QuestionA0201
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.02") }) | Test-QuestionA0202
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.03") }) | Test-QuestionA0203
     }
     elseif ($ContractType -eq "EnterpriseAgreement") {
-        $results += Test-QuestionA0301
-        $results += Test-QuestionA0302
-        $results += Test-QuestionA0304
-        $results += Test-QuestionA0305
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.01") }) | Test-QuestionA0301
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.02") }) | Test-QuestionA0302
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.04") }) | Test-QuestionA0304
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.05") }) | Test-QuestionA0305
     }
-    #MicrosoftCustomerAgreement
     else { 
-        $results += Test-QuestionA0401
-        $results += Test-QuestionA0402
-        $results += Test-QuestionA0403
-        $results += Test-QuestionA0404
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.01") }) | Test-QuestionA0401
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.02") }) | Test-QuestionA0402
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.03") }) | Test-QuestionA0403
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.04") }) | Test-QuestionA0404
     }
 
     return $results
@@ -59,12 +58,13 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
 
 
 function Test-QuestionA0101 {
-    Write-Host "Assessing question: Use one Entra tenant for managing your Azure resources, unless you have a clear regulatory or business requirement for multi-tenants."
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
+    $rawData = $null
 
     try {
         # Check if only one Entra tenant is being used for managing Azure resources
@@ -80,56 +80,50 @@ function Test-QuestionA0101 {
         $uniqueTenantIds = $tenantIds | Select-Object -Unique
         $numberOfTenants = $uniqueTenantIds.Count
 
-        # Total number of subscriptions
-        $totalSubscriptions = $subscriptions.Count
-
-        if ($numberOfTenants -eq 1) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
+        if ($numberOfTenants -gt 1) {
+            $status = [Status]::ManualVerificationRequired
         }
         else {
-            # Calculate the percentage of subscriptions in the most common tenant
-            $tenantIdCounts = $tenantIds | Group-Object | Select-Object Name, Count
-            $mostCommonTenant = $tenantIdCounts | Sort-Object -Property Count -Descending | Select-Object -First 1
-            $percentageInMostCommonTenant = ($mostCommonTenant.Count / $totalSubscriptions) * 100
-            $estimatedPercentageApplied = [Math]::Round($percentageInMostCommonTenant, 2)
-
-            if ($estimatedPercentageApplied -eq 0) {
-                $status = [Status]::NotImplemented
-            }
-            else {
-                $status = [Status]::PartiallyImplemented
-            }
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $score = ($weight * $estimatedPercentageApplied) / 100
         }
 
-        $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            Subscriptions = $subscriptions
+            UniqueTenantIds = $uniqueTenantIds
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A01.01" -QuestionText "Use one Entra tenant for managing your Azure resources, unless you have a clear regulatory or business requirement for multi-tenants." -FunctionName "Test-QuestionA0101" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
 }
 
-
 function Test-QuestionA0102 {
-    Write-Host "Assessing question: Use Multi-Tenant Automation approach to managing your Microsoft Entra ID Tenants."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
+    $rawData = $null
 
     try {
+        # Use Multi-Tenant Automation approach to managing your Microsoft Entra ID Tenants
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/multi-tenant/lighthouse
 
         $subscriptions = Get-AzSubscription
 
@@ -149,31 +143,37 @@ function Test-QuestionA0102 {
             $score = ($weight * $estimatedPercentageApplied) / 100
         }
 
-        
+        $rawData = @{
+            Subscriptions = $subscriptions
+            UniqueTenantIds = $uniqueTenantIds
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A01.02" -QuestionText "Use Multi-Tenant Automation approach to managing your Microsoft Entra ID Tenants." -FunctionName "Test-QuestionA0102" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionA0103 {
-    Write-Host "Assessing question: Use Azure Lighthouse for Multi-Tenant Management with the same IDs."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Check if Azure Lighthouse is used for multi-tenant management with the same IDs
@@ -220,31 +220,38 @@ function Test-QuestionA0103 {
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            LighthouseDefinitions = $lighthouseDefinitions
+            LighthouseAssignments = $lighthouseAssignments
+            SameIdAssignments = $sameIdAssignments
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A01.03" -QuestionText "Use Azure Lighthouse for Multi-Tenant Management with the same IDs." -FunctionName "Test-QuestionA0103" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
 function Test-QuestionA0201 {
-    Write-Host "Assessing question: If you give a partner access to administer your tenant, use Azure Lighthouse."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Verify if a partner has access to administer the tenant and ensure Azure Lighthouse is used
@@ -256,69 +263,62 @@ function Test-QuestionA0201 {
         }
         Import-Module Microsoft.Graph.Identity.DirectoryManagement
 
-        # Connect to Microsoft Graph with necessary scopes
-        $scopes = @('DelegatedAdminRelationship.Read.All', 'Directory.Read.All')
-        Connect-MgGraph -Scopes $scopes
+        # Get the list of service principals (partners) with directory roles
+        $servicePrincipals = Get-MgServicePrincipal -Filter "servicePrincipalType eq 'Partner'"
 
-        # Get all delegated admin relationships (partners with admin access)
-        $delegatedAdmins = Get-MgTenantRelationshipDelegatedAdminRelationship
-
-        if ($delegatedAdmins.Count -eq 0) {
-            # No partners have admin access to the tenant
+        if ($servicePrincipals.Count -eq 0) {
+            # No partners found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
         }
         else {
-            # Partners have admin access; check if Azure Lighthouse is used
-            # Import the Az.ManagedServices module
-            if (-not (Get-Module -ListAvailable -Name 'Az.ManagedServices')) {
-                Install-Module -Name 'Az.ManagedServices' -Scope CurrentUser -Force
-            }
-            Import-Module Az.ManagedServices
-
-            # Get Azure Lighthouse assignments (resource delegations)
+            # Check if Azure Lighthouse is used for partner access
             $lighthouseAssignments = Get-AzManagedServicesAssignment
 
-            if ($lighthouseAssignments.Count -gt 0) {
-                # Azure Lighthouse is being used
-                $status = [Status]::Implemented
-                $estimatedPercentageApplied = 100
-            }
-            else {
-                # Azure Lighthouse is not being used
+            if ($lighthouseAssignments.Count -eq 0) {
+                # Azure Lighthouse is not used
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
+            }
+            else {
+                # Azure Lighthouse is used
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
             }
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            ServicePrincipals = $servicePrincipals
+            LighthouseAssignments = $lighthouseAssignments
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A02.01" -QuestionText "If you give a partner access to administer your tenant, use Azure Lighthouse." -FunctionName "Test-QuestionA0201" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
-    }
-    finally {
-        Disconnect-MgGraph
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionA0202 {
-    Write-Host "Assessing question: If you have a CSP partner, define and document your support request and escalation process."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 1
+    $weight = 3
     $score = 0
+    $rawData = $null
 
     try {
         # Verify if you have a CSP partner
@@ -356,43 +356,50 @@ function Test-QuestionA0202 {
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            Subscriptions = $subscriptions
+            HasCspSubscription = $hasCspSubscription
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A02.02" -QuestionText "If you have a CSP partner, define and document your support request and escalation process." -FunctionName "Test-QuestionA0202" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
 function Test-QuestionA0203 {
-    Write-Host "Assessing question: Setup Cost Reporting and Views with Azure Cost Management."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
+    $rawData = $null
 
     try {
-        # Set up cost reporting and views with Azure Cost Management
+        # Setup Cost Reporting and Views with Azure Cost Management
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-microsoft-customer-agreement#design-recommendations
 
         # Initialize flags
         $hasExports = $false
         $hasBudgets = $false
 
-        # Check for Cost Management Exports at the subscription level
+        # Get all Azure subscriptions
         $subscriptions = Get-AzSubscription
 
+        # Check for Cost Management Exports at the subscription level
         foreach ($subscription in $subscriptions) {
             $exports = Get-AzCostManagementExport -Scope "/subscriptions/$($subscription.Id)" -ErrorAction SilentlyContinue
             if ($exports) {
@@ -403,7 +410,7 @@ function Test-QuestionA0203 {
 
         # Check for Budgets at the subscription level
         foreach ($subscription in $subscriptions) {
-            $budgets = Get-AzConsumptionBudget -ErrorAction SilentlyContinue
+            $budgets = Get-AzConsumptionBudget -Scope "/subscriptions/$($subscription.Id)" -ErrorAction SilentlyContinue
             if ($budgets) {
                 $hasBudgets = $true
                 break
@@ -420,33 +427,43 @@ function Test-QuestionA0203 {
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            Subscriptions = $subscriptions
+            HasExports = $hasExports
+            HasBudgets = $hasBudgets
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A02.03" -QuestionText "Setup Cost Reporting and Views with Azure Cost Management." -FunctionName "Test-QuestionA0203" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
 function Test-QuestionA0301 {
-    Write-Host "Assessing question: Configure Notification Contacts to a group mailbox."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
+    $rawData = $null
 
     try {
+        # Configure Notification Contacts to a group mailbox
+        # Reference: https://learn.microsoft.com/azure/cost-management-billing/manage/direct-ea-administration#manage-notification-contacts
+
         # Get the billing accounts
         $billingAccounts = Get-AzBillingAccount
 
@@ -508,119 +525,127 @@ function Test-QuestionA0301 {
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            BillingAccounts = $billingAccounts
+            ConfiguredAccounts = $configuredAccounts
+            TotalAccounts = $totalAccounts
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A03.01" -QuestionText "Configure Notification Contacts to a group mailbox." -FunctionName "Test-QuestionA0301" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
 function Test-QuestionA0302 {
-    Write-Host "Assessing question: Use departments and accounts to map your organization's structure to your enrollment hierarchy which can help with separating billing."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
+    $rawData = $null
 
     try {
-         # Get the billing accounts
-         $billingAccounts = Get-AzBillingAccount
+        # Use departments and accounts to map your organization's structure to your enrollment hierarchy which can help with separating billing
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-considerations
 
-         if ($billingAccounts.Count -eq 0) {
-             # No billing accounts found
-             $status = [Status]::NotApplicable
-             $estimatedPercentageApplied = 100
-         } else {
-             $totalAccounts = 0
-             $structuredAccounts = 0
- 
-             foreach ($billingAccount in $billingAccounts) {
-                 $billingAccountName = $billingAccount.Name
- 
-                 # For MCA, billing account has 'AccountType' as 'MicrosoftCustomerAgreement'
-                 if ($billingAccount.AccountType -eq 'MicrosoftCustomerAgreement') {
-                     $totalAccounts++
- 
-                     # Get billing profiles for the billing account
-                     $billingProfiles = Get-AzBillingProfile -BillingAccountName $billingAccountName
- 
-                     if ($billingProfiles.Count -gt 0) {
-                         $structuredProfiles = 0
-                         $totalProfiles = $billingProfiles.Count
- 
-                         foreach ($billingProfile in $billingProfiles) {
-                             # Get invoice sections under each billing profile
-                             $invoiceSections = Get-AzInvoiceSection -BillingAccountName $billingAccountName -BillingProfileName $billingProfile.Name
- 
-                             if ($invoiceSections.Count -gt 0) {
-                                 # We consider the billing profile to be mapped/structured if invoice sections exist
-                                 $structuredProfiles++
-                             }
-                         }
- 
-                         if ($structuredProfiles -eq $totalProfiles) {
-                             $structuredAccounts++
-                         }
-                     }
-                 }
-             }
- 
-             if ($totalAccounts -eq 0) {
-                 # No MCA billing accounts found
-                 $status = [Status]::NotApplicable
-                 $estimatedPercentageApplied = 100
-             } elseif ($structuredAccounts -eq $totalAccounts) {
-                 $status = [Status]::Implemented
-                 $estimatedPercentageApplied = 100
-             } elseif ($structuredAccounts -eq 0) {
-                 $status = [Status]::NotImplemented
-                 $estimatedPercentageApplied = 0
-             } else {
-                 $status = [Status]::PartiallyImplemented
-                 $estimatedPercentageApplied = ($structuredAccounts / $totalAccounts) * 100
-                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-             }
-         }
- 
-         $score = ($weight * $estimatedPercentageApplied) / 100
+        # Get the billing accounts
+        $billingAccounts = Get-AzBillingAccount
+
+        if ($billingAccounts.Count -eq 0) {
+            # No billing accounts found
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+        } else {
+            $totalAccounts = 0
+            $structuredAccounts = 0
+
+            foreach ($billingAccount in $billingAccounts) {
+                $billingAccountName = $billingAccount.Name
+
+                # Get billing profiles associated with this billing account
+                $billingProfiles = Get-AzBillingProfile -BillingAccountName $billingAccountName
+
+                foreach ($billingProfile in $billingProfiles) {
+                    # Check for departments and accounts in the billing profile
+                    $departments = $billingProfile.Departments
+                    $accounts = $billingProfile.Accounts
+
+                    if ($departments.Count -gt 0 -and $accounts.Count -gt 0) {
+                        $structuredAccounts++
+                    }
+                }
+                $totalAccounts++
+            }
+
+            if ($totalAccounts -eq 0) {
+                # No billing accounts found
+                $status = [Status]::NotApplicable
+                $estimatedPercentageApplied = 100
+            } elseif ($structuredAccounts -eq $totalAccounts) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($structuredAccounts -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($structuredAccounts / $totalAccounts) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            }
+        }
+
+        $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            BillingAccounts = $billingAccounts
+            StructuredAccounts = $structuredAccounts
+            TotalAccounts = $totalAccounts
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A03.02" -QuestionText "Use departments and accounts to map your organization's structure to your enrollment hierarchy which can help with separating billing." -FunctionName "Test-QuestionA0302" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionA0304 {
-    Write-Host "Assessing question: Enable both DA View Charges and AO View Charges on your EA Enrollments to allow users with the correct perms review Cost and Billing Data."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
+    $rawData = $null
 
     try {
+        # Enable both DA View Charges and AO View Charges on your EA Enrollments to allow users with the correct perms review Cost and Billing Data
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
+
         # Get the billing accounts (EA Enrollment) and relevant scopes
         $billingAccounts = Get-AzBillingAccount
 
@@ -683,34 +708,42 @@ function Test-QuestionA0304 {
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            BillingAccounts = $billingAccounts
+            ConfiguredAccounts = $configuredAccounts
+            TotalAccounts = $totalAccounts
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A03.04" -QuestionText "Enable both DA View Charges and AO View Charges on your EA Enrollments to allow users with the correct perms review Cost and Billing Data." -FunctionName "Test-QuestionA0304" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionA0305 {
-    Write-Host "Assessing question: Use of Enterprise Dev/Test Subscriptions to reduce costs for non-production workloads."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
+    $rawData = $null
 
     try {
         # Ensure use of Enterprise Dev/Test subscriptions for non-production workloads to reduce costs
-        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-considerations
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get all Azure subscriptions
         $subscriptions = Get-AzSubscription
@@ -719,37 +752,25 @@ function Test-QuestionA0305 {
         $totalSubscriptions = $subscriptions.Count
         $devTestSubscriptions = 0
 
-        # List of Dev/Test offer IDs
+        # List of Dev/Test quota IDs for Enterprise Agreement
         $devTestOfferIds = @(
-            'MS-AZR-DEVDTEST-WS'          # Visual Studio Enterprise Subscription
-            'MS-AZR-0062P'                # Enterprise Dev/Test
-            'MS-AZR-0148P'                # Pay-As-You-Go Dev/Test
-            'MS-AZR-0023P'                # Visual Studio Professional Subscription
-            'MS-AZR-0029P'                # Visual Studio Test Professional Subscription
-            'MS-AZR-0036P'                # MSDN Platforms
+            "MS-AZR-0148P",  # Enterprise Dev/Test
+            "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
         )
 
         foreach ($subscription in $subscriptions) {
             # Get subscription details via REST API to get the OfferType
-
             $subscriptionId = $subscription.Id
-
             $accessToken = (Get-AzAccessToken).Token
-
             $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2020-01-01"
-
             $headers = @{
                 Authorization = "Bearer $accessToken"
             }
-
             $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-            $offerId = $response.properties.authorizationSource
 
             if ($devTestOfferIds -contains $response.properties.subscriptionPolicies.quotaId) {
                 $devTestSubscriptions++
             }
-
         }
 
         if ($devTestSubscriptions -eq 0) {
@@ -767,34 +788,42 @@ function Test-QuestionA0305 {
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            Subscriptions = $subscriptions
+            DevTestSubscriptions = $devTestSubscriptions
+            TotalSubscriptions = $totalSubscriptions
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A03.05" -QuestionText "Use of Enterprise Dev/Test Subscriptions to reduce costs for non-production workloads." -FunctionName "Test-QuestionA0305" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionA0401 {
-    Write-Host "Assessing question: Configure Agreement billing account notification contact email."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
+    $rawData = $null
 
     try {
-        # Configure Microsoft Customer Agreement billing account notification contacts
-        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-microsoft-customer-agreement#design-recommendations
+        # Configure Agreement billing account notification contact email
+        # Reference: https://learn.microsoft.com/azure/cost-management-billing/manage/mca-setup-account
 
         # Get the billing accounts
         $billingAccounts = Get-AzBillingAccount
@@ -803,53 +832,38 @@ function Test-QuestionA0401 {
             # No billing accounts found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        }
-        else {
+        } else {
             $totalAccounts = 0
             $configuredAccounts = 0
 
             foreach ($billingAccount in $billingAccounts) {
                 $billingAccountName = $billingAccount.Name
 
-                # For MCA, billing account has 'AccountType' as 'MicrosoftCustomerAgreement'
-                if ($billingAccount.AccountType -eq 'MicrosoftCustomerAgreement') {
-                    $totalAccounts++
+                # Get billing profiles associated with this billing account
+                $billingProfiles = Get-AzBillingProfile -BillingAccountName $billingAccountName
 
-                    # Get billing profiles
-                    $billingProfiles = Get-AzBillingProfile -BillingAccountName $billingAccountName
+                foreach ($billingProfile in $billingProfiles) {
+                    # Check for notification email addresses in the billing profile
+                    $notificationEmails = $billingProfile.InvoiceEmails
 
-                    $configuredProfiles = 0
-                    $totalProfiles = $billingProfiles.Count
-
-                    foreach ($billingProfile in $billingProfiles) {
-                        # Check the notification email settings
-
-                        if ($billingProfile.InvoiceEmailOptIn -eq $true -and $billingProfile.InvoiceEmails -ne $null -and $billingProfile.InvoiceEmails.Count -gt 0) {
-                            # Assume configured
-                            $configuredProfiles++
-                        }
-                    }
-
-                    if ($configuredProfiles -eq $totalProfiles -and $totalProfiles -gt 0) {
+                    if ($notificationEmails.Count -gt 0) {
                         $configuredAccounts++
                     }
                 }
+                $totalAccounts++
             }
 
             if ($totalAccounts -eq 0) {
-                # No MCA billing accounts
+                # No billing accounts found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            }
-            elseif ($configuredAccounts -eq $totalAccounts) {
+            } elseif ($configuredAccounts -eq $totalAccounts) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            }
-            elseif ($configuredAccounts -eq 0) {
+            } elseif ($configuredAccounts -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            }
-            else {
+            } else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($configuredAccounts / $totalAccounts) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -857,35 +871,41 @@ function Test-QuestionA0401 {
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
-
+        $rawData = @{
+            BillingAccounts = $billingAccounts
+            ConfiguredAccounts = $configuredAccounts
+            TotalAccounts = $totalAccounts
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A04.01" -QuestionText "Configure Agreement billing account notification contact email." -FunctionName "Test-QuestionA0401" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
 function Test-QuestionA0402 {
-    Write-Host "Assessing question: Use Billing Profiles and Invoice sections to structure your agreements billing for effective cost management."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
+    $rawData = $null
 
     try {
-        # Use billing profiles and invoice sections to structure agreements for effective cost management
+        # Use Billing Profiles and Invoice sections to structure your agreements billing for effective cost management
         # Reference: https://learn.microsoft.com/azure/cost-management-billing/manage/mca-section-invoice
 
         # Get the billing accounts
@@ -895,8 +915,7 @@ function Test-QuestionA0402 {
             # No billing accounts found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        }
-        else {
+        } else {
             $totalAccounts = 0
             $structuredAccounts = 0
 
@@ -907,23 +926,14 @@ function Test-QuestionA0402 {
                 if ($billingAccount.AccountType -eq 'MicrosoftCustomerAgreement') {
                     $totalAccounts++
 
-                    # Get billing profiles
+                    # Get billing profiles associated with this billing account
                     $billingProfiles = Get-AzBillingProfile -BillingAccountName $billingAccountName
 
-                    if ($billingProfiles.Count -gt 0) {
-                        $structuredProfiles = 0
-                        $totalProfiles = $billingProfiles.Count
+                    foreach ($billingProfile in $billingProfiles) {
+                        # Check for invoice sections in the billing profile
+                        $invoiceSections = Get-AzBillingInvoiceSection -BillingAccountName $billingAccountName -BillingProfileName $billingProfile.Name
 
-                        foreach ($billingProfile in $billingProfiles) {
-                            # Get invoice sections
-                            $invoiceSections = Get-AzInvoiceSection -BillingAccountName $billingAccountName -BillingProfileName $billingProfile.Name
-
-                            if ($invoiceSections.Count -gt 0) {
-                                $structuredProfiles++
-                            }
-                        }
-
-                        if ($structuredProfiles -eq $totalProfiles) {
+                        if ($invoiceSections.Count -gt 0) {
                             $structuredAccounts++
                         }
                     }
@@ -931,19 +941,16 @@ function Test-QuestionA0402 {
             }
 
             if ($totalAccounts -eq 0) {
-                # No MCA billing accounts
+                # No MCA billing accounts found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            }
-            elseif ($structuredAccounts -eq $totalAccounts) {
+            } elseif ($structuredAccounts -eq $totalAccounts) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            }
-            elseif ($structuredAccounts -eq 0) {
+            } elseif ($structuredAccounts -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            }
-            else {
+            } else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($structuredAccounts / $totalAccounts) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -951,35 +958,41 @@ function Test-QuestionA0402 {
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
-
+        $rawData = @{
+            BillingAccounts = $billingAccounts
+            StructuredAccounts = $structuredAccounts
+            TotalAccounts = $totalAccounts
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A04.02" -QuestionText "Use Billing Profiles and Invoice sections to structure your agreements billing for effective cost management." -FunctionName "Test-QuestionA0402" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
 function Test-QuestionA0403 {
-    Write-Host "Assessing question: Make use of Microsoft Azure plan for dev/test offer to reduce costs for non-production workloads."
-    
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
+    $rawData = $null
 
     try {
-        # Make use of the Microsoft Azure plan for dev/test offers
+        # Make use of Microsoft Azure plan for dev/test offer to reduce costs for non-production workloads
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-microsoft-customer-agreement#design-recommendations
 
         # Get all Azure subscriptions
@@ -991,26 +1004,21 @@ function Test-QuestionA0403 {
 
         # List of Dev/Test quota IDs for Microsoft Customer Agreement
         $devTestQuotaIds = @(
-            'AzurePlan_DevTest'   # Quota ID for Microsoft Azure Plan for Dev/Test
+            "MS-AZR-0148P",  # Enterprise Dev/Test
+            "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
         )
 
         foreach ($subscription in $subscriptions) {
-            # Get subscription details via REST API to get the quotaId
+            # Get subscription details via REST API to get the OfferType
             $subscriptionId = $subscription.Id
-
             $accessToken = (Get-AzAccessToken).Token
-
             $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2020-01-01"
-
             $headers = @{
                 Authorization = "Bearer $accessToken"
             }
-
             $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
 
-            $quotaId = $response.properties.subscriptionPolicies.quotaId
-
-            if ($devTestQuotaIds -contains $quotaId) {
+            if ($devTestQuotaIds -contains $response.properties.subscriptionPolicies.quotaId) {
                 $devTestSubscriptions++
             }
         }
@@ -1030,34 +1038,41 @@ function Test-QuestionA0403 {
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            Subscriptions = $subscriptions
+            DevTestSubscriptions = $devTestSubscriptions
+            TotalSubscriptions = $totalSubscriptions
+        }
     }
     catch {
-        Write-ErrorLog -QuestionID "A04.03" -QuestionText "Make use of Microsoft Azure plan for dev/test offer to reduce costs for non-production workloads." -FunctionName "Test-QuestionA0403" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
 function Test-QuestionA0404 {
-    Write-Host "Assessing question: Define and document a process to periodically audit the agreement billing RBAC role assignments to review who has access to your MCA billing account."
-    
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
+    $rawData = $null
 
     try {
-        # Define and document a process to periodically audit RBAC role assignments in billing account
+        # Define and document a process to periodically audit the agreement billing RBAC role assignments to review who has access to your MCA billing account
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-microsoft-customer-agreement#design-recommendations
 
         # Since defining and documenting a process is a manual task that cannot be programmatically verified,
@@ -1068,17 +1083,13 @@ function Test-QuestionA0404 {
         $score = 0
     }
     catch {
-        Write-ErrorLog -QuestionID "A04.04" -QuestionText "Define and document a process to periodically audit the agreement billing RBAC role assignments to review who has access to your MCA billing account." -FunctionName "Test-QuestionA0404" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
