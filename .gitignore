@@ -2,3 +2,4 @@ reports/ErrorLog.csv
 scripts/tmp.json
 logs/*.log
 reports/report.json
+web/index.html

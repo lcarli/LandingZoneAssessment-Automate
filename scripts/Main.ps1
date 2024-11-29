@@ -56,7 +56,7 @@ function Main {
     $designAreas = $config.DesignAreas
 
     if ($designAreas.Billing) {     
-        $generalResult.Billing = Invoke-BillingAssessment -Checklist $global:Checklist -ContractType $contractType
+        $generalResult.Billing = Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment -Checklist $global:Checklist -ContractType $contractType
     }
     if ($designAreas.IAM) {
         $generalResult.IAM = Invoke-IdentityandAccessManagementAssessment -Checklist $global:Checklist
@@ -74,7 +74,7 @@ function Main {
         $generalResult.Security = Invoke-SecurityAssessment -Checklist $global:Checklist
     }
     if ($designAreas.DevOps) {
-        $generalResult.DevOps = Invoke-DevOpsAssessment -Checklist $global:Checklist
+        $generalResult.DevOps = Invoke-PlatformAutomationandDevOpsAssessment -Checklist $global:Checklist
     }
     if ($designAreas.Management) {
         $generalResult.Management = Invoke-ManagementAssessment -Checklist $global:Checklist

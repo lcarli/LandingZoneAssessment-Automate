@@ -762,7 +762,7 @@ function Test-QuestionA0305 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = Get-AzSubscription -TenantId $TenantId
 
         # Initialize counters
         $totalSubscriptions = $subscriptions.Count
@@ -777,17 +777,27 @@ function Test-QuestionA0305 {
         foreach ($subscription in $subscriptions) {
             # Get subscription details via REST API to get the OfferType
             $subscriptionId = $subscription.Id
-            $accessToken = (Get-AzAccessToken).Token
+        
+            # Get the access token securely
+            $accessToken = (Get-AzAccessToken -AsSecureString).Token
+        
+            # Convert SecureString to a plain string for use in the Authorization header
+            $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessToken)
+            )
+        
             $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2020-01-01"
             $headers = @{
-                Authorization = "Bearer $accessToken"
+                Authorization = "Bearer $plainAccessToken"
             }
+        
             $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
+        
             if ($devTestOfferIds -contains $response.properties.subscriptionPolicies.quotaId) {
                 $devTestSubscriptions++
             }
         }
+        
 
         if ($devTestSubscriptions -eq 0) {
             $status = [Status]::NotImplemented

@@ -78,7 +78,7 @@ function Test-QuestionF0101 {
 
     try {
         # Get all subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         if ($subscriptions.Count -eq 0) {
             # No subscriptions found
@@ -91,7 +91,7 @@ function Test-QuestionF0101 {
             $allWorkspaces = @()
 
             foreach ($subscription in $subscriptions) {
-                Set-AzContext -SubscriptionId $subscription.Id
+                Set-AzContext -SubscriptionId $subscription.Id -TenantId $TenantId
 
                 # Get all Log Analytics workspaces in the subscription
                 $workspaces = Get-AzOperationalInsightsWorkspace
@@ -214,7 +214,7 @@ function Test-QuestionF0103 {
 
     try {
         # Get all subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         if ($subscriptions.Count -eq 0) {
             # No subscriptions found
@@ -228,7 +228,7 @@ function Test-QuestionF0103 {
             $totalWorkspacesChecked = 0
 
             foreach ($subscription in $subscriptions) {
-                Set-AzContext -SubscriptionId $subscription.Id
+                Set-AzContext -SubscriptionId $subscription.Id -TenantId $TenantId
 
                 # Get all Log Analytics workspaces in the subscription
                 $workspaces = Get-AzOperationalInsightsWorkspace
