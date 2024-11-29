@@ -87,10 +87,6 @@ function Export-Report {
         [PSCustomObject]$generalResult
     )
 
-    # Create CSV file
-    $csvPath = "$PSScriptRoot/../reports/report.csv"
-    $generalResult | ConvertTo-Csv -NoTypeInformation | Out-File -FilePath $csvPath
-
     # Create JSON file
     $jsonPath = "$PSScriptRoot/../reports/report.json"
     $generalResult | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonPath
