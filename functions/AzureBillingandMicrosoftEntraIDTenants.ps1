@@ -329,14 +329,14 @@ function Test-QuestionA0202 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-cloud-solution-provider#design-recommendations
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         # Initialize flag to indicate presence of CSP subscriptions
         $hasCspSubscription = $false
 
         foreach ($subscription in $subscriptions) {
             # Check the SubscriptionPolicies for the SubscriptionType
-            $subscriptionContext = Get-AzSubscription -SubscriptionId $subscription.Id
+            $subscriptionContext = $subscriptions | Where-Object { ($_.id -eq $subscription.Id) 
             $subscriptionPolicies = $subscriptionContext.SubscriptionPolicies
 
             if ($subscriptionPolicies -and $subscriptionPolicies.SubscriptionType -eq 'CSP') {
@@ -401,7 +401,7 @@ function Test-QuestionA0203 {
         $hasBudgets = $false
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         # Check for Cost Management Exports at the subscription level
         foreach ($subscription in $subscriptions) {
@@ -762,7 +762,7 @@ function Test-QuestionA0305 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription -TenantId $TenantId
+        $subscriptions = $global:AzData.Subscriptions
 
         # Initialize counters
         $totalSubscriptions = $subscriptions.Count
@@ -1030,7 +1030,7 @@ function Test-QuestionA0403 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-microsoft-customer-agreement#design-recommendations
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         # Initialize counters
         $totalSubscriptions = $subscriptions.Count
