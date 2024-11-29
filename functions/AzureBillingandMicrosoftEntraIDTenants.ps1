@@ -28,32 +28,36 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
 
     Write-Host "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..."
 
-    $results = @()
+    Measure-ExecutionTime -ScriptBlock {
+        $results = @()
 
-    if ($ContractType -eq "MicrosoftEntraIDTenants") {
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A01.01") }) | Test-QuestionA0101
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A01.02") }) | Test-QuestionA0102
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A01.03") }) | Test-QuestionA0103
-    }
-    elseif ($ContractType -eq "CloudSolutionProvider") {
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.01") }) | Test-QuestionA0201
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.02") }) | Test-QuestionA0202
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.03") }) | Test-QuestionA0203
-    }
-    elseif ($ContractType -eq "EnterpriseAgreement") {
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.01") }) | Test-QuestionA0301
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.02") }) | Test-QuestionA0302
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.04") }) | Test-QuestionA0304
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.05") }) | Test-QuestionA0305
-    }
-    else { 
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.01") }) | Test-QuestionA0401
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.02") }) | Test-QuestionA0402
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.03") }) | Test-QuestionA0403
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.04") }) | Test-QuestionA0404
-    }
+        if ($ContractType -eq "MicrosoftEntraIDTenants") {
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A01.01") }) | Test-QuestionA0101
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A01.02") }) | Test-QuestionA0102
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A01.03") }) | Test-QuestionA0103
+        }
+        elseif ($ContractType -eq "CloudSolutionProvider") {
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.01") }) | Test-QuestionA0201
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.02") }) | Test-QuestionA0202
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.03") }) | Test-QuestionA0203
+        }
+        elseif ($ContractType -eq "EnterpriseAgreement") {
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.01") }) | Test-QuestionA0301
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.02") }) | Test-QuestionA0302
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.04") }) | Test-QuestionA0304
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.05") }) | Test-QuestionA0305
+        }
+        else { 
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.01") }) | Test-QuestionA0401
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.02") }) | Test-QuestionA0402
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.03") }) | Test-QuestionA0403
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A04.04") }) | Test-QuestionA0404
+        }
 
-    return $results
+        $script:FunctionResult = $results
+    } -FunctionName "Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment"
+
+    return $script:FunctionResult
 }
 
 
@@ -90,7 +94,7 @@ function Test-QuestionA0101 {
         }
 
         $rawData = @{
-            Subscriptions = $subscriptions
+            Subscriptions   = $subscriptions
             UniqueTenantIds = $uniqueTenantIds
         }
     }
@@ -144,7 +148,7 @@ function Test-QuestionA0102 {
         }
 
         $rawData = @{
-            Subscriptions = $subscriptions
+            Subscriptions   = $subscriptions
             UniqueTenantIds = $uniqueTenantIds
         }
     }
@@ -223,7 +227,7 @@ function Test-QuestionA0103 {
         $rawData = @{
             LighthouseDefinitions = $lighthouseDefinitions
             LighthouseAssignments = $lighthouseAssignments
-            SameIdAssignments = $sameIdAssignments
+            SameIdAssignments     = $sameIdAssignments
         }
     }
     catch {
@@ -289,7 +293,7 @@ function Test-QuestionA0201 {
 
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
-            ServicePrincipals = $servicePrincipals
+            ServicePrincipals     = $servicePrincipals
             LighthouseAssignments = $lighthouseAssignments
         }
     }
@@ -357,7 +361,7 @@ function Test-QuestionA0202 {
 
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
-            Subscriptions = $subscriptions
+            Subscriptions      = $subscriptions
             HasCspSubscription = $hasCspSubscription
         }
     }
@@ -429,8 +433,8 @@ function Test-QuestionA0203 {
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
             Subscriptions = $subscriptions
-            HasExports = $hasExports
-            HasBudgets = $hasBudgets
+            HasExports    = $hasExports
+            HasBudgets    = $hasBudgets
         }
     }
     catch {
@@ -471,7 +475,8 @@ function Test-QuestionA0301 {
             # No billing accounts found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAccounts = 0
             $configuredAccounts = 0
 
@@ -511,13 +516,16 @@ function Test-QuestionA0301 {
                 # No billing accounts found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } elseif ($configuredAccounts -eq $totalAccounts) {
+            }
+            elseif ($configuredAccounts -eq $totalAccounts) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($configuredAccounts -eq 0) {
+            }
+            elseif ($configuredAccounts -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($configuredAccounts / $totalAccounts) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -526,9 +534,9 @@ function Test-QuestionA0301 {
 
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
-            BillingAccounts = $billingAccounts
+            BillingAccounts    = $billingAccounts
             ConfiguredAccounts = $configuredAccounts
-            TotalAccounts = $totalAccounts
+            TotalAccounts      = $totalAccounts
         }
     }
     catch {
@@ -569,7 +577,8 @@ function Test-QuestionA0302 {
             # No billing accounts found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAccounts = 0
             $structuredAccounts = 0
 
@@ -595,13 +604,16 @@ function Test-QuestionA0302 {
                 # No billing accounts found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } elseif ($structuredAccounts -eq $totalAccounts) {
+            }
+            elseif ($structuredAccounts -eq $totalAccounts) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($structuredAccounts -eq 0) {
+            }
+            elseif ($structuredAccounts -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($structuredAccounts / $totalAccounts) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -610,9 +622,9 @@ function Test-QuestionA0302 {
 
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
-            BillingAccounts = $billingAccounts
+            BillingAccounts    = $billingAccounts
             StructuredAccounts = $structuredAccounts
-            TotalAccounts = $totalAccounts
+            TotalAccounts      = $totalAccounts
         }
     }
     catch {
@@ -653,7 +665,8 @@ function Test-QuestionA0304 {
             # No billing accounts found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAccounts = 0
             $configuredAccounts = 0
 
@@ -694,13 +707,16 @@ function Test-QuestionA0304 {
                 # No EA billing accounts found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } elseif ($configuredAccounts -eq $totalAccounts) {
+            }
+            elseif ($configuredAccounts -eq $totalAccounts) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($configuredAccounts -eq 0) {
+            }
+            elseif ($configuredAccounts -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($configuredAccounts / $totalAccounts) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -709,9 +725,9 @@ function Test-QuestionA0304 {
 
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
-            BillingAccounts = $billingAccounts
+            BillingAccounts    = $billingAccounts
             ConfiguredAccounts = $configuredAccounts
-            TotalAccounts = $totalAccounts
+            TotalAccounts      = $totalAccounts
         }
     }
     catch {
@@ -746,7 +762,7 @@ function Test-QuestionA0305 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = Get-AzSubscription -TenantId $TenantId
 
         # Initialize counters
         $totalSubscriptions = $subscriptions.Count
@@ -754,24 +770,34 @@ function Test-QuestionA0305 {
 
         # List of Dev/Test quota IDs for Enterprise Agreement
         $devTestOfferIds = @(
-            "MS-AZR-0148P",  # Enterprise Dev/Test
+            "MS-AZR-0148P", # Enterprise Dev/Test
             "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
         )
 
         foreach ($subscription in $subscriptions) {
             # Get subscription details via REST API to get the OfferType
             $subscriptionId = $subscription.Id
-            $accessToken = (Get-AzAccessToken).Token
+        
+            # Get the access token securely
+            $accessToken = (Get-AzAccessToken -AsSecureString).Token
+        
+            # Convert SecureString to a plain string for use in the Authorization header
+            $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessToken)
+            )
+        
             $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2020-01-01"
             $headers = @{
-                Authorization = "Bearer $accessToken"
+                Authorization = "Bearer $plainAccessToken"
             }
+        
             $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
+        
             if ($devTestOfferIds -contains $response.properties.subscriptionPolicies.quotaId) {
                 $devTestSubscriptions++
             }
         }
+        
 
         if ($devTestSubscriptions -eq 0) {
             $status = [Status]::NotImplemented
@@ -789,9 +815,9 @@ function Test-QuestionA0305 {
 
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
-            Subscriptions = $subscriptions
+            Subscriptions        = $subscriptions
             DevTestSubscriptions = $devTestSubscriptions
-            TotalSubscriptions = $totalSubscriptions
+            TotalSubscriptions   = $totalSubscriptions
         }
     }
     catch {
@@ -832,7 +858,8 @@ function Test-QuestionA0401 {
             # No billing accounts found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAccounts = 0
             $configuredAccounts = 0
 
@@ -857,13 +884,16 @@ function Test-QuestionA0401 {
                 # No billing accounts found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } elseif ($configuredAccounts -eq $totalAccounts) {
+            }
+            elseif ($configuredAccounts -eq $totalAccounts) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($configuredAccounts -eq 0) {
+            }
+            elseif ($configuredAccounts -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($configuredAccounts / $totalAccounts) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -872,9 +902,9 @@ function Test-QuestionA0401 {
 
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
-            BillingAccounts = $billingAccounts
+            BillingAccounts    = $billingAccounts
             ConfiguredAccounts = $configuredAccounts
-            TotalAccounts = $totalAccounts
+            TotalAccounts      = $totalAccounts
         }
     }
     catch {
@@ -915,7 +945,8 @@ function Test-QuestionA0402 {
             # No billing accounts found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAccounts = 0
             $structuredAccounts = 0
 
@@ -944,13 +975,16 @@ function Test-QuestionA0402 {
                 # No MCA billing accounts found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } elseif ($structuredAccounts -eq $totalAccounts) {
+            }
+            elseif ($structuredAccounts -eq $totalAccounts) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($structuredAccounts -eq 0) {
+            }
+            elseif ($structuredAccounts -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($structuredAccounts / $totalAccounts) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -959,9 +993,9 @@ function Test-QuestionA0402 {
 
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
-            BillingAccounts = $billingAccounts
+            BillingAccounts    = $billingAccounts
             StructuredAccounts = $structuredAccounts
-            TotalAccounts = $totalAccounts
+            TotalAccounts      = $totalAccounts
         }
     }
     catch {
@@ -1004,7 +1038,7 @@ function Test-QuestionA0403 {
 
         # List of Dev/Test quota IDs for Microsoft Customer Agreement
         $devTestQuotaIds = @(
-            "MS-AZR-0148P",  # Enterprise Dev/Test
+            "MS-AZR-0148P", # Enterprise Dev/Test
             "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
         )
 
@@ -1039,9 +1073,9 @@ function Test-QuestionA0403 {
 
         $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
-            Subscriptions = $subscriptions
+            Subscriptions        = $subscriptions
             DevTestSubscriptions = $devTestSubscriptions
-            TotalSubscriptions = $totalSubscriptions
+            TotalSubscriptions   = $totalSubscriptions
         }
     }
     catch {

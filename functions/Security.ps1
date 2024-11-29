@@ -24,44 +24,47 @@ function Invoke-SecurityAssessment {
         [Parameter(Mandatory = $true)]
         [object]$Checklist
     )
+    Measure-ExecutionTime -ScriptBlock {
+        Write-Host "Evaluating the Security design area..."
 
-    Write-Host "Evaluating the Security design area..."
+        $results = @()
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G01.01") }) | Test-QuestionG0101
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G01.02") }) | Test-QuestionG0102
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.01") }) | Test-QuestionG0201
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.02") }) | Test-QuestionG0202
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.03") }) | Test-QuestionG0203
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.04") }) | Test-QuestionG0204
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.05") }) | Test-QuestionG0205
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.06") }) | Test-QuestionG0206
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.07") }) | Test-QuestionG0207
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.08") }) | Test-QuestionG0208
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.09") }) | Test-QuestionG0209
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.10") }) | Test-QuestionG0210
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.11") }) | Test-QuestionG0211
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.12") }) | Test-QuestionG0212
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.13") }) | Test-QuestionG0213
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.01") }) | Test-QuestionG0301
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.02") }) | Test-QuestionG0302
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.03") }) | Test-QuestionG0303
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.04") }) | Test-QuestionG0304
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.05") }) | Test-QuestionG0305
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.06") }) | Test-QuestionG0306
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.07") }) | Test-QuestionG0307
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.08") }) | Test-QuestionG0308
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.09") }) | Test-QuestionG0309
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.10") }) | Test-QuestionG0310
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.11") }) | Test-QuestionG0311
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.12") }) | Test-QuestionG0312
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G04.01") }) | Test-QuestionG0401
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G04.02") }) | Test-QuestionG0402
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G05.01") }) | Test-QuestionG0501
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G06.01") }) | Test-QuestionG0601
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G06.02") }) | Test-QuestionG0602
 
-    $results = @()
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G01.01") }) | Test-QuestionG0101
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G01.02") }) | Test-QuestionG0102
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.01") }) | Test-QuestionG0201
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.02") }) | Test-QuestionG0202
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.03") }) | Test-QuestionG0203
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.04") }) | Test-QuestionG0204
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.05") }) | Test-QuestionG0205
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.06") }) | Test-QuestionG0206
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.07") }) | Test-QuestionG0207
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.08") }) | Test-QuestionG0208
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.09") }) | Test-QuestionG0209
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.10") }) | Test-QuestionG0210
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.11") }) | Test-QuestionG0211
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.12") }) | Test-QuestionG0212
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.13") }) | Test-QuestionG0213
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.01") }) | Test-QuestionG0301
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.02") }) | Test-QuestionG0302
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.03") }) | Test-QuestionG0303
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.04") }) | Test-QuestionG0304
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.05") }) | Test-QuestionG0305
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.06") }) | Test-QuestionG0306
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.07") }) | Test-QuestionG0307
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.08") }) | Test-QuestionG0308
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.09") }) | Test-QuestionG0309
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.10") }) | Test-QuestionG0310
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.11") }) | Test-QuestionG0311
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.12") }) | Test-QuestionG0312
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G04.01") }) | Test-QuestionG0401
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G04.02") }) | Test-QuestionG0402
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G05.01") }) | Test-QuestionG0501
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G06.01") }) | Test-QuestionG0601
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "G06.02") }) | Test-QuestionG0602
+        $script:FunctionResult = $results
+    } -FunctionName "Invoke-SecurityAssessment"
 
-    return $results
+    return $script:FunctionResult
 }
 
 # Function for Security item G01.01

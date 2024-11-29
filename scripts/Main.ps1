@@ -33,7 +33,9 @@ $configPath = "$PSScriptRoot/../shared/config.json"
 $config = Get-Content -Path $configPath | ConvertFrom-Json
 
 #Initialize environment
-Initialize-Environment
+Measure-ExecutionTime -ScriptBlock {
+    Initialize-Environment
+} -FunctionName "Initialize-Environment"
 
 # Main function
 function Main {
@@ -41,20 +43,20 @@ function Main {
     Write-Host "Contract Type: $contractType"
 
     $generalResult = [PSCustomObject]@{
-        Billing = @()
-        IAM = @()
+        Billing              = @()
+        IAM                  = @()
         ResourceOrganization = @()
-        Network = @()
-        Governance = @()
-        Security = @()
-        DevOps = @()
-        Management = @()
+        Network              = @()
+        Governance           = @()
+        Security             = @()
+        DevOps               = @()
+        Management           = @()
     }
 
     $designAreas = $config.DesignAreas
 
     if ($designAreas.Billing) {     
-        $generalResult.Billing = Invoke-BillingAssessment -Checklist $global:Checklist -ContractType $contractType
+        $generalResult.Billing = Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment -Checklist $global:Checklist -ContractType $contractType
     }
     if ($designAreas.IAM) {
         $generalResult.IAM = Invoke-IdentityandAccessManagementAssessment -Checklist $global:Checklist
@@ -72,24 +74,22 @@ function Main {
         $generalResult.Security = Invoke-SecurityAssessment -Checklist $global:Checklist
     }
     if ($designAreas.DevOps) {
-        $generalResult.DevOps = Invoke-DevOpsAssessment -Checklist $global:Checklist
+        $generalResult.DevOps = Invoke-PlatformAutomationandDevOpsAssessment -Checklist $global:Checklist
     }
     if ($designAreas.Management) {
         $generalResult.Management = Invoke-ManagementAssessment -Checklist $global:Checklist
     }
 
-    Export-Report -generalResult $generalResult
+    Measure-ExecutionTime -ScriptBlock {
+        Export-Report -generalResult $generalResult
+    } -FunctionName "Export-Report"
 }
 
 function Export-Report {
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [PSCustomObject]$generalResult
     )
-
-    # Create CSV file
-    $csvPath = "$PSScriptRoot/../reports/report.csv"
-    $generalResult | ConvertTo-Csv -NoTypeInformation | Out-File -FilePath $csvPath
 
     # Create JSON file
     $jsonPath = "$PSScriptRoot/../reports/report.json"
@@ -102,7 +102,9 @@ function Export-Report {
 
 # Call the main function
 try {
-    Main
+    Measure-ExecutionTime -ScriptBlock {
+        Main
+    } -FunctionName "Main"
 }
 catch {
     Write-Host "An error occurred: $_"

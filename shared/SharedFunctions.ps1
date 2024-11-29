@@ -104,3 +104,23 @@ function Test-QuestionAzureResourceGraph {
 
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $queryResults
 }
+
+function Measure-ExecutionTime {
+    param (
+        [ScriptBlock]$ScriptBlock,
+        [string]$FunctionName = "Unnamed Function"
+    )
+
+    # Record the start time
+    $startTime = Get-Date
+
+    # Execute the script block
+    & $ScriptBlock
+
+    # Record the end time
+    $endTime = Get-Date
+
+    # Calculate and output the duration
+    $executionTime = $endTime - $startTime
+    Write-Host "Function '$FunctionName' Execution Time: $($executionTime.TotalSeconds) seconds"
+}

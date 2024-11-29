@@ -26,153 +26,148 @@ function Invoke-IdentityandAccessManagementAssessment {
     )
 
     Write-Host "Evaluating the Identity and Access Management design area..."
+    Measure-ExecutionTime -ScriptBlock {
+        $results = @()
 
-    $results = @()
+        # Call individual assessment functions
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.01") }) | Test-QuestionB0301
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.02" -and ($_.subcategory -eq "Microsoft Entra ID and Hybrid Identity")) }) | Test-QuestionB0302
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.02" -and ($_.subcategory -eq "Identity")) }) | Test-QuestionB030201
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.03") }) | Test-QuestionB0303
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.04") }) | Test-QuestionB0304
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.05") }) | Test-QuestionB0305
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.06") }) | Test-QuestionB0306
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.07") }) | Test-QuestionB0307
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.09") }) | Test-QuestionB0309
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.10") }) | Test-QuestionB0310
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.11") }) | Test-QuestionB0311
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.12") }) | Test-QuestionB0312
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.13") }) | Test-QuestionB0313
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.14") }) | Test-QuestionB0314
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.15") }) | Test-QuestionB0315
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.16") }) | Test-QuestionB0316
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.17") }) | Test-QuestionB0317
 
-    # Call individual assessment functions
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.01") }) | Test-QuestionB0301
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.02") }) | Test-QuestionB0302
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.03") }) | Test-QuestionB0303
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.04") }) | Test-QuestionB0304
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.05") }) | Test-QuestionB0305
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.06") }) | Test-QuestionB0306
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.07") }) | Test-QuestionB0307
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.09") }) | Test-QuestionB0309
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.10") }) | Test-QuestionB0310
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.11") }) | Test-QuestionB0311
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.12") }) | Test-QuestionB0312
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.13") }) | Test-QuestionB0313
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.14") }) | Test-QuestionB0314
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.15") }) | Test-QuestionB0315
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.16") }) | Test-QuestionB0316
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.17") }) | Test-QuestionB0317
+        $script:FunctionResult = $results
+    } -FunctionName "Invoke-IdentityandAccessManagementAssessment"
 
-    # Return the results
-    return $results
+    return $script:FunctionResult
 }
 
 
 function Test-QuestionB0301 {
-    Write-Host "Assessing question: Enforce a RBAC model that aligns to your cloud operating model. Scope and Assign across Management Groups and Subscriptions."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
-        $config = Get-Content -Path "$PSScriptRoot/../shared/config.json" | ConvertFrom-Json
-        $tenantId = $config.TenantId
 
-        # Get the list of management groups
-        $managementGroups = Get-AzManagementGroup | Where-Object { $_.TenantId -eq $tenantId }
+        # Enforce a RBAC model that aligns to your cloud operating model. Scope and Assign across Management Groups and Subscriptions.
+        # Reference: https://learn.microsoft.com/azure/role-based-access-control/overview
 
-        if ($managementGroups.Count -eq 0) {
-            # No management groups found
+        # Get management groups
+        $managementGroups = Get-AzManagementGroup | Where-Object { $_.TenantId -eq $TenantId }
+        $totalGroups = $managementGroups.Count
+        $configuredGroups = 0
+
+        foreach ($managementGroup in $managementGroups) {
+            $managementGroupId = $managementGroup.Id
+            $mgmtGroupRoleAssignments = Get-AzRoleAssignment -Scope "$managementGroupId"
+
+            if ($mgmtGroupRoleAssignments | Where-Object { $_.RoleDefinitionName -in @("Contributor", "Owner", "Reader") }) {
+                $configuredGroups++
+            }
+        }
+
+        $mgmtGroupPercentage = if ($totalGroups -gt 0) {
+            ($configuredGroups / $totalGroups) * 100
         } else {
-            $totalGroups = 0
-            $configuredGroups = 0
+            100
+        }
 
-            # Loop through each management group
-            foreach ($managementGroup in $managementGroups) {
-                $totalGroups++
-                $managementGroupId = $managementGroup.Id
+        # Get subscriptions
+        $subscriptions = $global:AzData.Subscriptions
+        $totalSubscriptions = $subscriptions.Count
+        $configuredSubscriptions = 0
 
-                # Get the role assignments for the management group
-                $mgmtGroupRoleAssignments = Get-AzRoleAssignment -Scope "$managementGroupId"
+        foreach ($subscription in $subscriptions) {
+            $subscriptionId = $subscription.Id
+            $subscriptionRoleAssignments = Get-AzRoleAssignment -Scope "/subscriptions/$subscriptionId"
 
-                # Ensure that specific roles are applied across the management group
-                $rbacAligned = $false
-
-                # Check if relevant roles such as 'Contributor', 'Owner', or 'Reader' are assigned
-                foreach ($roleAssignment in $mgmtGroupRoleAssignments) {
-                    if ($roleAssignment.RoleDefinitionName -in @("Contributor", "Owner", "Reader")) {
-                        $rbacAligned = $true
-                    }
-                }
-
-                if ($rbacAligned) {
-                    $configuredGroups++
-                }
+            if ($subscriptionRoleAssignments | Where-Object { $_.RoleDefinitionName -in @("Contributor", "Owner", "Reader") }) {
+                $configuredSubscriptions++
             }
+        }
 
-            # Calculate percentage for management groups
-            if ($totalGroups -gt 0) {
-                $mgmtGroupPercentage = ($configuredGroups / $totalGroups) * 100
-            } else {
-                $mgmtGroupPercentage = 100
-            }
+        $subscriptionPercentage = if ($totalSubscriptions -gt 0) {
+            ($configuredSubscriptions / $totalSubscriptions) * 100
+        } else {
+            100
+        }
 
-            # Now handle subscriptions
-            $subscriptions = Get-AzSubscription | Where-Object { $_.TenantId -eq $tenantId }
+        # Calculate overall percentage
+        $estimatedPercentageApplied = [Math]::Round(($mgmtGroupPercentage + $subscriptionPercentage) / 2, 2)
 
-            $totalSubscriptions = $subscriptions.Count
-            $configuredSubscriptions = 0
-
-            # Loop through each subscription
-            foreach ($subscription in $subscriptions) {
-                $subscriptionId = $subscription.Id
-                $subscriptionRoleAssignments = Get-AzRoleAssignment -Scope "/subscriptions/$subscriptionId"
-
-                # Ensure that RBAC roles are appropriately assigned at the subscription level
-                $rbacAligned = $false
-
-                foreach ($roleAssignment in $subscriptionRoleAssignments) {
-                    if ($roleAssignment.RoleDefinitionName -in @("Contributor", "Owner", "Reader")) {
-                        $rbacAligned = $true
-                    }
-                }
-
-                if ($rbacAligned) {
-                    $configuredSubscriptions++
-                }
-            }
-
-            # Calculate percentage for subscriptions
-            if ($totalSubscriptions -gt 0) {
-                $subscriptionPercentage = ($configuredSubscriptions / $totalSubscriptions) * 100
-            } else {
-                $subscriptionPercentage = 100
-            }
-
-            # Combine the results from management groups and subscriptions
-            $estimatedPercentageApplied = ([Math]::Round(($mgmtGroupPercentage + $subscriptionPercentage) / 2, 2))
-
-            # Determine the status based on the applied percentage
-            if ($estimatedPercentageApplied -eq 100) {
-                $status = [Status]::Implemented
-            } elseif ($estimatedPercentageApplied -eq 0) {
-                $status = [Status]::NotImplemented
-            } else {
-                $status = [Status]::PartiallyImplemented
-            }
+        # Determine status
+        if ($estimatedPercentageApplied -eq 100) {
+            $status = [Status]::Implemented
+        } elseif ($estimatedPercentageApplied -eq 0) {
+            $status = [Status]::NotImplemented
+        } else {
+            $status = [Status]::PartiallyImplemented
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
-        Log-Error -QuestionID "B03.01" -QuestionText "Enforce a RBAC model that aligns to your cloud operating model. Scope and Assign across Management Groups and Subscriptions." -FunctionName "Assess-QuestionA0501" -ErrorMessage $_.Exception.Message
+        $rawData = @{
+            ManagementGroups = @{
+                Total       = $totalGroups
+                Configured  = $configuredGroups
+                Percentage  = $mgmtGroupPercentage
+            }
+            Subscriptions = @{
+                Total       = $totalSubscriptions
+                Configured  = $configuredSubscriptions
+                Percentage  = $subscriptionPercentage
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionB0302 {
-    Write-Host "Assessing question: Use managed identities instead of service principals for authentication to Azure services."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Get all service principals
@@ -209,29 +204,37 @@ function Test-QuestionB0302 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
+        # Prepare raw data
+        $rawData = @{
+            TotalServicePrincipals = $totalServicePrincipals
+            ManagedIdentities      = $managedIdentities
+        }
     } catch {
-        Log-Error -QuestionID "B03.02" -QuestionText "Use managed identities instead of service principals for authentication to Azure services." -FunctionName "Assess-QuestionA0601" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionB030201 {
-    Write-Host "Assessing question: Only use the authentication type Work or school account for all account types. Avoid using the Microsoft account."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5  # Adjust the weight as necessary
+    $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Get all Azure AD users
@@ -247,7 +250,7 @@ function Test-QuestionB030201 {
 
             # Check each user account
             foreach ($user in $users) {
-                # A user with a domain not belonging to Microsoft consumer accounts (outlook.com, hotmail.com, live.com) is assumed to be a work or school account
+                # A user with a domain not belonging to Microsoft consumer accounts (outlook.com, hotmail.com, live.com, gmail.com, yahoo.com) is assumed to be a work or school account
                 $userPrincipalName = $user.UserPrincipalName.ToLower()
 
                 if ($userPrincipalName -notmatch "@(outlook.com|hotmail.com|live.com|gmail.com|yahoo.com)$") {
@@ -272,36 +275,41 @@ function Test-QuestionB030201 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
+        # Prepare raw data
+        $rawData = @{
+            TotalUsers                = $totalUsers
+            ValidWorkOrSchoolAccounts = $validWorkOrSchoolAccounts
+        }
     } catch {
-        Log-Error -QuestionID "A03.02-01" -QuestionText "Only use the authentication type Work or school account for all account types. Avoid using the Microsoft account." -FunctionName "Assess-QuestionA0602" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionB0303 {
-    Write-Host "Assessing question: Only use groups to assign permissions across all subscriptions. Add on-premises groups to the Entra ID only group if a group management system is already in place."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5  # Adjust as necessary
+    $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Get all subscriptions in the current tenant
-        $config = Get-Content -Path "$PSScriptRoot/../shared/config.json" | ConvertFrom-Json
-        $tenantId = $config.TenantId
-
-        $subscriptions = Get-AzSubscription | Where-Object { $_.TenantId -eq $tenantId }
+        $subscriptions = $global:AzData.Subscriptions
 
         if ($subscriptions.Count -eq 0) {
             # No subscriptions found
@@ -316,7 +324,7 @@ function Test-QuestionB0303 {
                 $subscriptionId = $subscription.Id
 
                 # Set the context to the current subscription
-                Set-AzContext -SubscriptionId $subscriptionId
+                Set-AzContext -SubscriptionId $subscriptionId -TenantId $TenantId
 
                 Write-Host "Checking role assignments for Subscription ID: $subscriptionId"
 
@@ -336,7 +344,6 @@ function Test-QuestionB0303 {
 
             # Calculate the percentage of group-based assignments
             if ($totalAssignments -eq 0) {
-                # If no assignments found at all
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
             } elseif ($groupAssignments -eq $totalAssignments) {
@@ -355,33 +362,42 @@ function Test-QuestionB0303 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
+        # Prepare raw data
+        $rawData = @{
+            TotalAssignments = $totalAssignments
+            GroupAssignments = $groupAssignments
+            Subscriptions    = $subscriptions | ForEach-Object { $_.Id }
+        }
     } catch {
-        Log-Error -QuestionID "B03.03" -QuestionText "Only use groups to assign permissions. Add on-premises groups to the Entra ID only group if a group management system is already in place." -FunctionName "Assess-QuestionA0603" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionB0304 {
-    Write-Host "Assessing question: Enforce Microsoft Entra ID Conditional Access policies for any user with rights to Azure environments (B03.04)."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Connect to Microsoft Graph
-        Connect-MgGraph -Scopes "Policy.Read.All", "Directory.Read.All"
+        Connect-MgGraph -Scopes "Policy.Read.All", "Directory.Read.All" -TenantId $TenantId
 
         # Get all role assignments for Azure resources
         $roleAssignments = Get-AzRoleAssignment
@@ -398,7 +414,7 @@ function Test-QuestionB0304 {
             # Get all Conditional Access policies
             $conditionalAccessPolicies = Get-MgConditionalAccessPolicy
 
-            # Store user principal names from the role assignments
+            # Store unique user principal names from role assignments
             foreach ($assignment in $roleAssignments) {
                 if ($assignment.PrincipalType -eq "User") {
                     $uniqueUsers += $assignment.PrincipalName
@@ -438,28 +454,39 @@ function Test-QuestionB0304 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
+        # Prepare raw data
+        $rawData = @{
+            TotalAssignments         = $totalAssignments
+            UniqueUsers              = $uniqueUsers
+            UsersCoveredByPolicies   = $usersCoveredByPolicies
+            ConditionalAccessPolicies = $conditionalAccessPolicies
+        }
     } catch {
-        Log-Error -QuestionID "B03.04" -QuestionText "Enforce Microsoft Entra ID Conditional Access policies for any user with rights to Azure environments." -FunctionName "Assess-QuestionB0304" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
+
 function Test-QuestionB0305 {
-    Write-Host "Assessing question: Enforce multi-factor authentication for any user with rights to the Azure environments (B03.05)."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5  # Adjust as necessary
+    $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Get all role assignments for Azure resources
@@ -474,10 +501,10 @@ function Test-QuestionB0305 {
             $usersWithMFA = 0
             $uniqueUsers = @()
 
-            # Store user principal names from the role assignments
+            # Store unique user principal IDs from role assignments
             foreach ($assignment in $roleAssignments) {
                 if ($assignment.ObjectType -eq "User") {
-                    $uniqueUsers += $assignment.ObjectId  # Use PrincipalId to pass to Get-MgUserAuthenticationMethod
+                    $uniqueUsers += $assignment.ObjectId  # Use ObjectId to check MFA methods
                 }
             }
 
@@ -494,7 +521,8 @@ function Test-QuestionB0305 {
                     if ($mfaMethods.Count -gt 0) {
                         $isMFAEnabled = $true
                     }
-                } catch {
+                }
+                catch {
                     Write-Host "Failed to get MFA methods for user: $userId" -ForegroundColor Yellow
                 }
 
@@ -531,37 +559,42 @@ function Test-QuestionB0305 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
+        # Prepare raw data
+        $rawData = @{
+            TotalAssignments = $totalAssignments
+            UsersWithMFA     = $usersWithMFA
+            UniqueUsers      = $uniqueUsers
+        }
     } catch {
-        Log-Error -QuestionID "B03.05" -QuestionText "Enforce multi-factor authentication for any user with rights to the Azure environments." -FunctionName "Assess-QuestionB0305" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionB0306 {
-    Write-Host "Assessing question: Enforce centralized and delegated responsibilities to manage resources deployed inside the landing zone, based on role and security requirements."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5  # Assigning high severity weight
+    $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
-        # Retrieve tenant information and current configurations
-        $config = Get-Content -Path "$PSScriptRoot/../shared/config.json" | ConvertFrom-Json
-        $tenantId = $config.TenantId
-
-        # Assess role assignments across management groups and subscriptions
-        $managementGroups = Get-AzManagementGroup | Where-Object { $_.TenantId -eq $tenantId }
+        # Assess role assignments across management groups
+        $managementGroups = Get-AzManagementGroup | Where-Object { $_.TenantId -eq $TenantId }
         $totalGroups = 0
         $configuredGroups = 0
         $delegatedGroups = 0
@@ -576,6 +609,7 @@ function Test-QuestionB0306 {
             # Check for centralized (Owner) and delegated roles (Contributor, Reader)
             $hasOwner = $false
             $hasDelegated = $false
+
             foreach ($roleAssignment in $mgmtGroupRoleAssignments) {
                 if ($roleAssignment.RoleDefinitionName -eq "Owner") {
                     $hasOwner = $true
@@ -616,26 +650,44 @@ function Test-QuestionB0306 {
         # Calculate score based on the weight and the percentage applied
         $score = ($weight * $estimatedPercentageApplied) / 100
 
+        # Prepare raw data
+        $rawData = @{
+            TotalGroups          = $totalGroups
+            ConfiguredGroups     = $configuredGroups
+            DelegatedGroups      = $delegatedGroups
+            ManagementGroupPercentage = $mgmtGroupPercentage
+            DelegationPercentage = $delegationPercentage
+        }
     } catch {
-        Log-Error -QuestionID "B03.06" -QuestionText "Enforce centralized and delegated responsibilities to manage resources deployed inside the landing zone." -FunctionName "Test-QuestionB0306" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
-    
+        $rawData = $_.Exception.Message
     }
+
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionB0307 {
-    Write-Host "Assessing question: Enforce Microsoft Entra ID Privileged Identity Management (PIM) to establish zero standing access and least privilege."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5  # Adjust as necessary
+    $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Connect to Microsoft Graph with appropriate scopes for PIM
-        Connect-MgGraph -Scopes "PrivilegedAccess.Read.AzureAD"
+        Connect-MgGraph -Scopes "PrivilegedAccess.Read.AzureAD" -TenantId $TenantId
 
         # Get all PIM roles and check for standing access
         $pimRoles = Get-MgPrivilegedRoleAssignment | Where-Object { $_.RoleDefinitionName -in @("Global Administrator", "Privileged Role Administrator", "Security Administrator") }
@@ -672,39 +724,47 @@ function Test-QuestionB0307 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
+        # Prepare raw data
+        $rawData = @{
+            TotalRoles                = $totalRoles
+            RolesWithNoStandingAccess = $rolesWithNoStandingAccess
+            PrivilegedRoles           = $pimRoles
+        }
     } catch {
-        Log-Error -QuestionID "B03.07" -QuestionText "Enforce Microsoft Entra ID Privileged Identity Management (PIM)." -FunctionName "Test-QuestionB0307" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionB0308 {
-    Write-Host "Assessing question: When deploying Active Directory Domain Controllers, use a location with Availability Zones and deploy at least two VMs across these zones. If not available, deploy in an Availability Set."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Check if Availability Zones are available
-        $availabilityZones = Get-AzAvailabilityZone -Location "YourLocation" # Replace "YourLocation" with the relevant Azure region
+        $location = "YourLocation" # Replace "YourLocation" with the relevant Azure region
+        $availabilityZones = Get-AzAvailabilityZone -Location $location
 
         if ($availabilityZones.Count -gt 1) {
             # Check if at least two VMs are deployed across Availability Zones
             $vmCount = 0
-
-            # Get all VMs in the subscription
             $vms = Get-AzVM
 
             foreach ($vm in $vms) {
@@ -725,7 +785,6 @@ function Test-QuestionB0308 {
             $availabilitySets = Get-AzAvailabilitySet
 
             if ($availabilitySets.Count -gt 0) {
-                # If at least one Availability Set exists, assume compliant
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
             } else {
@@ -737,29 +796,39 @@ function Test-QuestionB0308 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
+        # Prepare raw data
+        $rawData = @{
+            Location              = $location
+            AvailabilityZones     = $availabilityZones.Count
+            VirtualMachinesInZones = $vmCount
+            AvailabilitySets      = $availabilitySets.Count
+        }
     } catch {
-        Log-Error -QuestionID "B03.08" -QuestionText "When deploying Active Directory Domain Controllers, use a location with Availability Zones and deploy at least two VMs across these zones. If not available, deploy in an Availability Set." -FunctionName "Test-QuestionB0309" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionB0309 {
-    Write-Host "Assessing question: Use Azure custom RBAC roles for key roles to provide fine-grain access across your ALZ: Azure platform owner, network management, security operations, subscription owner, application owner."
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
+    $rawData = $null
 
     try {
         # Get all custom roles in the tenant
@@ -776,9 +845,12 @@ function Test-QuestionB0309 {
 
         # Check if each required role is represented in custom roles
         $rolesFound = 0
+        $foundRoles = @()
+
         foreach ($role in $requiredRoles) {
             if ($customRoles.Name -contains $role) {
                 $rolesFound++
+                $foundRoles += $role
             }
         }
 
@@ -798,48 +870,22 @@ function Test-QuestionB0309 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
+        # Prepare raw data
+        $rawData = @{
+            RequiredRoles = $requiredRoles
+            FoundRoles    = $foundRoles
+            CustomRoles   = $customRoles
+        }
     } catch {
-        Log-Error -QuestionID "B03.9" -QuestionText "Use Azure custom RBAC roles for the following key roles: Azure platform owner, network management, security operations, subscription owner, application owner." -FunctionName "Test-QuestionB0310" -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $score = 0
-    }
-
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status.ToString()
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
-}
-
-# Function for IAM item B03.09
-function Test-QuestionB0309 {
-    [cmdletbinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-
-    try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
+        $score = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for IAM item B03.10

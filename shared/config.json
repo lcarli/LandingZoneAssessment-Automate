@@ -1,16 +1,16 @@
 {
-    "TenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3",
+    "TenantId": "822a77c9-b7c5-4a10-808d-4a449157d0da", //MCAPS 16b3c013-d300-468d-ac64-7eda0820b6d3
     "DefaultSubscriptionId": "",
     "ContractType": "EnterpriseAgreement",  // Options: EnterpriseAgreement, MicrosoftCustomerAgreement, CloudSolutionProvider, MicrosoftEntraIDTenants
     "AlzChecklist": "alz_checklist.en.json",
     "DesignAreas": {
-        "Billing": false,
-        "IAM": false,
-        "ResourceOrganization": false,
+        "Billing": true,
+        "IAM": true,
+        "ResourceOrganization": true,
         "Network": false,
         "Governance": true,
-        "Security": false,
-        "DevOps": false,
-        "Management": false
+        "Security": true,
+        "DevOps": true,
+        "Management": true
     }
 }

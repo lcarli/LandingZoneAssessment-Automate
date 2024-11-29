@@ -24,23 +24,26 @@ function Invoke-PlatformAutomationandDevOpsAssessment {
         [Parameter(Mandatory = $true)]
         [object]$Checklist
     )
+    Measure-ExecutionTime -ScriptBlock {
+        $results = @()
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.01") }) | Test-QuestionH0101
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.02") }) | Test-QuestionH0102
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.03") }) | Test-QuestionH0103
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.04") }) | Test-QuestionH0104
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.05") }) | Test-QuestionH0105
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.06") }) | Test-QuestionH0106
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.07") }) | Test-QuestionH0107
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H02.01") }) | Test-QuestionH0201
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H02.02") }) | Test-QuestionH0202
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H02.03") }) | Test-QuestionH0203
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H02.04") }) | Test-QuestionH0204
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H03.01") }) | Test-QuestionH0301
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "H04.01") }) | Test-QuestionH0401
 
-    $results = @()
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.01")  }) | Test-QuestionH0101
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.02")  }) | Test-QuestionH0102
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.03")  }) | Test-QuestionH0103
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.04")  }) | Test-QuestionH0104
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.05")  }) | Test-QuestionH0105
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.06")  }) | Test-QuestionH0106
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.07")  }) | Test-QuestionH0107
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H02.01")  }) | Test-QuestionH0201
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H02.02")  }) | Test-QuestionH0202
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H02.03")  }) | Test-QuestionH0203
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H02.04")  }) | Test-QuestionH0204
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H03.01")  }) | Test-QuestionH0301
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "H04.01")  }) | Test-QuestionH0401
+        $script:FunctionResult = $results
+    } -FunctionName "Invoke-PlatformAutomationandDevOpsAssessment"
 
-    return $results
+    return $script:FunctionResult
 }
 
 # Function for Platform Automation and DevOps item H01.01

@@ -25,21 +25,25 @@ function Invoke-GovernanceAssessment {
         [object]$Checklist
     )
 
-    $results = @()
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.01")  }) | Test-QuestionE0101
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.03")  }) | Test-QuestionE0103
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.04")  }) | Test-QuestionE0104
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.05")  }) | Test-QuestionE0105
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.06")  }) | Test-QuestionE0106
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.07")  }) | Test-QuestionE0107
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.08")  }) | Test-QuestionE0108
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.09")  }) | Test-QuestionE0109
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.10")  }) | Test-QuestionE0110
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.11")  }) | Test-QuestionE0111
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.12")  }) | Test-QuestionE0112
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.13")  }) | Test-QuestionE0113
+    Measure-ExecutionTime -ScriptBlock {
+        $results = @()
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.01") }) | Test-QuestionE0101
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.03") }) | Test-QuestionE0103
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.04") }) | Test-QuestionE0104
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.05") }) | Test-QuestionE0105
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.06") }) | Test-QuestionE0106
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.07") }) | Test-QuestionE0107
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.08") }) | Test-QuestionE0108
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.09") }) | Test-QuestionE0109
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.10") }) | Test-QuestionE0110
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.11") }) | Test-QuestionE0111
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.12") }) | Test-QuestionE0112
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.13") }) | Test-QuestionE0113
 
-    return $results
+        $script:FunctionResult = $results
+    } -FunctionName "Invoke-GovernanceAssessment"
+
+    return $script:FunctionResult
 }
 
 # Function for Governance item E01.01
