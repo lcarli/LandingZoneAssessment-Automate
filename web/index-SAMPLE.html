@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Review Checklist</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Azure Review Checklist</h1>
+    </header>
+    <main>
+      <section>
+        <div class="container">
+          <div class="section header">Review Status</div>
+
+          <!-- Large Chart (Overall Status) -->
+          <div class="section chart-x-large">
+            <h3>Status (Overall)</h3>
+            <table class="styled-table">
+              <thead>
+                <tr>
+                  <th>Severity</th>
+                  <th>Implemented</th>
+                  <th>Partial Implemented</th>
+                  <th>Not Implemented</th>
+                  <th>Unknown</th>
+                  <th>Manual Verification Required</th>
+                  <th>Not Applicable</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody id="table-body-overall"></tbody>
+            </table>
+          </div>
+
+          <div class="section chart-small">
+            <h3>Status (Overall)</h3>
+            <canvas id="designAreaPieChart" width="100%" height="100%"></canvas>
+          </div>
+
+          <div class="section chart-medium">
+            <h3>Status (Per category)</h3>
+            <table class="styled-table">
+              <thead>
+                <tr>
+                  <td>Category</td>
+                  <td>Not verified</td>
+                  <td>Open</td>
+                  <td>Closed</td>
+                  <td>Total</td>
+                  <td>Progress</td>
+                </tr>
+              </thead>
+              <tbody id="table-body-category"></tbody>
+            </table>
+            <canvas id="wafChart" width="100%" height="100%"></canvas>
+          </div>
+
+          <div class="section chart-medium">
+            <h3>Overall Checks (Per Design Area)</h3>
+            <canvas id="lowRadarChart" width="100%" height="100%"></canvas>
+          </div>
+          <div class="section chart-xx-large">
+            <h3>Details</h3>
+            <table class="fixed-header-table">
+              <tbody id="table-body-all-items"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const jsonReportListData = {
+        __REPORTLISTDATA__
+      };
+
+      const Status = {
+        Implemented: 1,
+        PartialImplemented: 2,
+        NotImplemented: 3,
+        Unknown: 4,
+        ManualVerificationRequired: 5,
+        NotApplicable: 6,
+        Error: 7,
+      };
+
+      function extractChecklistItems() {
+        const items = [];
+        Object.values(jsonReportListData).forEach((category) => {
+          (category || []).forEach((item) => {
+            if (item.RawSource) {
+              items.push(item.RawSource);
+            }
+          });
+        });
+        return items;
+      }
+
+      function calculateStatusData() {
+        const checklistItems = extractChecklistItems();
+        const statusCounts = {
+          High: {
+            Implemented: 0,
+            PartialImplemented: 0,
+            NotImplemented: 0,
+            Unknown: 0,
+            ManualVerificationRequired: 0,
+            NotApplicable: 0,
+            Error: 0,
+          },
+          Medium: {
+            Implemented: 0,
+            PartialImplemented: 0,
+            NotImplemented: 0,
+            Unknown: 0,
+            ManualVerificationRequired: 0,
+            NotApplicable: 0,
+            Error: 0,
+          },
+          Low: {
+            Implemented: 0,
+            PartialImplemented: 0,
+            NotImplemented: 0,
+            Unknown: 0,
+            ManualVerificationRequired: 0,
+            NotApplicable: 0,
+            Error: 0,
+          },
+          Unknown: {
+            Implemented: 0,
+            PartialImplemented: 0,
+            NotImplemented: 0,
+            Unknown: 0,
+            ManualVerificationRequired: 0,
+            NotApplicable: 0,
+            Error: 0,
+          },
+        };
+
+        checklistItems.forEach((item) => {
+          const severity = item.severity || "Unknown";
+          const statusKey = item.Status || "Unknown";
+
+          if (!statusCounts[severity]) {
+            statusCounts[severity] = {
+              Implemented: 0,
+              PartialImplemented: 0,
+              NotImplemented: 0,
+              Unknown: 0,
+              ManualVerificationRequired: 0,
+              NotApplicable: 0,
+              Error: 0,
+            };
+          }
+          statusCounts[severity][statusKey]++;
+        });
+
+        return statusCounts;
+      }
+
+      function populateTable() {
+        const tableBody = document.getElementById("table-body-overall");
+        const statusData = calculateStatusData();
+
+        Object.keys(statusData).forEach((severity) => {
+          const row = statusData[severity];
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${severity}</td>
+            <td>${row.Implemented}</td>
+            <td>${row.PartialImplemented}</td>
+            <td>${row.NotImplemented}</td>
+            <td>${row.Unknown}</td>
+            <td>${row.ManualVerificationRequired}</td>
+            <td>${row.NotApplicable}</td>
+            <td>${row.Error}</td>
+          `;
+          tableBody.appendChild(tr);
+        });
+
+        // Update charts
+        updatePieChart(statusData);
+        populateCategoryTable();
+      }
+
+      function populateAllItemsTable() {
+        const tableBody = document.getElementById("table-body-all-items");
+        const checklistItems = extractChecklistItems();
+
+        checklistItems.forEach((item) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${item.category}</td>
+            <td>${item.subcategory}</td>
+            <td>${item.text}</td>
+            <td>${item.waf}</td>
+            <td>${item.service}</td>
+            <td>${item.id}</td>
+            <td>${item.severity}</td>
+            <td><a href="${item.training}">Training</a></td>
+            <td><a href="${item.link}">Reference</a></td>
+          `;
+          tableBody.appendChild(tr);
+        });
+      }
+
+      window.onload = function () {
+        populateTable();
+        populateAllItemsTable();
+      };
+    </script>
+  </body>
+</html>

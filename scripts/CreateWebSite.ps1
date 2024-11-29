@@ -1,3 +1,6 @@
+# Function to generate the HTML <head> section
+function Generate-HTMLHead {
+    @"
 <!DOCTYPE html>
 <html lang='en'>
   <head>
@@ -8,10 +11,21 @@
     <script src='https://d3js.org/d3.v7.min.js'></script>
     <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
   </head>
-<body>
+"@
+}
+
+# Function to generate the header section
+function Generate-HTMLHeader {
+    @"
 <header>
   <h1>Azure Review Checklist</h1>
 </header>
+"@
+}
+
+# Function to generate the main content section
+function Generate-MainSection {
+    @"
 <main>
   <section>
     <div class='container'>
@@ -74,280 +88,15 @@
     </div>
   </section>
 </main>
-<script>
-const jsonReportListData =
-    {
-  "Billing": [],
-  "IAM": [],
-  "ResourceOrganization": [],
-  "Network": [],
-  "Governance": [
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.01",
-      "QuestionText": "Leverage Azure Policy strategically, define controls for your environment, using Policy Initiatives to group related policies.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "Leverage Azure Policy strategically, define controls for your environment, using Policy Initiatives to group related policies.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "5c986cb2-9131-456a-8247-6e49f541acdc",
-        "id": "E01.01",
-        "severity": "High",
-        "link": "https://learn.microsoft.com/azure/governance/policy/overview",
-        "training": "https://learn.microsoft.com/training/modules/configure-azure-policy/"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": null,
-      "QuestionText": null,
-      "RawData": "In development",
-      "RawSource": null
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.03",
-      "QuestionText": "Map regulatory and compliance requirements to Azure Policy definitions and Azure role assignments.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "Map regulatory and compliance requirements to Azure Policy definitions and Azure role assignments.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "d8a2adb1-17d6-4326-af62-5ca44e5695f2",
-        "id": "E01.03",
-        "severity": "Medium",
-        "link": "https://learn.microsoft.com/azure/governance/policy/overview",
-        "training": "https://learn.microsoft.com/training/modules/governance-security/"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.04",
-      "QuestionText": "Establish Azure Policy definitions at the intermediate root management group so that they can be assigned at inherited scopes.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "Establish Azure Policy definitions at the intermediate root management group so that they can be assigned at inherited scopes.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "223ace8c-b123-408c-a501-7f154e3ab369",
-        "id": "E01.04",
-        "severity": "Medium",
-        "link": "https://learn.microsoft.com/azure/governance/policy/overview",
-        "training": "https://learn.microsoft.com/training/modules/configure-azure-policy/"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.05",
-      "QuestionText": "Manage policy assignments at the highest appropriate level with exclusions at bottom levels, if required.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "Manage policy assignments at the highest appropriate level with exclusions at bottom levels, if required.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "3829e7e3-1618-4368-9a04-77a209945bda",
-        "id": "E01.05",
-        "severity": "High",
-        "link": "https://learn.microsoft.com/azure/governance/policy/overview",
-        "training": "https://learn.microsoft.com/training/modules/configure-azure-policy/"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.06",
-      "QuestionText": "Use Azure Policy to control which services users can provision at the subscription/management group level.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "Use Azure Policy to control which services users can provision at the subscription/management group level.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "43334f24-9116-4341-a2ba-527526944008",
-        "id": "E01.06",
-        "severity": "Low",
-        "link": "https://learn.microsoft.com/security/benchmark/azure/mcsb-asset-management#am-2-use-only-approved-services",
-        "training": "https://learn.microsoft.com/training/modules/configure-azure-policy/"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.07",
-      "QuestionText": "Use built-in policies where possible to minimize operational overhead.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "Use built-in policies where possible to minimize operational overhead.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "be7d7e48-4327-46d8-adc0-55bcf619e8a1",
-        "id": "E01.07",
-        "severity": "High",
-        "link": "https://learn.microsoft.com/azure/governance/policy/overview",
-        "training": "https://learn.microsoft.com/training/modules/configure-azure-policy/"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.08",
-      "QuestionText": "Assign the built-in Resource Policy Contributor role at a particular scope to enable application-level governance.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "Assign the built-in Resource Policy Contributor role at a particular scope to enable application-level governance.",
-        "description": "Assigning the Resource Policy Contributor role to specific scopes allows you to delegate policy management to relevant teams. For instance, a central IT team may oversee management group-level policies, while application teams handle policies for their subscriptions, enabling distributed governance with adherence to organizational standards.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "3f988795-25d6-4268-a6d7-0ba6c97be995",
-        "id": "E01.08",
-        "severity": "Medium",
-        "link": "https://learn.microsoft.com/azure/governance/policy/overview#azure-rbac-permissions-in-azure-policy",
-        "training": "https://learn.microsoft.com/training/modules/configure-azure-policy/"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.09",
-      "QuestionText": "Limit the number of Azure Policy assignments made at the root management group scope to avoid managing through exclusions at inherited scopes.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "Limit the number of Azure Policy assignments made at the root management group scope to avoid managing through exclusions at inherited scopes.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "19048384-5c98-46cb-8913-156a12476e49",
-        "id": "E01.09",
-        "severity": "Medium",
-        "link": "https://learn.microsoft.com/azure/governance/policy/overview",
-        "training": "https://learn.microsoft.com/training/modules/configure-azure-policy/"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.10",
-      "QuestionText": "If any data sovereignty requirements exist, Azure Policies should be deployed to enforce them.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "If any data sovereignty requirements exist, Azure Policies should be deployed to enforce them.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "5a917e1f-348e-4f25-9c27-d42e8bbac757",
-        "id": "E01.10",
-        "severity": "Medium",
-        "training": "https://learn.microsoft.com/learn/paths/secure-your-cloud-data/",
-        "link": "https://learn.microsoft.com/industry/release-plan/2023wave2/cloud-sovereignty/enable-data-sovereignty-policy-baseline"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.11",
-      "QuestionText": "For Sovereign Landing Zone, deploy sovereignty policy baseline and assign at correct management group level.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "For Sovereign Landing Zone, deploy sovereignty policy baseline and assign at correct management group level.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "78b22132-b41c-460b-a4d3-df8f73a67dc2",
-        "id": "E01.11",
-        "severity": "Medium",
-        "link": "https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/sovereign-landing-zone"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.12",
-      "QuestionText": "For Sovereign Landing Zone, document Sovereign Control objectives to policy mapping.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "For Sovereign Landing Zone, document Sovereign Control objectives to policy mapping.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "caeea0e9-1024-41df-a52e-d99c3f22a6f4",
-        "id": "E01.12",
-        "severity": "Medium",
-        "link": "https://learn.microsoft.com/industry/sovereignty/policy-portfolio-baseline"
-      }
-    },
-    {
-      "Status": "NotDeveloped",
-      "EstimatedPercentageApplied": 0,
-      "Weight": null,
-      "Score": 0,
-      "QuestionId": "E01.13",
-      "QuestionText": "For Sovereign Landing Zone, ensure process is in place for management of 'Sovereign Control objectives to policy mapping'.",
-      "RawData": "In development",
-      "RawSource": {
-        "category": "Governance",
-        "subcategory": "Governance",
-        "text": "For Sovereign Landing Zone, ensure process is in place for management of 'Sovereign Control objectives to policy mapping'.",
-        "waf": "Security",
-        "service": "Policy",
-        "guid": "9b461617-db7b-4399-8ac6-d4eb7153893a",
-        "id": "E01.13",
-        "severity": "Medium",
-        "link": "https://learn.microsoft.com/industry/sovereignty/policy-portfolio-baseline#sovereignty-baseline-policy-initiatives"
-      }
-    }
-  ],
-  "Security": [],
-  "DevOps": [],
-  "Management": []
+"@
 }
 
+# Function to generate the JavaScript section
+function Generate-JavaScript {
+    @"
+<script>
+const jsonReportListData =
+    __REPORTLISTDATA__
 ;
 
 const categoryMapping = {
@@ -542,7 +291,7 @@ function populateCategoryTable() {
   Object.keys(categoryStatusData).forEach((category) => {
     const row = categoryStatusData[category];
     const tr = document.createElement("tr");
-    tr.innerHTML = 
+    tr.innerHTML = `
   "<td>" + category + "</td>" +
   "<td>" + row.NotVerified + "</td>" +
   "<td>" + row.Open + "</td>" +
@@ -580,7 +329,7 @@ function populateTable() {
     totalError += row.Error;
 
     const tr = document.createElement("tr");
-    tr.innerHTML = 
+    tr.innerHTML = `
  "<td>" + severity + "</td>" +
   "<td>" + row.Implemented + "</td>" +
   "<td>" + row.PartialImplemented + "</td>" +
@@ -595,7 +344,7 @@ function populateTable() {
 
   // Add total row
   const totalRow = document.createElement("tr");
-  totalRow.innerHTML = 
+  totalRow.innerHTML = `
  "<td><strong>Total</strong></td>" +
   "<td><strong>" + totalImplemented + "</strong></td>" +
   "<td><strong>" + totalPartialImplemented + "</strong></td>" +
@@ -905,7 +654,7 @@ function populateAllItemsTable() {
       .filter((item) => item.RawSource?.category === category)
       .forEach((item) => {
         const tr = document.createElement("tr");
-        tr.innerHTML = 
+        tr.innerHTML = `
   "<td>" + item.category + "</td>" +
   "<td>" + item.subcategory + "</td>" +
   "<td>" + item.status + "</td>" +
@@ -929,5 +678,51 @@ function populateAllItemsTable() {
   populateAllItemsTable();
 };
 </script>
+"@
+}
+
+# Function to generate the HTML footer
+function Generate-HTMLFooter {
+    @"
   </body>
 </html>
+"@
+}
+
+# Function to generate the complete HTML
+function Generate-HTML {
+    $html = @()
+    $html += Generate-HTMLHead
+    $html += "<body>"
+    $html += Generate-HTMLHeader
+    $html += Generate-MainSection
+    $html += Generate-JavaScript
+    $html += Generate-HTMLFooter
+    $html -join "`n"
+}
+
+# Replace the placeholder __REPORTLISTDATA__ with content from the JSON file
+function Replace-ReportDataPlaceholder {
+    param (
+        [string]$HTMLContent,
+        [string]$ReportJsonPath
+    )
+
+    # Read the JSON file
+    $reportJsonContent = Get-Content -Path $ReportJsonPath -Raw
+    # Replace the placeholder with the JSON content
+    return $HTMLContent -replace "__REPORTLISTDATA__", $reportJsonContent
+}
+
+# Define the path to the report.json file
+$reportJsonPath = "$PSScriptRoot/../reports/report.json"
+
+# Generate the HTML and replace the placeholder
+$htmlContent = Generate-HTML
+$htmlContent = Replace-ReportDataPlaceholder -HTMLContent $htmlContent -ReportJsonPath $reportJsonPath
+
+# Save the final HTML to a file
+$outputPath = "$PSScriptRoot/../web/index.html"
+Set-Content -Path $outputPath -Value $htmlContent -Encoding UTF8
+
+Write-Output "HTML generated at: $outputPath"
