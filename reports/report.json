@@ -1,8 +1,8 @@
 {
-  "Billing": {},
-  "IAM": {},
-  "ResourceOrganization": {},
-  "Network": {},
+  "Billing": [],
+  "IAM": [],
+  "ResourceOrganization": [],
+  "Network": [],
   "Governance": [
     {
       "Status": "NotDeveloped",
@@ -265,7 +265,7 @@
       }
     }
   ],
-  "Security": {},
-  "DevOps": {},
-  "Management": {}
+  "Security": [],
+  "DevOps": [],
+  "Management": []
 }

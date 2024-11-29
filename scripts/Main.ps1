@@ -36,14 +36,14 @@ function Main {
     Write-Host "Contract Type: $contractType"
 
     $generalResult = [PSCustomObject]@{
-        Billing = @{}
-        IAM =  @{}
-        ResourceOrganization =  @{}
-        Network =  @{}
-        Governance =  @{}
-        Security =  @{}
-        DevOps =  @{}
-        Management =  @{}
+        Billing = @()
+        IAM = @()
+        ResourceOrganization = @()
+        Network = @()
+        Governance = @()
+        Security = @()
+        DevOps = @()
+        Management = @()
     }
 
     $designAreas = $config.DesignAreas
@@ -89,6 +89,9 @@ function Export-Report {
     # Create JSON file
     $jsonPath = "$PSScriptRoot/../reports/report.json"
     $generalResult | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonPath
+
+    Write-Host "Creating the web site..."
+    & "$PSScriptRoot/CreateWebSite.ps1"
 }
 
 
