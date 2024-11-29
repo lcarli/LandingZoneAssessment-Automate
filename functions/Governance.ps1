@@ -27,7 +27,6 @@ function Invoke-GovernanceAssessment {
 
     $results = @()
     $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.01")  }) | Test-QuestionE0101
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.02")  }) | Test-QuestionE0102
     $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.03")  }) | Test-QuestionE0103
     $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.04")  }) | Test-QuestionE0104
     $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.05")  }) | Test-QuestionE0105

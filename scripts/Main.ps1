@@ -23,6 +23,11 @@
 . "$PSScriptRoot/../functions/ResourceOrganization.ps1"
 . "$PSScriptRoot/../functions/Security.ps1"
 
+
+# START TRANSCRIPT
+$transcriptPath = "$PSScriptRoot/../logs/Initialize-Environment_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+Start-Transcript -Path $transcriptPath
+
 # Load configuration file
 $configPath = "$PSScriptRoot/../shared/config.json"
 $config = Get-Content -Path $configPath | ConvertFrom-Json
@@ -96,4 +101,12 @@ function Export-Report {
 
 
 # Call the main function
-Main
+try {
+    Main
+}
+catch {
+    Write-Host "An error occurred: $_"
+}
+finally {
+    Stop-Transcript
+}
