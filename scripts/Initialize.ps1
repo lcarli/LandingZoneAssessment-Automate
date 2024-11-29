@@ -25,11 +25,13 @@ function Install-And-ImportModule {
         try {
             Install-Module -Name $ModuleName -Scope CurrentUser -Force -ErrorAction Stop
             Write-Host "Module '$ModuleName' installed successfully."
-        } catch {
+        }
+        catch {
             Write-Host "Error installing module '$ModuleName': $($_.Exception.Message)"
             return
         }
-    } else {
+    }
+    else {
         Write-Host "Module '$ModuleName' is already installed."
     }
 
@@ -39,10 +41,12 @@ function Install-And-ImportModule {
         try {
             Import-Module $ModuleName -Force -ErrorAction Stop
             Write-Host "Module '$ModuleName' imported successfully."
-        } catch {
+        }
+        catch {
             Write-Host "Error importing module '$ModuleName': $($_.Exception.Message)"
         }
-    } else {
+    }
+    else {
         Write-Host "Module '$ModuleName' is already imported."
     }
 }
@@ -50,16 +54,16 @@ function Install-And-ImportModule {
 function Get-AzModules {
     $requiredModules = @(
         'Az.Accounts',
-        'Az.Resources',
-        'Az.Compute',
-        'Az.Network',
-        'Az.Monitor',
-        'Az.PolicyInsights',
-        'Az.Portal',
-        'Az.ResourceGraph',
-        'Az.ManagedServices',
-        'Az.CostManagement',
-        'Microsoft.Graph'
+        'Az.Resources'
+        # 'Az.Compute',
+        # 'Az.Network',
+        # 'Az.Monitor',
+        # 'Az.PolicyInsights',
+        # 'Az.Portal',
+        # 'Az.ResourceGraph',
+        # 'Az.ManagedServices',
+        # 'Az.CostManagement',
+        # 'Microsoft.Graph'
     )
 
     foreach ($module in $requiredModules) {
@@ -75,7 +79,8 @@ function Initialize-Connect {
         $config = Get-Content -Path $configPath | ConvertFrom-Json
         $TenantId = $config.TenantId
         Set-Variable -Name "TenantId" -Value $TenantId -Scope Global
-    } catch {
+    }
+    catch {
         Write-Host "Error reading configuration file: $_.Exception.Message"
         return
     }
@@ -84,17 +89,26 @@ function Initialize-Connect {
         $azContext = Get-AzContext
         if ($null -eq $azContext) {
             Write-Host "No existing Azure connection found. Connecting..."
-            Connect-AzAccount -Tenant $TenantId
-        } else {
-            Write-Host "Already connected to Azure."
-            Get-AzContext
+            Connect-AzAccount -Tenant $TenantId   
         }
-    } catch {
+        else {
+            if ($azContext.Tenant.Id -eq $TenantId) {
+                Write-Host "Already connected to Azure."
+                Get-AzContext
+            }
+            else {
+                Write-Host "No existing Azure connection found. Connecting..."
+                Connect-AzAccount -Tenant $TenantId
+            }  
+        }
+    }
+    catch {
         Write-Host "Error checking Azure connection: $_.Exception.Message"
         Write-Host "Connecting to Azure..."
         try {
             Connect-AzAccount -Tenant $TenantId
-        } catch {
+        }
+        catch {
             Write-Host "Error connecting to Azure: $_.Exception.Message"
         }
     }
@@ -106,7 +120,8 @@ function Initialize-Connect {
         if (-not $graphContext) {
             Write-Host "You are not connected to Microsoft Graph. Please sign in."
             Connect-MgGraph
-        } else {
+        }
+        else {
             Write-Host "You are already connected to Microsoft Graph."
         }
     }
@@ -148,13 +163,18 @@ function Set-GlobalChecklist {
     $checklistPath = "$PSScriptRoot/../shared/$($config.AlzChecklist)"
     $checklists = Get-Content -Path $checklistPath | ConvertFrom-Json
     $global:Checklist = $checklists
+    $global:ChecklistPath = $checklistPath
 }
 
 
 function Initialize-Environment {
+    Write-Host "Calling Get-AzModules"
     Get-AzModules
+    Write-Host "Calling Set-GlobalChecklist"
     Set-GlobalChecklist
+    Write-Host "Initialize-Connect"
     Initialize-Connect
+    Write-Host "Get-AzData"
     Get-AzData
 }
 

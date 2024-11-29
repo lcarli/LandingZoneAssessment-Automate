@@ -453,7 +453,6 @@ function Test-QuestionB0304 {
         Score                      = $score
     }
 }
-
 function Test-QuestionB0305 {
     Write-Host "Assessing question: Enforce multi-factor authentication for any user with rights to the Azure environments (B03.05)."
 
@@ -547,6 +546,7 @@ function Test-QuestionB0305 {
         Score                      = $score
     }
 }
+
 function Test-QuestionB0306 {
     Write-Host "Assessing question: Enforce centralized and delegated responsibilities to manage resources deployed inside the landing zone, based on role and security requirements."
 
@@ -688,7 +688,6 @@ function Test-QuestionB0307 {
     }
 }
 
-
 function Test-QuestionB0308 {
     Write-Host "Assessing question: When deploying Active Directory Domain Controllers, use a location with Availability Zones and deploy at least two VMs across these zones. If not available, deploy in an Availability Set."
 
@@ -753,6 +752,7 @@ function Test-QuestionB0308 {
         Score                      = $score
     }
 }
+
 function Test-QuestionB0309 {
     Write-Host "Assessing question: Use Azure custom RBAC roles for key roles to provide fine-grain access across your ALZ: Azure platform owner, network management, security operations, subscription owner, application owner."
 

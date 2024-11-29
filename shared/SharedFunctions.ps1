@@ -36,17 +36,11 @@ function Set-EvaluationResultObject {
     param (
         [string]$status,
         [int]$estimatedPercentageApplied,
-        [string]$questionId,
-        [string]$subCategory
+        [Object]$checklistItem,
+        [Object]$rawData
     )
 
-    $localChecklist = $global:Checklist
-    $currentChecklistItem = $localChecklist.items | Where-Object { $_.id -eq $questionId } | ConvertTo-Json -Depth 5
-    if ($subCategory) {
-        $currentChecklistItem = $currentChecklistItem | Where-Object { $_.id -eq $questionId -and $_.subCategory -eq $subCategory} | ConvertTo-Json -Depth 5
-    }
-
-    $weight = switch ($currentChecklistItem.severity) {
+    $weight = switch ($checklistItem.severity) {
         'Low' { $weight = 1;break; }
         'Medium' { $weight = 3;break; }
         'High' { $weight = 5;break; }
@@ -59,9 +53,10 @@ function Set-EvaluationResultObject {
         EstimatedPercentageApplied = $estimatedPercentageApplied
         Weight                     = $weight
         Score                      = ($weight * $estimatedPercentageApplied) / 100
-        QuestionId                 = $currentChecklistItem.id
-        QuestionText               = $currentChecklistItem.text
-        RawData                    = $currentChecklistItem
+        QuestionId                 = $checklistItem.id
+        QuestionText               = $checklistItem.text
+        RawData                    = $rawData
+        RawSource                  = $checklistItem
     }
 
     return $resultObject
@@ -107,7 +102,5 @@ function Test-QuestionAzureResourceGraph {
         $estimatedPercentageApplied = 0
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $queryResults
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $queryResults
 }

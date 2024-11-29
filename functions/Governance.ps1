@@ -75,7 +75,7 @@ function Test-QuestionE0101 {
 function Test-QuestionE0102 {
     [cmdletbinding()]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 

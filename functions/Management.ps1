@@ -15,34 +15,63 @@
 #>
 
 # Import shared modules
-Import-Module "$PSScriptRoot/../shared/Enums.ps1"
-Import-Module "$PSScriptRoot/../shared/SharedFunctions.ps1"
-Import-Module "$PSScriptRoot/../shared/ErrorHandling.ps1"
+. "$PSScriptRoot/../shared/Enums.ps1"
+. "$PSScriptRoot/../shared/SharedFunctions.ps1"
+. "$PSScriptRoot/../shared/ErrorHandling.ps1"
 
 function Invoke-ManagementAssessment {
-    param(
+    [CmdletBinding()]
+    param (
         [Parameter(Mandatory = $true)]
-        [string]$ContractType
+        [object]$Checklist
     )
+
     Write-Host "Evaluating the Management design area..."
 
     $results = @()
-
-    # Run Management questions
-    $results += Test-QuestionF0101
-    $results += Test-QuestionF0103
-    $results += Test-QuestionF0105
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.01") }) | Test-QuestionF0101
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.03") }) | Test-QuestionF0103
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.05") }) | Test-QuestionF0105
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.06") }) | Test-QuestionF0106
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.07") }) | Test-QuestionF0107
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.08") }) | Test-QuestionF0108
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.09") }) | Test-QuestionF0109
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.10") }) | Test-QuestionF0110
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.11") }) | Test-QuestionF0111
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.12") }) | Test-QuestionF0112
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.13") }) | Test-QuestionF0113
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.15") }) | Test-QuestionF0115
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.16") }) | Test-QuestionF0116
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.17") }) | Test-QuestionF0117
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.18") }) | Test-QuestionF0118
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.19") }) | Test-QuestionF0119
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.20") }) | Test-QuestionF0120
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.21") }) | Test-QuestionF0121
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F02.01") }) | Test-QuestionF0201
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.01") }) | Test-QuestionF0301
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.02") }) | Test-QuestionF0302
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.01") }) | Test-QuestionF0401
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.02") }) | Test-QuestionF0402
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.03") }) | Test-QuestionF0403
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.01") }) | Test-QuestionF0601
+    $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.02") }) | Test-QuestionF0602
 
     return $results
 }
 
 function Test-QuestionF0101 {
-    Write-Host "Assessing question: Use a single monitor logs workspace to manage platforms centrally except where Azure RBAC, data sovereignty requirements, or data retention policies mandate separate workspaces."
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
 
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
+    $rawData = $null
 
     try {
         # Get all subscriptions
@@ -144,30 +173,35 @@ function Test-QuestionF0101 {
                 }
             }
 
+            $rawData = $justifiedWorkspaces
+
             $score = ($weight * $estimatedPercentageApplied) / 100
         }
     } catch {
-        Write-ErrorLog -QuestionID "F01.01" -QuestionText "Use a single monitor logs workspace to manage platforms centrally except where Azure RBAC, data sovereignty requirements, or data retention policies mandate separate workspaces." -FunctionName "Assess-QuestionF0101" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-function Test-QuestionF0103 {
-    Write-Host "Assessing question: Export logs to Azure Storage if your log retention requirements exceed twelve years. Use immutable storage with a write-once, read-many policy to make data non-erasable and non-modifiable for a user-specified interval."
 
+function Test-QuestionF0103 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
+    $rawData = $null
 
     try {
         # Get all subscriptions
@@ -259,26 +293,29 @@ function Test-QuestionF0103 {
                 }
             }
 
+            $rawData = $workspacesExceedingRetention
+
             $score = ($weight * $estimatedPercentageApplied) / 100
         }
     } catch {
-        Write-ErrorLog -QuestionID "F01.03" -QuestionText "Export logs to Azure Storage if your log retention requirements exceed twelve years. Use immutable storage with a write-once, read-many policy to make data non-erasable and non-modifiable for a user-specified interval." -FunctionName "Test-QuestionF0103" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object
-    return [PSCustomObject]@{
-        Status                     = $status
-        EstimatedPercentageApplied = $estimatedPercentageApplied
-        Weight                     = $weight
-        Score                      = $score
-    }
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-function Test-QuestionF0105 {
-    Write-Host "Assessing question: Monitor OS level virtual machine (VM) configuration drift using Azure Policy. Enabling Azure Automanage Machine Configuration audit capabilities through policy helps application team workloads to immediately consume feature capabilities with little effort."
 
+function Test-QuestionF0105 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
 
@@ -339,12 +376,660 @@ function Test-QuestionF0105 {
                     $status = [Status]::PartiallyImplemented
                 }
             }
+
+            $rawData = $totalVms
         }
     } catch {
-        Write-ErrorLog -QuestionID "F01.05" -QuestionText "Monitor OS level virtual machine (VM) configuration drift using Azure Policy. Enabling Azure Automanage Machine Configuration audit capabilities through policy helps application team workloads to immediately consume feature capabilities with little effort." -FunctionName "Test-QuestionF0105" -ErrorMessage $_.Exception.Message
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
     }
 
-    Set-EvaluationResultObject -status $status -estimatedPercentageApplied $estimatedPercentageApplied -questionId "F01.05"
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.06
+function Test-QuestionF0106 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.07
+function Test-QuestionF0107 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.08
+function Test-QuestionF0108 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.09
+function Test-QuestionF0109 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.10
+function Test-QuestionF0110 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.11
+function Test-QuestionF0111 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.12
+function Test-QuestionF0112 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.13
+function Test-QuestionF0113 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.15
+function Test-QuestionF0115 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.16
+function Test-QuestionF0116 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.17
+function Test-QuestionF0117 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.18
+function Test-QuestionF0118 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.19
+function Test-QuestionF0119 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.20
+function Test-QuestionF0120 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F01.21
+function Test-QuestionF0121 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F02.01
+function Test-QuestionF0201 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F03.01
+function Test-QuestionF0301 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F03.02
+function Test-QuestionF0302 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F04.01
+function Test-QuestionF0401 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F04.02
+function Test-QuestionF0402 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F04.03
+function Test-QuestionF0403 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F06.01
+function Test-QuestionF0601 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+# Function for Management item F06.02
+function Test-QuestionF0602 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+
+    try {
+        $status = [Status]::NotDeveloped
+        $rawData = "In development"
+        $estimatedPercentageApplied = 0
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
 }
