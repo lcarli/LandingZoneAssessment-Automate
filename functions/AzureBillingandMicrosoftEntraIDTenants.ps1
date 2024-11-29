@@ -337,32 +337,33 @@ function Test-QuestionA0202 {
         foreach ($subscription in $subscriptions) {
             # Check the SubscriptionPolicies for the SubscriptionType
             $subscriptionContext = $subscriptions | Where-Object { ($_.id -eq $subscription.Id) 
-            $subscriptionPolicies = $subscriptionContext.SubscriptionPolicies
+                $subscriptionPolicies = $subscriptionContext.SubscriptionPolicies
 
-            if ($subscriptionPolicies -and $subscriptionPolicies.SubscriptionType -eq 'CSP') {
-                $hasCspSubscription = $true
-                break
+                if ($subscriptionPolicies -and $subscriptionPolicies.SubscriptionType -eq 'CSP') {
+                    $hasCspSubscription = $true
+                    break
+                }
             }
-        }
 
-        if (-not $hasCspSubscription) {
-            # No CSP subscriptions found
-            $status = [Status]::NotApplicable
-            $estimatedPercentageApplied = 100
-        }
-        else {
-            # CSP subscriptions are present
-            # Since we cannot programmatically verify documentation of support request and escalation process,
-            # we will assume that this needs to be manually verified.
+            if (-not $hasCspSubscription) {
+                # No CSP subscriptions found
+                $status = [Status]::NotApplicable
+                $estimatedPercentageApplied = 100
+            }
+            else {
+                # CSP subscriptions are present
+                # Since we cannot programmatically verify documentation of support request and escalation process,
+                # we will assume that this needs to be manually verified.
 
-            $status = [Status]::ManualVerificationRequired
-            $estimatedPercentageApplied = 0
-        }
+                $status = [Status]::ManualVerificationRequired
+                $estimatedPercentageApplied = 0
+            }
 
-        $score = ($weight * $estimatedPercentageApplied) / 100
-        $rawData = @{
-            Subscriptions      = $subscriptions
-            HasCspSubscription = $hasCspSubscription
+            $score = ($weight * $estimatedPercentageApplied) / 100
+            $rawData = @{
+                Subscriptions      = $subscriptions
+                HasCspSubscription = $hasCspSubscription
+            }
         }
     }
     catch {
