@@ -33,7 +33,9 @@ $configPath = "$PSScriptRoot/../shared/config.json"
 $config = Get-Content -Path $configPath | ConvertFrom-Json
 
 #Initialize environment
-Initialize-Environment
+Measure-ExecutionTime -ScriptBlock {
+    Initialize-Environment
+} -FunctionName "Initialize-Environment"
 
 # Main function
 function Main {
@@ -41,14 +43,14 @@ function Main {
     Write-Host "Contract Type: $contractType"
 
     $generalResult = [PSCustomObject]@{
-        Billing = @()
-        IAM = @()
+        Billing              = @()
+        IAM                  = @()
         ResourceOrganization = @()
-        Network = @()
-        Governance = @()
-        Security = @()
-        DevOps = @()
-        Management = @()
+        Network              = @()
+        Governance           = @()
+        Security             = @()
+        DevOps               = @()
+        Management           = @()
     }
 
     $designAreas = $config.DesignAreas
@@ -78,12 +80,14 @@ function Main {
         $generalResult.Management = Invoke-ManagementAssessment -Checklist $global:Checklist
     }
 
-    Export-Report -generalResult $generalResult
+    Measure-ExecutionTime -ScriptBlock {
+        Export-Report -generalResult $generalResult
+    } -FunctionName "Export-Report"
 }
 
 function Export-Report {
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [PSCustomObject]$generalResult
     )
 
@@ -98,7 +102,9 @@ function Export-Report {
 
 # Call the main function
 try {
-    Main
+    Measure-ExecutionTime -ScriptBlock {
+        Main
+    } -FunctionName "Main"
 }
 catch {
     Write-Host "An error occurred: $_"

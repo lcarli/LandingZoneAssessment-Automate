@@ -26,29 +26,31 @@ function Invoke-IdentityandAccessManagementAssessment {
     )
 
     Write-Host "Evaluating the Identity and Access Management design area..."
+    Measure-ExecutionTime -ScriptBlock {
+        $results = @()
 
-    $results = @()
+        # Call individual assessment functions
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.01") }) | Test-QuestionB0301
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.02") }) | Test-QuestionB0302
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.03") }) | Test-QuestionB0303
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.04") }) | Test-QuestionB0304
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.05") }) | Test-QuestionB0305
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.06") }) | Test-QuestionB0306
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.07") }) | Test-QuestionB0307
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.09") }) | Test-QuestionB0309
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.10") }) | Test-QuestionB0310
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.11") }) | Test-QuestionB0311
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.12") }) | Test-QuestionB0312
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.13") }) | Test-QuestionB0313
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.14") }) | Test-QuestionB0314
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.15") }) | Test-QuestionB0315
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.16") }) | Test-QuestionB0316
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.17") }) | Test-QuestionB0317
 
-    # Call individual assessment functions
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.01") }) | Test-QuestionB0301
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.02") }) | Test-QuestionB0302
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.03") }) | Test-QuestionB0303
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.04") }) | Test-QuestionB0304
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.05") }) | Test-QuestionB0305
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.06") }) | Test-QuestionB0306
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.07") }) | Test-QuestionB0307
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.09") }) | Test-QuestionB0309
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.10") }) | Test-QuestionB0310
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.11") }) | Test-QuestionB0311
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.12") }) | Test-QuestionB0312
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.13") }) | Test-QuestionB0313
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.14") }) | Test-QuestionB0314
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.15") }) | Test-QuestionB0315
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.16") }) | Test-QuestionB0316
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.17") }) | Test-QuestionB0317
+        $script:FunctionResult = $results
+    } -FunctionName "Invoke-IdentityandAccessManagementAssessment"
 
-    # Return the results
-    return $results
+    return $script:FunctionResult
 }
 
 
@@ -69,7 +71,8 @@ function Test-QuestionB0301 {
 
         if ($managementGroups.Count -eq 0) {
             # No management groups found
-        } else {
+        }
+        else {
             $totalGroups = 0
             $configuredGroups = 0
 
@@ -99,7 +102,8 @@ function Test-QuestionB0301 {
             # Calculate percentage for management groups
             if ($totalGroups -gt 0) {
                 $mgmtGroupPercentage = ($configuredGroups / $totalGroups) * 100
-            } else {
+            }
+            else {
                 $mgmtGroupPercentage = 100
             }
 
@@ -131,7 +135,8 @@ function Test-QuestionB0301 {
             # Calculate percentage for subscriptions
             if ($totalSubscriptions -gt 0) {
                 $subscriptionPercentage = ($configuredSubscriptions / $totalSubscriptions) * 100
-            } else {
+            }
+            else {
                 $subscriptionPercentage = 100
             }
 
@@ -141,16 +146,19 @@ function Test-QuestionB0301 {
             # Determine the status based on the applied percentage
             if ($estimatedPercentageApplied -eq 100) {
                 $status = [Status]::Implemented
-            } elseif ($estimatedPercentageApplied -eq 0) {
+            }
+            elseif ($estimatedPercentageApplied -eq 0) {
                 $status = [Status]::NotImplemented
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
             }
         }
 
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "B03.01" -QuestionText "Enforce a RBAC model that aligns to your cloud operating model. Scope and Assign across Management Groups and Subscriptions." -FunctionName "Assess-QuestionA0501" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -182,7 +190,8 @@ function Test-QuestionB0302 {
             # No service principals found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalServicePrincipals = $servicePrincipals.Count
             $managedIdentities = 0
 
@@ -196,10 +205,12 @@ function Test-QuestionB0302 {
             if ($managedIdentities -eq $totalServicePrincipals) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($managedIdentities -eq 0) {
+            }
+            elseif ($managedIdentities -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($managedIdentities / $totalServicePrincipals) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -209,7 +220,8 @@ function Test-QuestionB0302 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "B03.02" -QuestionText "Use managed identities instead of service principals for authentication to Azure services." -FunctionName "Assess-QuestionA0601" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -241,7 +253,8 @@ function Test-QuestionB030201 {
             # No users found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalUsers = $users.Count
             $validWorkOrSchoolAccounts = 0
 
@@ -259,10 +272,12 @@ function Test-QuestionB030201 {
             if ($validWorkOrSchoolAccounts -eq $totalUsers) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($validWorkOrSchoolAccounts -eq 0) {
+            }
+            elseif ($validWorkOrSchoolAccounts -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($validWorkOrSchoolAccounts / $totalUsers) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -272,7 +287,8 @@ function Test-QuestionB030201 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "A03.02-01" -QuestionText "Only use the authentication type Work or school account for all account types. Avoid using the Microsoft account." -FunctionName "Assess-QuestionA0602" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -307,7 +323,8 @@ function Test-QuestionB0303 {
             # No subscriptions found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAssignments = 0
             $groupAssignments = 0
 
@@ -339,13 +356,16 @@ function Test-QuestionB0303 {
                 # If no assignments found at all
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } elseif ($groupAssignments -eq $totalAssignments) {
+            }
+            elseif ($groupAssignments -eq $totalAssignments) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($groupAssignments -eq 0) {
+            }
+            elseif ($groupAssignments -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($groupAssignments / $totalAssignments) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -355,7 +375,8 @@ function Test-QuestionB0303 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "B03.03" -QuestionText "Only use groups to assign permissions. Add on-premises groups to the Entra ID only group if a group management system is already in place." -FunctionName "Assess-QuestionA0603" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -390,7 +411,8 @@ function Test-QuestionB0304 {
             # No role assignments found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAssignments = $roleAssignments.Count
             $usersCoveredByPolicies = 0
             $uniqueUsers = @()
@@ -425,10 +447,12 @@ function Test-QuestionB0304 {
             if ($usersCoveredByPolicies -eq $uniqueUsers.Count) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($usersCoveredByPolicies -eq 0) {
+            }
+            elseif ($usersCoveredByPolicies -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($usersCoveredByPolicies / $uniqueUsers.Count) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -438,7 +462,8 @@ function Test-QuestionB0304 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "B03.04" -QuestionText "Enforce Microsoft Entra ID Conditional Access policies for any user with rights to Azure environments." -FunctionName "Assess-QuestionB0304" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -469,7 +494,8 @@ function Test-QuestionB0305 {
             # No role assignments found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAssignments = $roleAssignments.Count
             $usersWithMFA = 0
             $uniqueUsers = @()
@@ -494,7 +520,8 @@ function Test-QuestionB0305 {
                     if ($mfaMethods.Count -gt 0) {
                         $isMFAEnabled = $true
                     }
-                } catch {
+                }
+                catch {
                     Write-Host "Failed to get MFA methods for user: $userId" -ForegroundColor Yellow
                 }
 
@@ -518,10 +545,12 @@ function Test-QuestionB0305 {
             if ($usersWithMFA -eq $uniqueUsers.Count) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($usersWithMFA -eq 0) {
+            }
+            elseif ($usersWithMFA -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($usersWithMFA / $uniqueUsers.Count) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -531,7 +560,8 @@ function Test-QuestionB0305 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "B03.05" -QuestionText "Enforce multi-factor authentication for any user with rights to the Azure environments." -FunctionName "Assess-QuestionB0305" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -579,7 +609,8 @@ function Test-QuestionB0306 {
             foreach ($roleAssignment in $mgmtGroupRoleAssignments) {
                 if ($roleAssignment.RoleDefinitionName -eq "Owner") {
                     $hasOwner = $true
-                } elseif ($roleAssignment.RoleDefinitionName -in @("Contributor", "Reader")) {
+                }
+                elseif ($roleAssignment.RoleDefinitionName -in @("Contributor", "Reader")) {
                     $hasDelegated = $true
                 }
             }
@@ -596,7 +627,8 @@ function Test-QuestionB0306 {
         if ($totalGroups -gt 0) {
             $mgmtGroupPercentage = ($configuredGroups / $totalGroups) * 100
             $delegationPercentage = ($delegatedGroups / $totalGroups) * 100
-        } else {
+        }
+        else {
             $mgmtGroupPercentage = 100
             $delegationPercentage = 100
         }
@@ -607,16 +639,19 @@ function Test-QuestionB0306 {
         # Determine status
         if ($estimatedPercentageApplied -eq 100) {
             $status = [Status]::Implemented
-        } elseif ($estimatedPercentageApplied -eq 0) {
+        }
+        elseif ($estimatedPercentageApplied -eq 0) {
             $status = [Status]::NotImplemented
-        } else {
+        }
+        else {
             $status = [Status]::PartiallyImplemented
         }
 
         # Calculate score based on the weight and the percentage applied
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "B03.06" -QuestionText "Enforce centralized and delegated responsibilities to manage resources deployed inside the landing zone." -FunctionName "Test-QuestionB0306" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -644,7 +679,8 @@ function Test-QuestionB0307 {
             # No privileged roles found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalRoles = $pimRoles.Count
             $rolesWithNoStandingAccess = 0
 
@@ -659,10 +695,12 @@ function Test-QuestionB0307 {
             if ($rolesWithNoStandingAccess -eq $totalRoles) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($rolesWithNoStandingAccess -eq 0) {
+            }
+            elseif ($rolesWithNoStandingAccess -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($rolesWithNoStandingAccess / $totalRoles) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -672,7 +710,8 @@ function Test-QuestionB0307 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "B03.07" -QuestionText "Enforce Microsoft Entra ID Privileged Identity Management (PIM)." -FunctionName "Test-QuestionB0307" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -716,11 +755,13 @@ function Test-QuestionB0308 {
             if ($vmCount -ge 2) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } else {
+            }
+            else {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
             }
-        } else {
+        }
+        else {
             # If no Availability Zones, check for Availability Set
             $availabilitySets = Get-AzAvailabilitySet
 
@@ -728,7 +769,8 @@ function Test-QuestionB0308 {
                 # If at least one Availability Set exists, assume compliant
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } else {
+            }
+            else {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
             }
@@ -737,7 +779,8 @@ function Test-QuestionB0308 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "B03.08" -QuestionText "When deploying Active Directory Domain Controllers, use a location with Availability Zones and deploy at least two VMs across these zones. If not available, deploy in an Availability Set." -FunctionName "Test-QuestionB0309" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -786,10 +829,12 @@ function Test-QuestionB0309 {
         if ($rolesFound -eq $requiredRoles.Count) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } elseif ($rolesFound -eq 0) {
+        }
+        elseif ($rolesFound -eq 0) {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
-        } else {
+        }
+        else {
             $status = [Status]::PartiallyImplemented
             $estimatedPercentageApplied = ($rolesFound / $requiredRoles.Count) * 100
             $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -798,7 +843,8 @@ function Test-QuestionB0309 {
         # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Log-Error -QuestionID "B03.9" -QuestionText "Use Azure custom RBAC roles for the following key roles: Azure platform owner, network management, security operations, subscription owner, application owner." -FunctionName "Test-QuestionB0310" -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0

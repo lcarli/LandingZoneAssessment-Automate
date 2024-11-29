@@ -26,60 +26,63 @@ function Invoke-NetworkTopologyandConnectivityAssessment {
         [object]$Checklist
     )
     Write-Host "Evaluating the NetworkTopologyandConnectivity design area..."
+    Measure-ExecutionTime -ScriptBlock {
+        $results = @()
 
-    $results = @()
+        $virtualWANPresent = (Search-AzGraph -Query "Resources | where type =~ 'Microsoft.Network/virtualWans' | project name").Count -gt 0
+        $azureFirewallPresent = (Search-AzGraph -Query "Resources | where type =~ 'Microsoft.Network/azureFirewalls' | project name").Count -gt 0
 
-    $virtualWANPresent = (Search-AzGraph -Query "Resources | where type =~ 'Microsoft.Network/virtualWans' | project name").Count -gt 0
-    $azureFirewallPresent = (Search-AzGraph -Query "Resources | where type =~ 'Microsoft.Network/azureFirewalls' | project name").Count -gt 0
+        #Virtual WAN subcategory
+        if ($virtualWANPresent) {
+            $graphItems = $Checklist.items | Where-Object { ($_.category -eq "Network Topology and Connectivity") -and ($_.subcategory -eq "Virtual WAN") -and $_.graph } | ForEach-Object {
+                $results += $_ | Test-QuestionAzureResourceGraph
+            }
+        }
+        #Hub and Spoke subcategory
+        else {
+            #Exception for D01.01 since there's 2 of them in the checklist
+            $d0101Results += ($Checklist.items | Where-Object { ($_.id -eq "D01.01") -and ($_.subcategory -eq "Hub and spoke") }) | Test-QuestionD0101
+            $results += $d0101Results
 
-    #Virtual WAN subcategory
-    if ($virtualWANPresent) {
-        $graphItems = $Checklist.items | Where-Object { ($_.category -eq "Network Topology and Connectivity") -and ($_.subcategory -eq "Virtual WAN") -and $_.graph } | ForEach-Object {
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.02") }) | Test-QuestionD0102 -rawDataD0101 $($d0101Results.rawData)
+            #Exception for D01.03 since there's 2 of them in the checklist
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.03") -and ($_.subcategory -eq "Hub and spoke") }) | Test-QuestionD0103HS
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.04") }) | Test-QuestionD0104
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.06") }) | Test-QuestionD0106
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.07") }) | Test-QuestionD0107
+
+            $graphItems = $Checklist.items | Where-Object { ($_.category -eq "Network Topology and Connectivity") -and ($_.subcategory -eq "Hub and spoke") -and $_.graph } | ForEach-Object {
+                $results += $_ | Test-QuestionAzureResourceGraph
+            }
+        }
+
+        #Firewall subcategory
+        if ($azureFirewallPresent) {
+            $graphItems = $Checklist.items | Where-Object { ($_.category -eq "Network Topology and Connectivity") -and ($_.subcategory -eq "Firewall") -and $_.graph } | ForEach-Object {
+                $results += $_ | Test-QuestionAzureResourceGraph
+            }
+        }
+
+        # App delivery subcategory
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.03") -and ($_.subcategory -eq "App delivery") }) | Test-QuestionD0103
+
+        # Encryption
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "D02.01") }) | Test-QuestionD0201
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "D02.02") }) | Test-QuestionD0202
+        # Hybrid
+        # Internet
+        # IP plan
+        # PaaS
+        # Segmentation
+
+        $graphItems = $Checklist.items | Where-Object { ($_.category -eq "Network Topology and Connectivity") -and ($_.subcategory -notin @("Firewall", "Hub and spoke", "Virtual WAN")) -and $_.graph } | ForEach-Object {
             $results += $_ | Test-QuestionAzureResourceGraph
         }
-    }
-    #Hub and Spoke subcategory
-    else {
-        #Exception for D01.01 since there's 2 of them in the checklist
-        $d0101Results += ($Checklist.items | Where-Object { ($_.id -eq "D01.01") -and ($_.subcategory -eq "Hub and spoke") }) | Test-QuestionD0101
-        $results += $d0101Results
 
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.02") }) | Test-QuestionD0102 -rawDataD0101 $($d0101Results.rawData)
-        #Exception for D01.03 since there's 2 of them in the checklist
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.03") -and ($_.subcategory -eq "Hub and spoke") }) | Test-QuestionD0103HS
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.04") }) | Test-QuestionD0104
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.06") }) | Test-QuestionD0106
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.07") }) | Test-QuestionD0107
+        $script:FunctionResult = $results
+    } -FunctionName "Invoke-NetworkTopologyandConnectivityAssessment"
 
-        $graphItems = $Checklist.items | Where-Object { ($_.category -eq "Network Topology and Connectivity") -and ($_.subcategory -eq "Hub and spoke") -and $_.graph } | ForEach-Object {
-            $results += $_ | Test-QuestionAzureResourceGraph
-        }
-    }
-
-    #Firewall subcategory
-    if ($azureFirewallPresent) {
-        $graphItems = $Checklist.items | Where-Object { ($_.category -eq "Network Topology and Connectivity") -and ($_.subcategory -eq "Firewall") -and $_.graph } | ForEach-Object {
-            $results += $_ | Test-QuestionAzureResourceGraph
-        }
-    }
-
-    # App delivery subcategory
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "D01.03") -and ($_.subcategory -eq "App delivery") }) | Test-QuestionD0103
-
-    # Encryption
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "D02.01")  }) | Test-QuestionD0201
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "D02.02")  }) | Test-QuestionD0202
-    # Hybrid
-    # Internet
-    # IP plan
-    # PaaS
-    # Segmentation
-
-    $graphItems = $Checklist.items | Where-Object { ($_.category -eq "Network Topology and Connectivity") -and ($_.subcategory -notin @("Firewall", "Hub and spoke", "Virtual WAN")) -and $_.graph } | ForEach-Object {
-        $results += $_ | Test-QuestionAzureResourceGraph
-    }
-
-    return $results
+    return $script:FunctionResult
 }
 
 function Test-QuestionD0101 {
@@ -250,9 +253,9 @@ function Test-QuestionD0103 {
         } 
 
         $rawData = @{
-            "PublicIPs"           = $publicIPs
-            "TotalIPs"            = $publicIPs.Count
-            "ProtectedIPs"        = $protectedIPs
+            "PublicIPs"                  = $publicIPs
+            "TotalIPs"                   = $publicIPs.Count
+            "ProtectedIPs"               = $protectedIPs
             "estimatedPercentageApplied" = $estimatedPercentageApplied
         }
 
@@ -444,7 +447,8 @@ function Test-QuestionD0107 {
             $vnetFlowLog = $flowLogs | Where-Object { $_.targetResourceId -eq $vnet.id }
             if ($vnetFlowLog.status -eq 'Enabled') {
                 $enabledFlowLogsResources += $vnet.id
-            } else {
+            }
+            else {
                 $disabledFlowLogsResources += $vnet.id
             }
         }
@@ -453,7 +457,8 @@ function Test-QuestionD0107 {
             $nsgFlowLog = $flowLogs | Where-Object { $_.targetResourceId -eq $nsg.id }
             if ($nsgFlowLog.status -eq 'Enabled') {
                 $enabledFlowLogsResources += $nsg
-            } else {
+            }
+            else {
                 $disabledFlowLogsResources += $nsg
             }
         }
@@ -461,16 +466,18 @@ function Test-QuestionD0107 {
         $estimatedPercentageApplied = ($enabledFlowLogsResources.Count / ($virtualNetworks.Count + $nsgs.Count)) * 100
 
         $rawData = @{
-            "EnabledFlowLogs"    = $enabledFlowLogs
-            "DisabledFlowLogs"   = $disabledFlowLogs
-            "flowLogs"           = $flowLogs
+            "EnabledFlowLogs"  = $enabledFlowLogs
+            "DisabledFlowLogs" = $disabledFlowLogs
+            "flowLogs"         = $flowLogs
         }
 
         if ($estimatedPercentageApplied -eq 100) {
             $status = [Status]::Implemented
-        } elseif ($estimatedPercentageApplied -gt 0) {
+        }
+        elseif ($estimatedPercentageApplied -gt 0) {
             $status = [Status]::PartiallyImplemented
-        } else {
+        }
+        else {
             $status = [Status]::NotImplemented
         }
     }
@@ -522,13 +529,16 @@ function Test-QuestionD0202 {
                 if ($vpnGatewayPresent) {
                     $status = [Status]::ManualVerificationRequired
                     $estimatedPercentageApplied = 50
-                } else {
+                }
+                else {
                     $status = [Status]::NotImplemented
                 }
-            } else {
+            }
+            else {
                 $status = [Status]::NotImplemented
             }
-        } else {
+        }
+        else {
             $status = [Status]::NotApplicable
         }
 

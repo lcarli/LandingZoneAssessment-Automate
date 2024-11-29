@@ -27,36 +27,39 @@ function Invoke-ManagementAssessment {
     )
 
     Write-Host "Evaluating the Management design area..."
+    Measure-ExecutionTime -ScriptBlock {
+        $results = @()
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.01") }) | Test-QuestionF0101
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.03") }) | Test-QuestionF0103
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.05") }) | Test-QuestionF0105
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.06") }) | Test-QuestionF0106
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.07") }) | Test-QuestionF0107
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.08") }) | Test-QuestionF0108
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.09") }) | Test-QuestionF0109
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.10") }) | Test-QuestionF0110
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.11") }) | Test-QuestionF0111
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.12") }) | Test-QuestionF0112
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.13") }) | Test-QuestionF0113
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.15") }) | Test-QuestionF0115
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.16") }) | Test-QuestionF0116
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.17") }) | Test-QuestionF0117
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.18") }) | Test-QuestionF0118
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.19") }) | Test-QuestionF0119
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.20") }) | Test-QuestionF0120
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.21") }) | Test-QuestionF0121
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F02.01") }) | Test-QuestionF0201
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.01") }) | Test-QuestionF0301
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.02") }) | Test-QuestionF0302
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.01") }) | Test-QuestionF0401
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.02") }) | Test-QuestionF0402
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.03") }) | Test-QuestionF0403
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.01") }) | Test-QuestionF0601
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.02") }) | Test-QuestionF0602
 
-    $results = @()
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.01") }) | Test-QuestionF0101
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.03") }) | Test-QuestionF0103
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.05") }) | Test-QuestionF0105
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.06") }) | Test-QuestionF0106
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.07") }) | Test-QuestionF0107
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.08") }) | Test-QuestionF0108
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.09") }) | Test-QuestionF0109
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.10") }) | Test-QuestionF0110
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.11") }) | Test-QuestionF0111
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.12") }) | Test-QuestionF0112
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.13") }) | Test-QuestionF0113
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.15") }) | Test-QuestionF0115
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.16") }) | Test-QuestionF0116
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.17") }) | Test-QuestionF0117
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.18") }) | Test-QuestionF0118
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.19") }) | Test-QuestionF0119
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.20") }) | Test-QuestionF0120
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.21") }) | Test-QuestionF0121
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F02.01") }) | Test-QuestionF0201
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.01") }) | Test-QuestionF0301
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.02") }) | Test-QuestionF0302
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.01") }) | Test-QuestionF0401
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.02") }) | Test-QuestionF0402
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.03") }) | Test-QuestionF0403
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.01") }) | Test-QuestionF0601
-    $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.02") }) | Test-QuestionF0602
+        $script:FunctionResult = $results
+    } -FunctionName "Invoke-ManagementAssessment"
 
-    return $results
+    return $script:FunctionResult
 }
 
 function Test-QuestionF0101 {
@@ -81,7 +84,8 @@ function Test-QuestionF0101 {
             # No subscriptions found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalWorkspaces = 0
             $justifiedWorkspaces = 0
             $allWorkspaces = @()
@@ -101,11 +105,13 @@ function Test-QuestionF0101 {
                 # No workspaces found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } elseif ($totalWorkspaces -eq 1) {
+            }
+            elseif ($totalWorkspaces -eq 1) {
                 # Only one workspace exists
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } else {
+            }
+            else {
                 # Multiple workspaces found
                 # Check for data sovereignty, data retention, and RBAC differences
 
@@ -148,7 +154,8 @@ function Test-QuestionF0101 {
                     if ($assignments.Count -ne $firstWorkspaceAssignments.Count) {
                         $rbacDifferent = $true
                         break
-                    } else {
+                    }
+                    else {
                         # Compare the assignments
                         if ($firstWorkspaceAssignments && $assignments) {
                             $diff = Compare-Object -ReferenceObject $firstWorkspaceAssignments -DifferenceObject $assignments -Property RoleDefinitionName, PrincipalId, PrincipalType
@@ -167,7 +174,8 @@ function Test-QuestionF0101 {
                 if ($justifiedWorkspaces -gt 0) {
                     $status = [Status]::PartiallyImplemented
                     $estimatedPercentageApplied = [Math]::Round((($totalWorkspaces - $justifiedWorkspaces) / $totalWorkspaces) * 100, 2)
-                } else {
+                }
+                else {
                     $status = [Status]::NotImplemented
                     $estimatedPercentageApplied = 0
                 }
@@ -177,7 +185,8 @@ function Test-QuestionF0101 {
 
             $score = ($weight * $estimatedPercentageApplied) / 100
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -211,7 +220,8 @@ function Test-QuestionF0103 {
             # No subscriptions found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $workspacesExceedingRetention = @()
             $workspacesCompliant = 0
             $workspacesNonCompliant = 0
@@ -264,10 +274,12 @@ function Test-QuestionF0103 {
 
                         if ($storageExportConfigured -and $storageCompliant) {
                             $workspacesCompliant++
-                        } else {
+                        }
+                        else {
                             $workspacesNonCompliant++
                         }
-                    } else {
+                    }
+                    else {
                         # Workspace retention does not exceed 12 years
                         # Consider compliant
                         $workspacesCompliant++
@@ -279,14 +291,17 @@ function Test-QuestionF0103 {
                 # No workspaces exceeding retention
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } else {
+            }
+            else {
                 if ($workspacesNonCompliant -eq 0) {
                     $status = [Status]::Implemented
                     $estimatedPercentageApplied = 100
-                } elseif ($workspacesCompliant -eq 0) {
+                }
+                elseif ($workspacesCompliant -eq 0) {
                     $status = [Status]::NotImplemented
                     $estimatedPercentageApplied = 0
-                } else {
+                }
+                else {
                     $status = [Status]::PartiallyImplemented
                     $estimatedPercentageApplied = ($workspacesCompliant / $workspacesExceedingRetention.Count) * 100
                     $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -297,7 +312,8 @@ function Test-QuestionF0103 {
 
             $score = ($weight * $estimatedPercentageApplied) / 100
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -326,7 +342,8 @@ function Test-QuestionF0105 {
             # No subscriptions found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalVms = 0
             $compliantVms = 0
 
@@ -364,22 +381,26 @@ function Test-QuestionF0105 {
                 # No VMs found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } else {
+            }
+            else {
                 $estimatedPercentageApplied = ($compliantVms / $totalVms) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
 
                 if ($estimatedPercentageApplied -eq 100) {
                     $status = [Status]::Implemented
-                } elseif ($estimatedPercentageApplied -eq 0) {
+                }
+                elseif ($estimatedPercentageApplied -eq 0) {
                     $status = [Status]::NotImplemented
-                } else {
+                }
+                else {
                     $status = [Status]::PartiallyImplemented
                 }
             }
 
             $rawData = $totalVms
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0

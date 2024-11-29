@@ -12,7 +12,7 @@
     lramoscostah@microsoft.com
 #>
 
-function Install-And-ImportModule {
+function InstallAndImportModule {
     param(
         [string]$ModuleName
     )
@@ -36,38 +36,49 @@ function Install-And-ImportModule {
     }
 
     # Check if the module is already imported
-    if (-not (Get-Module -Name $ModuleName)) {
-        Write-Host "Importing module '$ModuleName'..."
-        try {
-            Import-Module $ModuleName -Force -ErrorAction Stop
-            Write-Host "Module '$ModuleName' imported successfully."
-        }
-        catch {
-            Write-Host "Error importing module '$ModuleName': $($_.Exception.Message)"
-        }
+    if ($ModuleName -eq "Microsoft.Graph") {
+        Write-Host "Skipping module 'Microsoft.Graph'. This module is not allowed to be imported."
     }
     else {
-        Write-Host "Module '$ModuleName' is already imported."
+        # Check if the module is already imported
+        if (-not (Get-Module -Name $ModuleName)) {
+            Write-Host "Importing module '$ModuleName'..."
+            try {
+                Import-Module $ModuleName -Force -ErrorAction Stop
+                Write-Host "Module '$ModuleName' imported successfully."
+            }
+            catch {
+                Write-Host "Error importing module '$ModuleName': $($_.Exception.Message)"
+            }
+        }
+        else {
+            Write-Host "Module '$ModuleName' is already imported."
+        }
     }
+
 }
 
 function Get-AzModules {
+    Write-Host "Getting Azure modules..."
     $requiredModules = @(
         'Az.Accounts',
-        'Az.Resources'
-        # 'Az.Compute',
-        # 'Az.Network',
-        # 'Az.Monitor',
-        # 'Az.PolicyInsights',
-        # 'Az.Portal',
-        # 'Az.ResourceGraph',
-        # 'Az.ManagedServices',
-        # 'Az.CostManagement',
-        # 'Microsoft.Graph'
+        'Az.Resources',
+        'Az.Compute',
+        'Az.Network',
+        'Az.Monitor',
+        'Az.PolicyInsights',
+        'Az.Portal',
+        'Az.ResourceGraph',
+        'Az.ManagedServices'
+        'Az.CostManagement',
+        'Microsoft.Graph'
     )
 
     foreach ($module in $requiredModules) {
-        Install-And-ImportModule -ModuleName $module
+        Measure-ExecutionTime -ScriptBlock {
+            InstallAndImportModule -ModuleName $module
+        } -FunctionName "InstallAndImportModule $module"
+        
     }
 }
 
@@ -146,7 +157,7 @@ function Get-AzData {
 
     foreach ($subscription in $global:AzData.Subscriptions) {
         Write-Host "Getting data for subscription: $($subscription.Name)"
-        Select-AzSubscription -SubscriptionId $subscription.Id
+        Set-AzContext -Subscription $subscription.Id -Tenant $TenantId
 
         $resources = Get-AzResource
         $global:AzData.Resources += $resources
@@ -158,6 +169,7 @@ function Get-AzData {
 }
 
 function Set-GlobalChecklist {
+    Write-Host "Setting global checklist..."
     $configPath = "$PSScriptRoot/../shared/config.json"
     $config = Get-Content -Path $configPath | ConvertFrom-Json
     $checklistPath = "$PSScriptRoot/../shared/$($config.AlzChecklist)"
@@ -166,15 +178,20 @@ function Set-GlobalChecklist {
     $global:ChecklistPath = $checklistPath
 }
 
+function New-ReportFolder {
+    Write-Host "Creating folder Report if necessary"
+    $reportsDirectory = "$PSScriptRoot/../reports"
+    if (!(Test-Path -Path $reportsDirectory)) {
+        New-Item -ItemType Directory -Path $reportsDirectory -Force
+    }
+}
+
 
 function Initialize-Environment {
-    Write-Host "Calling Get-AzModules"
     Get-AzModules
-    Write-Host "Calling Set-GlobalChecklist"
     Set-GlobalChecklist
-    Write-Host "Initialize-Connect"
     Initialize-Connect
-    Write-Host "Get-AzData"
     Get-AzData
+    New-ReportFolder
 }
 
