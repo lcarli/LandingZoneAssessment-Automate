@@ -888,32 +888,78 @@ function Test-QuestionB0309 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B03.10
 function Test-QuestionB0310 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Get all Custom RBAC Roles
+        $customRoles = Get-AzRoleDefinition | Where-Object { $_.IsCustom -eq $true }
+
+        # Define the required roles
+        $requiredRoles = @(
+            "Azure platform owner",
+            "Network management",
+            "Security operations",
+            "Subscription owner",
+            "Application owner"
+        )
+
+        # Check if each required role exists
+        $rolesMatched = @()
+        $missingRoles = @()
+
+        foreach ($role in $requiredRoles) {
+            if ($customRoles.Name -contains $role) {
+                $rolesMatched += $role
+            } else {
+                $missingRoles += $role
+            }
+        }
+
+        # Determine status and estimated percentage
+        $rolesFound = $rolesMatched.Count
+        $totalRequiredRoles = $requiredRoles.Count
+
+        if ($rolesFound -eq $totalRequiredRoles) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+            $rawData = "All required custom roles are implemented."
+        } elseif ($rolesFound -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+            $rawData = @{
+                MissingRoles = $missingRoles
+                Message      = "None of the required custom roles are implemented."
+            }
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($rolesFound / $totalRequiredRoles) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            $rawData = @{
+                TotalRequiredRoles = $totalRequiredRoles
+                RolesMatched        = $rolesMatched
+                MissingRoles        = $missingRoles
+                Message             = "Some required custom roles are missing."
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for IAM item B03.11
