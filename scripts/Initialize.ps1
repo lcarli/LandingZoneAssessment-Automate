@@ -145,15 +145,33 @@ function Initialize-Connect {
 function Get-AzData {
     Write-Host "Getting data from Azure..."
 
+    # Initialize global object
     $global:AzData = [PSCustomObject]@{
-        Tenant        = Get-AzTenant -TenantId $TenantId
-        Subscriptions = Get-AzSubscription -TenantId $TenantId
-        Resources     = @()
-        Policies      = @()
-        Users         = @()
+        Tenant             = Get-AzTenant -TenantId $TenantId
+        ManagementGroups   = @()
+        Subscriptions      = Get-AzSubscription -TenantId $TenantId
+        Resources          = @()
+        Policies           = @()
+        Users              = @()
     }
 
-    #$global:AzData.Users = Get-MgUser -All
+    $managementGroups = Get-AzManagementGroup
+    foreach ($mg in $managementGroups) {
+        try {
+            $detailedMG = Get-AzManagementGroup -GroupName $mg.Name
+            $global:AzData.ManagementGroups += $detailedMG
+        } catch {
+            Write-Warning "Unable to retrieve details for Management Group: $($mg.Name). Error: $($_.Exception.Message)"
+        }
+    }
+
+    foreach ($mg in $global:AzData.ManagementGroups) {
+        $policyAssignments = Get-AzPolicyAssignment -Scope $mg.Id
+        $global:AzData.Policies += $policyAssignments
+    }
+
+    $policyAssignments = Get-AzPolicyAssignment
+    $global:AzData.Policies += $policyAssignments
 
     foreach ($subscription in $global:AzData.Subscriptions) {
         Write-Host "Getting data for subscription: $($subscription.Name)"
@@ -161,10 +179,6 @@ function Get-AzData {
 
         $resources = Get-AzResource
         $global:AzData.Resources += $resources
-
-        $policyAssignments = Get-AzPolicyAssignment
-        $global:AzData.Policies += $policyAssignments
-
     }
 }
 
