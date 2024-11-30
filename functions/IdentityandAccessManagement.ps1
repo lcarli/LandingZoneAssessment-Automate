@@ -962,60 +962,92 @@ function Test-QuestionB0310 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B03.11
 function Test-QuestionB0311 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = "This question requires manual verification to evaluate the compatibility of all workloads when planning to switch from Active Directory Domain Services (AD DS) to Entra Domain Services (ED DS)."
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # No automated logic is implemented here
+        $status = [Status]::ManualVerificationRequired
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B03.12
 function Test-QuestionB0312 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Get all Entra Domain Services configurations
+        $entraDomains = Get-AzADDomainService
+
+        if (-not $entraDomains -or $entraDomains.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No Entra Domain Services (ED DS) configurations found in the current environment."
+        } else {
+            $totalDomains = $entraDomains.Count
+            $domainsWithReplicaSets = 0
+
+            foreach ($domain in $entraDomains) {
+                # Check if replica sets are configured
+                if ($domain.ReplicaSets.Count -gt 1) {
+                    $domainsWithReplicaSets++
+                }
+            }
+
+            if ($domainsWithReplicaSets -eq $totalDomains) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = "All Entra Domain Services domains have replica sets configured."
+            } elseif ($domainsWithReplicaSets -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = "No Entra Domain Services domains have replica sets configured."
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($domainsWithReplicaSets / $totalDomains) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalDomains         = $totalDomains
+                    DomainsWithReplicaSets = $domainsWithReplicaSets
+                    DomainsWithoutReplicaSets = $totalDomains - $domainsWithReplicaSets
+                    Message              = "Some Entra Domain Services domains are missing replica sets."
+                }
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for IAM item B03.13
