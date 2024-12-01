@@ -1107,116 +1107,252 @@ function Test-QuestionB0313 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B03.14
 function Test-QuestionB0314 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Get all Azure AD users
+        $users = Get-AzADUser
+
+        if (-not $users -or $users.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+            $rawData = "No users found in the tenant to verify emergency access accounts."
+        } else {
+            # Define criteria for break-glass accounts
+            $breakGlassAccounts = $users | Where-Object {
+                ($_.UserPrincipalName -match "breakglass" -or $_.UserPrincipalName -match "emergency") -and
+                $_.AccountEnabled -eq $true -and
+                $_.UserType -eq "Member"
+            }
+
+            if ($breakGlassAccounts.Count -ge 2) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    BreakGlassAccountsFound = $breakGlassAccounts.Count
+                    Accounts                = $breakGlassAccounts | Select-Object DisplayName, UserPrincipalName
+                    Message                 = "Sufficient emergency access accounts (at least 2) are configured."
+                }
+            } elseif ($breakGlassAccounts.Count -eq 1) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = 50
+                $rawData = @{
+                    BreakGlassAccountsFound = $breakGlassAccounts.Count
+                    Accounts                = $breakGlassAccounts | Select-Object DisplayName, UserPrincipalName
+                    Message                 = "Only 1 emergency access account found. At least 2 are recommended."
+                }
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = "No emergency access or break-glass accounts configured with name containing 'breakglass' or 'emergency'."
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B03.15
 function Test-QuestionB0315 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Get all Entra Connect servers
+        $connectServers = Get-AzADConnectSyncServer
+
+        if (-not $connectServers -or $connectServers.Count -eq 0) {
+            # No Entra Connect servers found
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No Microsoft Entra Connect servers are configured in this environment."
+        } else {
+            # Check for staging servers
+            $stagingServers = $connectServers | Where-Object { $_.StagingModeEnabled -eq $true }
+            $totalServers = $connectServers.Count
+            $stagingServerCount = $stagingServers.Count
+
+            if ($stagingServerCount -ge 1) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalServers       = $totalServers
+                    StagingServers     = $stagingServerCount
+                    StagingServerDetails = $stagingServers | Select-Object DisplayName, StagingModeEnabled, LastSyncTime
+                    Message            = "At least one staging server is configured for high availability/disaster recovery."
+                }
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalServers   = $totalServers
+                    StagingServers = $stagingServerCount
+                    Message        = "No staging servers are configured. Consider adding one for high availability/disaster recovery."
+                }
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B03.16
 function Test-QuestionB0316 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Get all role assignments in Microsoft Entra ID
+        $roleAssignments = Get-AzRoleAssignment
+
+        if (-not $roleAssignments -or $roleAssignments.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No role assignments found in the environment."
+        } else {
+            # Filter role assignments for on-premises synced accounts
+            $syncedAccounts = $roleAssignments | Where-Object {
+                $_.SignInName -match "@.*" -and $_.PrincipalType -eq "User" -and $_.SignInName -match "\.onmicrosoft\.com"
+            }
+
+            $totalAssignments = $roleAssignments.Count
+            $syncedAssignments = $syncedAccounts.Count
+
+            if ($syncedAssignments -eq 0) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = "No on-premises synced accounts are being used for Microsoft Entra ID role assignments."
+            } elseif ($syncedAssignments -eq $totalAssignments) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalAssignments = $totalAssignments
+                    SyncedAssignments = $syncedAssignments
+                    Message = "All role assignments are using on-premises synced accounts. Avoid this practice unless necessary."
+                }
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = (($totalAssignments - $syncedAssignments) / $totalAssignments) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalAssignments     = $totalAssignments
+                    SyncedAssignments    = $syncedAssignments
+                    NonSyncedAssignments = $totalAssignments - $syncedAssignments
+                    Message              = "Some role assignments are using on-premises synced accounts. Review these cases to ensure they are necessary."
+                }
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B03.17
 function Test-QuestionB0317 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Check for Microsoft Entra ID Application Proxy connectors
+        $appProxyConnectors = Get-AzADApplicationProxyConnectorGroup
+
+        if (-not $appProxyConnectors -or $appProxyConnectors.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+            $rawData = "No Microsoft Entra ID Application Proxy connectors are configured in this tenant."
+        } else {
+            # Ensure the Application Proxy is managed as a platform resource
+            $managedAsPlatform = $appProxyConnectors | Where-Object {
+                $_.DisplayName -match "Platform" -or $_.Tags -contains "PlatformResource"
+            }
+
+            if ($managedAsPlatform.Count -eq $appProxyConnectors.Count) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalConnectors       = $appProxyConnectors.Count
+                    ManagedAsPlatform     = $managedAsPlatform.Count
+                    ConnectorDetails      = $appProxyConnectors | Select-Object DisplayName, ConnectorGroupType, Tags
+                    Message               = "All Microsoft Entra ID Application Proxy connectors are managed as platform resources."
+                }
+            } elseif ($managedAsPlatform.Count -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalConnectors   = $appProxyConnectors.Count
+                    ManagedAsPlatform = $managedAsPlatform.Count
+                    Message           = "No Microsoft Entra ID Application Proxy connectors are managed as platform resources. Consider tagging them appropriately. We recommend using 'PlatformResource' tag."
+                }
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($managedAsPlatform.Count / $appProxyConnectors.Count) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalConnectors       = $appProxyConnectors.Count
+                    ManagedAsPlatform     = $managedAsPlatform.Count
+                    NotManagedAsPlatform  = $appProxyConnectors.Count - $managedAsPlatform.Count
+                    Message               = "Some Application Proxy connectors are managed as platform resources, but not all."
+                }
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for IAM item B04.01
