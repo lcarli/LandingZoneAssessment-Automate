@@ -1050,32 +1050,61 @@ function Test-QuestionB0312 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B03.13
 function Test-QuestionB0313 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Get Diagnostic Settings for Microsoft Entra ID
+        $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId "/providers/microsoft.aadiam/diagnosticSettings"
+
+        if (-not $diagnosticSettings -or $diagnosticSettings.Count -eq 0) {
+            # No diagnostic settings found
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+            $rawData = "No diagnostic settings are configured for Microsoft Entra ID."
+        } else {
+            $logsToAzureMonitor = $diagnosticSettings | Where-Object {
+                $_.WorkspaceId -ne $null -and $_.Logs | Where-Object { $_.Enabled -eq $true }
+            }
+
+            if ($logsToAzureMonitor.Count -eq $diagnosticSettings.Count) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = "All diagnostic settings for Microsoft Entra ID are configured to send logs to Azure Monitor."
+            } elseif ($logsToAzureMonitor.Count -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = "None of the diagnostic settings for Microsoft Entra ID are configured to send logs to Azure Monitor."
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($logsToAzureMonitor.Count / $diagnosticSettings.Count) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalSettings          = $diagnosticSettings.Count
+                    SettingsWithAzureMonitor = $logsToAzureMonitor.Count
+                    SettingsWithoutAzureMonitor = $diagnosticSettings.Count - $logsToAzureMonitor.Count
+                    Message               = "Some diagnostic settings are configured to send logs to Azure Monitor, but not all."
+                }
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for IAM item B03.14
