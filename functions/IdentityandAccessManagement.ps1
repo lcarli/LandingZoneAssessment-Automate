@@ -1355,86 +1355,243 @@ function Test-QuestionB0317 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B04.01
 function Test-QuestionB0401 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Retrieve all VNets in the environment
+        $vnets = Get-AzVirtualNetwork
+
+        if (-not $vnets -or $vnets.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+            $rawData = "No Virtual Networks (VNets) are configured in this environment."
+        } else {
+            $totalVNets = $vnets.Count
+
+            # Identify VNets tagged for identity purposes by checking all tags
+            $identityVNets = $vnets | Where-Object {
+                $_.Tags.Values -match "identity"
+            }
+
+            $peeredVNets = 0
+
+            foreach ($vnet in $identityVNets) {
+                # Check if the VNet is peered to a hub network
+                $peerings = Get-AzVirtualNetworkPeering -ResourceGroupName $vnet.ResourceGroupName -VirtualNetworkName $vnet.Name
+                if ($peerings | Where-Object { $_.RemoteVirtualNetwork.Id -match "hub" -and $_.PeeringState -eq "Connected" }) {
+                    $peeredVNets++
+                }
+            }
+
+            if ($identityVNets.Count -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = "No VNets tagged for identity purposes are configured in the environment."
+            } elseif ($peeredVNets -eq $identityVNets.Count) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalVNets        = $totalVNets
+                    IdentityVNets     = $identityVNets.Count
+                    PeeredVNets       = $peeredVNets
+                    Message           = "All identity VNets are peered to the hub network."
+                }
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($peeredVNets / $identityVNets.Count) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalVNets        = $totalVNets
+                    IdentityVNets     = $identityVNets.Count
+                    PeeredVNets       = $peeredVNets
+                    NotPeeredVNets    = $identityVNets.Count - $peeredVNets
+                    Message           = "Some identity VNets are not peered to the hub network."
+                }
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B04.02
 function Test-QuestionB0402 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Define the resource types to check for RBAC usage
+        $resourceTypes = @("Microsoft.KeyVault/vaults", "Microsoft.Storage/storageAccounts", "Microsoft.Sql/servers")
+
+        # Filter resources by type
+        $resources = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in $resourceTypes
+        }
+
+        if (-not $resources -or $resources.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No resources of the specified types (Key Vault, Storage Account, Database Services) are configured in this environment."
+        } else {
+            $totalResources = $resources.Count
+            $resourcesUsingRBAC = 0
+
+            foreach ($resource in $resources) {
+                switch ($resource.ResourceType) {
+                    "Microsoft.KeyVault/vaults" {
+                        # Check if RBAC is enabled for Key Vault
+                        $keyVault = Get-AzKeyVault -VaultName $resource.Name -ResourceGroupName $resource.ResourceGroupName
+                        if ($keyVault.Properties.EnableRbacAuthorization -eq $true) {
+                            $resourcesUsingRBAC++
+                        }
+                    }
+                    "Microsoft.Storage/storageAccounts" {
+                        # Check if RBAC is enabled for Storage Account
+                        $storageAccount = Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
+                        if ($storageAccount.EnableAzureActiveDirectoryDomainServicesForFile -or $storageAccount.EnableAzureActiveDirectoryKerberosForFile -or $storageAccount.EnableAzureActiveDirectoryDomainServicesForBlob) {
+                            $resourcesUsingRBAC++
+                        }
+                    }
+                    "Microsoft.Sql/servers" {
+                        # Check if Azure AD authentication is enabled for SQL
+                        $sqlServer = Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name
+                        $adAdmins = Get-AzSqlServerActiveDirectoryAdministrator -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name
+                        if ($adAdmins) {
+                            $resourcesUsingRBAC++
+                        }
+                    }
+                }
+            }
+
+            # Determine the status based on the count of resources using RBAC
+            if ($resourcesUsingRBAC -eq $totalResources) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalResources      = $totalResources
+                    ResourcesUsingRBAC  = $resourcesUsingRBAC
+                    Message             = "All resources of specified types are configured to use Azure RBAC for data plane access."
+                }
+            } elseif ($resourcesUsingRBAC -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalResources      = $totalResources
+                    ResourcesUsingRBAC  = $resourcesUsingRBAC
+                    Message             = "None of the specified resources are configured to use Azure RBAC for data plane access."
+                }
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($resourcesUsingRBAC / $totalResources) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalResources      = $totalResources
+                    ResourcesUsingRBAC  = $resourcesUsingRBAC
+                    ResourcesWithoutRBAC = $totalResources - $resourcesUsingRBAC
+                    Message             = "Some resources are configured to use Azure RBAC for data plane access, but not all."
+                }
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for IAM item B04.03
 function Test-QuestionB0403 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Connect to Microsoft Graph with appropriate permissions
+        Connect-MgGraph -Scopes "AccessReview.Read.All"
+
+        # Get all active Access Reviews in PIM
+        $accessReviews = Get-MgAccessReviewScheduleDefinition -Filter "status eq 'active'" -All
+
+        if (-not $accessReviews -or $accessReviews.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+            $rawData = "No active access reviews are configured in Microsoft Entra ID PIM."
+        } else {
+            $totalAccessReviews = $accessReviews.Count
+
+            # Filter access reviews related to resource entitlements (Azure AD roles, Groups, or Resources)
+            $resourceReviews = $accessReviews | Where-Object {
+                $_.ReviewScope -in @("DirectoryRole", "Group", "Resource")
+            }
+
+            if ($resourceReviews.Count -eq $totalAccessReviews) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalAccessReviews  = $totalAccessReviews
+                    ResourceReviews     = $resourceReviews.Count
+                    Message             = "All active access reviews are configured for resource entitlements."
+                }
+            } elseif ($resourceReviews.Count -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalAccessReviews  = $totalAccessReviews
+                    ResourceReviews     = $resourceReviews.Count
+                    Message             = "None of the active access reviews are related to resource entitlements."
+                }
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($resourceReviews.Count / $totalAccessReviews) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalAccessReviews      = $totalAccessReviews
+                    ResourceReviews         = $resourceReviews.Count
+                    NonResourceReviews      = $totalAccessReviews - $resourceReviews.Count
+                    Message                 = "Some active access reviews are configured for resource entitlements, but not all."
+                }
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
