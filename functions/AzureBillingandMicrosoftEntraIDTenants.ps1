@@ -64,7 +64,7 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
 function Test-QuestionA0101 {
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -119,7 +119,7 @@ function Test-QuestionA0102 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -173,7 +173,7 @@ function Test-QuestionA0103 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
@@ -251,7 +251,7 @@ function Test-QuestionA0201 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
@@ -318,7 +318,7 @@ function Test-QuestionA0202 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -387,7 +387,7 @@ function Test-QuestionA0203 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -459,7 +459,7 @@ function Test-QuestionA0301 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -561,7 +561,7 @@ function Test-QuestionA0302 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -649,7 +649,7 @@ function Test-QuestionA0304 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -752,7 +752,7 @@ function Test-QuestionA0305 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -842,7 +842,7 @@ function Test-QuestionA0401 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -929,7 +929,7 @@ function Test-QuestionA0402 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -1020,7 +1020,7 @@ function Test-QuestionA0403 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -1100,7 +1100,7 @@ function Test-QuestionA0404 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
