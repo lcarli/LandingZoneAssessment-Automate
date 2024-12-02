@@ -98,35 +98,69 @@ function Generate-MainSection {
 "@
 }
 
-# Function to generate the JavaScript section
-function Generate-JavaScript2 {
+function Generate-JavaScript {
+  $js = @()
+  $js += Generate-JavaScriptConstants
+  $js += Generate-JavaScriptInitialization
+  $js += Generate-JavaScriptFunctions
+  $js -join "`n"
+}
+
+function Generate-JavaScriptConstants {
   @"
-<script>
-const jsonReportListData =
-    __REPORTLISTDATA__
-;
+const jsonReportListData = __REPORTLISTDATA__;
+const errorLogData = __ERRORLOGDATA__;
 
 const categoryMapping = {
-  "Azure Billing and Microsoft Entra ID Tenants": "Billing",
-  "Identity and Access Management": "IAM",
-  "Network Topology and Connectivity": "Network",
-  Security: "Security",
-  Management: "Management",
-  "Resource Organization": "ResourceOrganization",
-  "Platform Automation and DevOps": "DevOps",
-  Governance: "Governance",
+"Azure Billing and Microsoft Entra ID Tenants": "Billing",
+"Identity and Access Management": "IAM",
+"Network Topology and Connectivity": "Network",
+"Security": "Security",
+"Management": "Management",
+"Resource Organization": "ResourceOrganization",
+"Platform Automation and DevOps": "DevOps",
+"Governance": "Governance",
 };
 
 const Status = {
-    Implemented: 1,
-    PartialImplemented: 2,
-    NotImplemented: 3,
-    Unknown: 4,
-    ManualVerificationRequired: 5,
-    NotApplicable: 6,
-    Error: 7,
+Implemented: 1,
+PartialImplemented: 2,
+NotImplemented: 3,
+Unknown: 4,
+ManualVerificationRequired: 5,
+NotApplicable: 6,
+Error: 7,
 };
+"@
+}
 
+function Generate-JavaScriptInitialization {
+  @"
+window.onload = function () {
+  populateOverallStatusTable();
+  updateWAFChart();
+  populateDetailsTable();
+  populateErrorLogTable();
+};
+"@
+}
+
+function Generate-JavaScriptFunctions {
+  $functions = @()
+  $functions += GenerateCalculateStatusDataFunction
+  $functions += GenerateCalculateCategoryStatusDataFunction
+  $functions += GeneratePopulateOverallStatusTableFunction
+  $functions += GeneratePopulateCategoryTableFunction
+  $functions += GeneratePopulateDetailsTableFunction
+  $functions += GeneratePopulateErrorLogTableFunction
+  $functions += GeneratePieChartFunction
+  $functions += GenerateRadarChartFunction
+  $functions += GenerateWAFChartFunction
+  $functions -join "`n"
+}
+
+function GenerateCalculateStatusDataFunction {
+  @"
 function calculateStatusData() {
     const statusCounts = {
         High: {
@@ -225,7 +259,11 @@ function calculateStatusData() {
 
     return statusCounts;
 }
+"@
+}
 
+function GenerateCalculateCategoryStatusDataFunction {
+  @"
 function calculateCategoryStatusData() {
   const categoryStatusCounts = {};
 
@@ -290,29 +328,13 @@ function calculateCategoryStatusData() {
 
   return categoryStatusCounts;
 }
-  
-function populateCategoryTable() {
-  const tableBody = document.getElementById("table-body-category");
-  const categoryStatusData = calculateCategoryStatusData();
-
-  Object.keys(categoryStatusData).forEach((category) => {
-    const row = categoryStatusData[category];
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-  "<td>" + category + "</td>" +
-  "<td>" + row.NotVerified + "</td>" +
-  "<td>" + row.Open + "</td>" +
-  "<td>" + row.Closed + "</td>" +
-  "<td>" + row.Total + "</td>" +
-  "<td>" + row.Progress.toFixed(2) + "%</td>";
-    tableBody.appendChild(tr);
-  });
-  // Update the radar chart with the category data
-  updateRadarChart(categoryStatusData);
+"@
 }
 
-function populateTable() {
-  const tableBody = document.getElementById("table-body-overall");
+function GeneratePopulateOverallStatusTableFunction {
+  @"
+function populateOverallStatusTable() {
+const tableBody = document.getElementById("table-body-overall");
   const statusData = calculateStatusData();
 
   let totalImplemented = 0;
@@ -364,7 +386,7 @@ function populateTable() {
   tableBody.appendChild(totalRow);
 
   // Update the pie chart with the totals
-  updatePieChart({
+  populatePieChart({
     Implemented: totalImplemented,
     PartialImplemented: totalPartialImplemented,
     NotImplemented: totalNotImplemented,
@@ -378,184 +400,35 @@ function populateTable() {
   // Populate the category table
   populateCategoryTable();
 }
-
-function updatePieChart(totals) {
-  const ctxDesignAreaPie = document
-    .getElementById("designAreaPieChart")
-    .getContext("2d");
-  const designAreaPieChart = new Chart(ctxDesignAreaPie, {
-    type: "pie",
-    data: {
-      labels: [
-        "Implemented",
-        "Partial Implemented",
-        "Not Implemented",
-        "Unknown",
-        "Manual Verification Required",
-        "Not Applicable",
-        "Not Developed",
-        "Error",
-      ],
-      datasets: [
-        {
-          label: "Overall Status",
-          data: [
-            totals.Implemented,
-            totals.PartialImplemented,
-            totals.NotImplemented,
-            totals.Unknown,
-            totals.ManualVerificationRequired,
-            totals.NotApplicable,
-            totals.NotDeveloped,
-            totals.Error,
-          ],
-          backgroundColor: [
-            "rgba(75, 192, 192, 0.2)",
-            "rgba(54, 162, 235, 0.2)",
-            "rgba(255, 99, 132, 0.2)",
-            "rgba(255, 206, 86, 0.2)",
-            "rgba(153, 102, 255, 0.2)",
-            "rgba(255, 159, 64, 0.2)",
-            "rgba(255, 159, 108, 0.2)",
-            "rgba(201, 203, 207, 0.2)",
-          ],
-          borderColor: [
-            "rgba(75, 192, 192, 1)",
-            "rgba(54, 162, 235, 1)",
-            "rgba(255, 99, 132, 1)",
-            "rgba(255, 206, 86, 1)",
-            "rgba(153, 102, 255, 1)",
-            "rgba(255, 159, 64, 1)",
-            "rgba(255, 159, 108, 1)",
-            "rgba(201, 203, 207, 1)",
-          ],
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: {
-          position: "top",
-        },
-        title: {
-          display: true,
-          text: "Overall Status Pie Chart",
-        },
-      },
-    },
-  });
+"@
 }
 
-function updateRadarChart(categoryStatusData) {
-  const labels = Object.keys(categoryStatusData);
-  const data = labels.map(
-    (category) => categoryStatusData[category].Progress
-  );
+function GeneratePopulateCategoryTableFunction {
+  @"
+function populateCategoryTable() {
+  const tableBody = document.getElementById("table-body-category");
+  const categoryStatusData = calculateCategoryStatusData();
 
-  const ctxLowRadar = document
-    .getElementById("lowRadarChart")
-    .getContext("2d");
-  const lowRadarChart = new Chart(ctxLowRadar, {
-    type: "radar",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: "Progress",
-          data: data,
-          backgroundColor: "rgba(54, 162, 235, 0.2)",
-          borderColor: "rgba(54, 162, 235, 1)",
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: "Progress by Category",
-        },
-      },
-      scales: {
-        r: {
-          angleLines: {
-            display: true,
-          },
-          suggestedMin: 0,
-          suggestedMax: 100,
-        },
-      },
-    },
+  Object.keys(categoryStatusData).forEach((category) => {
+    const row = categoryStatusData[category];
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+  "<td>" + category + "</td>" +
+  "<td>" + row.NotVerified + "</td>" +
+  "<td>" + row.Open + "</td>" +
+  "<td>" + row.Closed + "</td>" +
+  "<td>" + row.Total + "</td>" +
+  "<td>" + row.Progress.toFixed(2) + "%</td>";
+    tableBody.appendChild(tr);
   });
+  // Update the radar chart with the category data
+  populateRadarChart(categoryStatusData);
+}
+"@
 }
 
-
-function calculateWAFData() {
-  const wafCounts = {};
-
-  Object.values(jsonReportListData).forEach((category) => {
-      (category || []).forEach((item) => {
-          const waf = item.RawSource?.waf || "Unknown";
-          if (!wafCounts[waf]) {
-            wafCounts[waf] = 0;
-          }
-          const reportItem = Object.values(jsonReportListData)
-            .flat()
-            .find((report) => report.RawSource?.id === item.RawSource?.id);
-          if (reportItem) {
-            wafCounts[waf]++;
-          }
-      });
-  });
-
-  return wafCounts;
-}
-
-function updateWAFChart() {
-  const wafData = calculateWAFData();
-  const labels = Object.keys(wafData);
-  const data = Object.values(wafData);
-
-  const ctxWAFChart = document
-    .getElementById("wafChart")
-    .getContext("2d");
-  const wafChart = new Chart(ctxWAFChart, {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: "WAF Indicator",
-          data: data,
-          backgroundColor: "rgba(75, 192, 192, 0.2)",
-          borderColor: "rgba(75, 192, 192, 1)",
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: {
-          position: "top",
-        },
-        title: {
-          display: true,
-          text: "WAF Indicator Chart",
-        },
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-        },
-      },
-    },
-  });
-}
-
+function GeneratePopulateDetailsTableFunction {
+  @"
 function getCoveredItems() {
   const coveredItems = [];
 
@@ -601,8 +474,7 @@ function getCoveredItems() {
   return coveredItems;
 }
 
-
-function populateAllItemsTable() {
+function populateDetailsTable() {
   const tableBody = document.getElementById("table-body-all-items");
   const coveredItems = getCoveredItems();
   const categories = [
@@ -671,12 +543,12 @@ function populateAllItemsTable() {
     tableBody.appendChild(contentRowGroup);
   });
 }
-
-// Placeholder for ErrorLog.csv content
-const errorLogData = `__ERRORLOGDATA__`;
-
+"@
+}
+function GeneratePopulateErrorLogTableFunction {
+  @"
 function populateErrorLogTable() {
-    const errorLogContainer = document.getElementById('error-log-container');
+const errorLogContainer = document.getElementById('error-log-container');
     errorLogContainer.innerHTML = ''; // Clear previous content
 
     const categories = [...new Set(errorLogData.errorsArray.map(error => error.Category))];
@@ -720,152 +592,76 @@ function populateErrorLogTable() {
         errorLogContainer.appendChild(content);
     });
 }
-
- window.onload = function () {
-  populateTable();
-  updateWAFChart();
-  populateAllItemsTable();
-  populateErrorLogTable();
-};
-</script>
 "@
 }
-
-function Generate-JavaScript {
-  @"
-<script>
-const jsonReportListData = __REPORTLISTDATA__;
-const errorLogData = __ERRORLOGDATA__;
-
-const categoryMapping = {
-  "Azure Billing and Microsoft Entra ID Tenants": "Billing",
-  "Identity and Access Management": "IAM",
-  "Network Topology and Connectivity": "Network",
-  Security: "Security",
-  Management: "Management",
-  "Resource Organization": "ResourceOrganization",
-  "Platform Automation and DevOps": "DevOps",
-  Governance: "Governance",
-};
-
-const Status = {
-  Implemented: 1,
-  PartialImplemented: 2,
-  NotImplemented: 3,
-  Unknown: 4,
-  ManualVerificationRequired: 5,
-  NotApplicable: 6,
-  Error: 7,
-};
-
-// Main initialization function
-window.onload = function () {
-  populateOverallStatusTable();
-  populatePieChart();
-  populateCategoryStatusTable();
-  populateRadarChart();
-  populateDetailsTable();
-  populateErrorLogTable();
-};
-
-// Functions
-${GenerateOverallStatusTableFunction()}
-${GeneratePieChartFunction()}
-${GenerateCategoryStatusTableFunction()}
-${GenerateRadarChartFunction()}
-${GenerateDetailsTableFunction()}
-${GenerateErrorLogTableFunction()}
-</script>
-"@
-}
-
-function GenerateOverallStatusTableFunction {
-  @"
-function populateOverallStatusTable() {
-  const tableBody = document.getElementById("table-body-overall");
-  const statusData = calculateStatusData();
-
-  let total = {
-      Implemented: 0,
-      PartialImplemented: 0,
-      NotImplemented: 0,
-      Unknown: 0,
-      ManualVerificationRequired: 0,
-      NotApplicable: 0,
-      NotDeveloped: 0,
-      Error: 0
-  };
-
-  Object.keys(statusData).forEach(severity => {
-      const row = statusData[severity];
-      Object.keys(total).forEach(key => total[key] += row[key]);
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-          "<td>" + severity + "</td>" +
-          "<td>" + row.Implemented + "</td>" +
-          "<td>" + row.PartialImplemented + "</td>" +
-          "<td>" + row.NotImplemented + "</td>" +
-          "<td>" + row.Unknown + "</td>" +
-          "<td>" + row.ManualVerificationRequired + "</td>" +
-          "<td>" + row.NotApplicable + "</td>" +
-          "<td>" + row.NotDeveloped + "</td>" +
-          "<td>" + row.Error + "</td>";
-      tableBody.appendChild(tr);
-  });
-
-  const totalRow = document.createElement("tr");
-  totalRow.innerHTML = `
-      "<td><strong>Total</strong></td>" +
-      Object.keys(total).map(key => "<td><strong>" + total[key] + "</strong></td>").join("");
-  tableBody.appendChild(totalRow);
-}
-"@
-}
-
 function GeneratePieChartFunction {
   @"
-function populatePieChart() {
-  const totals = calculateStatusDataTotals();
-  const ctx = document.getElementById("designAreaPieChart").getContext("2d");
-  new Chart(ctx, {
-      type: "pie",
-      data: {
-          labels: Object.keys(totals),
-          datasets: [{
-              data: Object.values(totals),
-              backgroundColor: ["#4caf50", "#2196f3", "#ff5722", "#ffc107", "#9c27b0", "#00bcd4", "#607d8b", "#e91e63"]
-          }]
+function populatePieChart(totals) {
+  const ctxDesignAreaPie = document
+    .getElementById("designAreaPieChart")
+    .getContext("2d");
+  const designAreaPieChart = new Chart(ctxDesignAreaPie, {
+    type: "pie",
+    data: {
+      labels: [
+        "Implemented",
+        "Partial Implemented",
+        "Not Implemented",
+        "Unknown",
+        "Manual Verification Required",
+        "Not Applicable",
+        "Not Developed",
+        "Error",
+      ],
+      datasets: [
+        {
+          label: "Overall Status",
+          data: [
+            totals.Implemented,
+            totals.PartialImplemented,
+            totals.NotImplemented,
+            totals.Unknown,
+            totals.ManualVerificationRequired,
+            totals.NotApplicable,
+            totals.NotDeveloped,
+            totals.Error,
+          ],
+          backgroundColor: [
+            "rgba(75, 192, 192, 0.2)",
+            "rgba(54, 162, 235, 0.2)",
+            "rgba(255, 99, 132, 0.2)",
+            "rgba(255, 206, 86, 0.2)",
+            "rgba(153, 102, 255, 0.2)",
+            "rgba(255, 159, 64, 0.2)",
+            "rgba(255, 159, 108, 0.2)",
+            "rgba(201, 203, 207, 0.2)",
+          ],
+          borderColor: [
+            "rgba(75, 192, 192, 1)",
+            "rgba(54, 162, 235, 1)",
+            "rgba(255, 99, 132, 1)",
+            "rgba(255, 206, 86, 1)",
+            "rgba(153, 102, 255, 1)",
+            "rgba(255, 159, 64, 1)",
+            "rgba(255, 159, 108, 1)",
+            "rgba(201, 203, 207, 1)",
+          ],
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "top",
+        },
+        title: {
+          display: true,
+          text: "Overall Status Pie Chart",
+        },
       },
-      options: {
-          responsive: true,
-          plugins: {
-              legend: { position: "top" },
-              title: { display: true, text: "Overall Status Pie Chart" }
-          }
-      }
-  });
-}
-"@
-}
-
-function GenerateCategoryStatusTableFunction {
-  @"
-function populateCategoryStatusTable() {
-  const tableBody = document.getElementById("table-body-category");
-  const categoryStatusData = calculateCategoryStatusData();
-
-  Object.keys(categoryStatusData).forEach(category => {
-      const row = categoryStatusData[category];
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-          "<td>" + category + "</td>" +
-          "<td>" + row.NotVerified + "</td>" +
-          "<td>" + row.Open + "</td>" +
-          "<td>" + row.Closed + "</td>" +
-          "<td>" + row.Total + "</td>" +
-          "<td>" + row.Progress.toFixed(2) + "%</td>";
-      tableBody.appendChild(tr);
+    },
   });
 }
 "@
@@ -873,110 +669,110 @@ function populateCategoryStatusTable() {
 
 function GenerateRadarChartFunction {
   @"
-function populateRadarChart() {
-  const categoryStatusData = calculateCategoryStatusData();
+function populateRadarChart(categoryStatusData) {
   const labels = Object.keys(categoryStatusData);
-  const data = labels.map(category => categoryStatusData[category].Progress);
+  const data = labels.map(
+    (category) => categoryStatusData[category].Progress
+  );
 
-  const ctx = document.getElementById("lowRadarChart").getContext("2d");
+  const ctxLowRadar = document
+    .getElementById("lowRadarChart")
+    .getContext("2d");
+  const lowRadarChart = new Chart(ctxLowRadar, {
+    type: "radar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Progress",
+          data: data,
+          backgroundColor: "rgba(54, 162, 235, 0.2)",
+          borderColor: "rgba(54, 162, 235, 1)",
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: "Progress by Category",
+        },
+      },
+      scales: {
+        r: {
+          angleLines: {
+            display: true,
+          },
+          suggestedMin: 0,
+          suggestedMax: 100,
+        },
+      },
+    },
+  });
+}
+"@
+}
+function GenerateWAFChartFunction {
+  @"
+  function calculateWAFData() {
+    const wafCounts = {};
+
+    Object.values(jsonReportListData).forEach((category) => {
+        (category || []).forEach((item) => {
+            const waf = item.RawSource?.waf || "Unknown";
+            if (!wafCounts[waf]) {
+                wafCounts[waf] = 0;
+            }
+            wafCounts[waf]++;
+        });
+    });
+
+    return wafCounts;
+}
+
+function updateWAFChart() {
+  const wafData = calculateWAFData();
+  const labels = Object.keys(wafData);
+  const data = Object.values(wafData);
+
+  const ctx = document.getElementById('wafChart').getContext('2d');
   new Chart(ctx, {
-      type: "radar",
+      type: 'bar',
       data: {
           labels: labels,
-          datasets: [{
-              label: "Progress",
-              data: data,
-              backgroundColor: "rgba(54, 162, 235, 0.2)",
-              borderColor: "rgba(54, 162, 235, 1)",
-              borderWidth: 1
-          }]
+          datasets: [
+              {
+                  label: 'WAF Indicator',
+                  data: data,
+                  backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                  borderColor: 'rgba(75, 192, 192, 1)',
+                  borderWidth: 1,
+              },
+          ],
       },
       options: {
           responsive: true,
           plugins: {
-              title: { display: true, text: "Progress by Category" }
+              legend: {
+                  position: 'top',
+              },
+              title: {
+                  display: true,
+                  text: 'WAF Indicator Chart',
+              },
           },
           scales: {
-              r: { beginAtZero: true }
-          }
-      }
+              y: {
+                  beginAtZero: true,
+              },
+          },
+      },
   });
 }
 "@
 }
-
-function GenerateDetailsTableFunction {
-  @"
-function populateDetailsTable() {
-  const tableBody = document.getElementById("table-body-all-items");
-  const coveredItems = getCoveredItems();
-
-  coveredItems.forEach(item => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-          "<td>" + item.category + "</td>" +
-          "<td>" + item.subcategory + "</td>" +
-          "<td>" + item.status + "</td>" +
-          "<td>" + item.description + "</td>" +
-          "<td>" + item.waf + "</td>" +
-          "<td>" + item.id + "</td>" +
-          "<td>" + item.severity + "</td>" +
-          "<td><a href='" + item.training + "'>Training</a></td>" +
-          "<td><a href='" + item.reference + "'>Reference</a></td>";
-      tableBody.appendChild(tr);
-  });
-}
-"@
-}
-
-function GenerateErrorLogTableFunction {
-  @"
-function populateErrorLogTable() {
-  const errorLogContainer = document.getElementById('error-log-container');
-  errorLogContainer.innerHTML = '';
-
-  const categories = [...new Set(errorLogData.errorsArray.map(error => error.Category))];
-
-  categories.forEach(category => {
-      const header = document.createElement('div');
-      header.className = 'collapsible-header';
-      header.innerHTML = "<h4>" + category + "</h4>";
-      header.onclick = function () {
-          this.nextElementSibling.classList.toggle('active');
-      };
-      errorLogContainer.appendChild(header);
-
-      const content = document.createElement('div');
-      content.className = 'collapsible-content';
-      const table = document.createElement('table');
-      table.className = 'fixed-header-table';
-      table.innerHTML = `
-          "<thead>" +
-              "<tr>" +
-                  "<th>Question ID</th>" +
-                  "<th>Question Text</th>" +
-                  "<th>Function Name</th>" +
-                  "<th>Error Message</th>" +
-              "</tr>" +
-          "</thead>" +
-          "<tbody>"
-          ${errorLogData.errorsArray
-              .filter(error => error.Category === category)
-              .map(error => `
-                  "<tr>" +
-                      "<td>" + error.QuestionID + "</td>" +
-                      "<td>" + error.QuestionText + "</td>" +
-                      "<td>" + error.FunctionName + "</td>" +
-                      "<td>" + error.ErrorMessage + "</td>" +
-                  "</tr>").join('')}
-          "</tbody>"
-      content.appendChild(table);
-      errorLogContainer.appendChild(content);
-  });
-}
-"@
-}
-
 function Generate-HTMLFooter {
   @"
   </body>
@@ -984,14 +780,15 @@ function Generate-HTMLFooter {
 "@
 }
 
-# Function to generate the complete HTML
 function Generate-HTML {
   $html = @()
   $html += Generate-HTMLHead
   $html += "<body>"
   $html += Generate-HTMLHeader
   $html += Generate-MainSection
-  $html += Generate-JavaScript2
+  $html += "<script>"
+  $html += Generate-JavaScript
+  $html += "</script>"
   $html += Generate-HTMLFooter
   $html -join "`n"
 }
