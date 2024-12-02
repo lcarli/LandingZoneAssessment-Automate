@@ -61,6 +61,10 @@ function Test-QuestionE0101 {
     $rawData = $null
 
     try {
+        # Question: Leverage Azure Policy strategically, define controls for your environment, using Policy Initiatives to group related policies.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/overview
+
+        
         # Retrieve all Policy Assignments in the subscription
         $policyAssignments = $global:AzData.Policies
 
@@ -118,6 +122,10 @@ function Test-QuestionE0103 {
     $rawData = $null
 
     try {
+        # Question: Map regulatory and compliance requirements to Azure Policy definitions and Azure role assignments.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/samples/policy-compliance
+
+
         # Retrieve all Policy Assignments in the subscription
         $policyAssignments = $global:AzData.Policies
 
@@ -174,6 +182,9 @@ function Test-QuestionE0104 {
     $rawData = $null
 
     try {
+        # Question: Establish Azure Policy definitions at the intermediate root management group so that they can be assigned at inherited scopes.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/overview
+
         # Retrieve all Management Groups
         $managementGroups = $global:AzData.ManagementGroups
 
@@ -257,6 +268,10 @@ function Test-QuestionE0105 {
     $rawData = $null
 
     try {
+        # Question: Manage policy assignments at the highest appropriate level with exclusions at bottom levels, if required.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/overview
+
+
         $rootGroup = $global:AzData.ManagementGroups | Where-Object { -not $_.ParentId }
 
         if (-not $rootGroup) {
@@ -312,7 +327,6 @@ function Test-QuestionE0105 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
 function Test-QuestionE0106 {
     [CmdletBinding()]
     param(
@@ -327,6 +341,10 @@ function Test-QuestionE0106 {
     $rawData = $null
 
     try {
+        # Question: Use Azure Policy to control which services users can provision at the subscription/management group level.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/overview
+
+
         $policyAssignments = $global:AzData.Policies
         $managementGroups = $global:AzData.ManagementGroups
         $subscriptions = $global:AzData.Subscriptions
@@ -396,6 +414,9 @@ function Test-QuestionE0107 {
     $rawData = "This question requires manual verification to evaluate if custom policies can be replaced with built-in policies to minimize operational overhead."
 
     try {
+        # Question: Use built-in policies where possible to minimize operational overhead.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/samples/
+
         # No automated logic is implemented here
         $status = [Status]::ManualVerificationRequired
     } catch {
@@ -422,6 +443,9 @@ function Test-QuestionE0108 {
     $rawData = $null
 
     try {
+        # Question: Assign the built-in Resource Policy Contributor role at a particular scope to enable application-level governance.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/overview
+
         $managementGroups = $global:AzData.ManagementGroups
         $subscriptions = $global:AzData.Subscriptions
         $roleAssignments = Get-AzRoleAssignment
@@ -491,6 +515,9 @@ function Test-QuestionE0109 {
     $rawData = "This question requires manual verification to determine if the number of Azure Policy assignments at the root management group scope is appropriately limited to avoid excessive use of exclusions."
 
     try {
+        # Question: Limit the number of Azure Policy assignments made at the root management group scope to avoid managing through exclusions at inherited scopes.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/overview
+
         # No automated logic is implemented here
         $status = [Status]::ManualVerificationRequired
     } catch {
@@ -517,6 +544,9 @@ function Test-QuestionE0110 {
     $rawData = "This question requires manual verification to determine if Azure Policies are deployed to enforce data sovereignty requirements, based on existing regulatory and organizational needs."
 
     try {
+        # Question: If any data sovereignty requirements exist, Azure Policies should be deployed to enforce them.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/overview
+
         # No automated logic is implemented here
         $status = [Status]::ManualVerificationRequired
     } catch {
@@ -543,6 +573,9 @@ function Test-QuestionE0111 {
     $rawData = "This question requires manual verification to ensure that the sovereignty policy baseline is deployed and assigned at the correct management group level for Sovereign Landing Zone."
 
     try {
+        # Question: For Sovereign Landing Zone, deploy sovereignty policy baseline and assign at correct management group level.
+        # Reference: https://learn.microsoft.com/industry/sovereignty/policy-portfolio-baseline
+
         # No automated logic is implemented here
         $status = [Status]::ManualVerificationRequired
     } catch {
@@ -569,6 +602,9 @@ function Test-QuestionE0112 {
     $rawData = "This question requires manual verification to document Sovereign Control objectives to policy mapping for Sovereign Landing Zone."
 
     try {
+        # Question: For Sovereign Landing Zone, document Sovereign Control objectives to policy mapping.
+        # Reference: https://learn.microsoft.com/industry/sovereignty/policy-portfolio-baseline
+
         # No automated logic is implemented here
         $status = [Status]::ManualVerificationRequired
     } catch {
@@ -595,6 +631,9 @@ function Test-QuestionE0113 {
     $rawData = "This question requires manual verification to ensure a process is in place for the management of 'Sovereign Control objectives to policy mapping' for Sovereign Landing Zone."
 
     try {
+        # Question: For Sovereign Landing Zone, ensure process is in place for management of 'Sovereign Control objectives to policy mapping'.
+        # Reference: https://learn.microsoft.com/industry/sovereignty/policy-portfolio-baseline#sovereignty-baseline-policy-initiatives
+
         # No automated logic is implemented here
         $status = [Status]::ManualVerificationRequired
     } catch {
@@ -621,6 +660,9 @@ function Test-QuestionE0202 {
     $rawData = $null
 
     try {
+        # Question: Configure 'Actual' and 'Forecasted' Budget Alerts.
+        # Reference: https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets
+
         $subscriptions = $global:AzData.Subscriptions
         $totalSubscriptions = $subscriptions.Count
         $subscriptionsWithBudgetAlerts = 0
