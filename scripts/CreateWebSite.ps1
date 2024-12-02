@@ -1,6 +1,6 @@
 # Function to generate the HTML <head> section
 function Generate-HTMLHead {
-    @"
+  @"
 <!DOCTYPE html>
 <html lang='en'>
   <head>
@@ -16,7 +16,7 @@ function Generate-HTMLHead {
 
 # Function to generate the header section
 function Generate-HTMLHeader {
-    @"
+  @"
 <header>
   <h1>Azure Review Checklist</h1>
 </header>
@@ -25,7 +25,7 @@ function Generate-HTMLHeader {
 
 # Function to generate the main content section
 function Generate-MainSection {
-    @"
+  @"
 <main>
   <section>
     <div class='container'>
@@ -85,6 +85,13 @@ function Generate-MainSection {
           <tbody id='table-body-all-items'></tbody>
         </table>
       </div>
+      </br>
+      <div class="section chart-xx-large">
+        <h3>Error Log</h3>
+        <div id="error-log-container">
+            <!-- Error Log Categories and Details will be populated via JS -->
+        </div>
+      </div>
     </div>
   </section>
 </main>
@@ -92,8 +99,8 @@ function Generate-MainSection {
 }
 
 # Function to generate the JavaScript section
-function Generate-JavaScript {
-    @"
+function Generate-JavaScript2 {
+  @"
 <script>
 const jsonReportListData =
     __REPORTLISTDATA__
@@ -243,7 +250,7 @@ function calculateCategoryStatusData() {
             categoryStatusCounts[categoryName].Closed++;
             break;
           case Status.PartialImplemented:
-            categoryStatusCounts[categoryName].NotVerified++;
+            categoryStatusCounts[categoryName].Open++;
             break;
           case Status.NotImplemented:
             categoryStatusCounts[categoryName].Open++;
@@ -252,7 +259,7 @@ function calculateCategoryStatusData() {
             categoryStatusCounts[categoryName].NotVerified++;
             break;
           case Status.ManualVerificationRequired:
-            categoryStatusCounts[categoryName].Open++;
+            categoryStatusCounts[categoryName].NotVerified++;
             break;
           case Status.NotApplicable:
             categoryStatusCounts[categoryName].Closed++;
@@ -261,7 +268,7 @@ function calculateCategoryStatusData() {
             categoryStatusCounts[categoryName].NotVerified++;
             break;
           case Status.Error:
-            categoryStatusCounts[categoryName].Open++;
+            categoryStatusCounts[categoryName].NotVerified++;
             break;
           default:
             categoryStatusCounts[categoryName].NotVerified++;
@@ -579,14 +586,9 @@ function getCoveredItems() {
         coveredItems.push({
           category: categoryKey,
           subcategory: checkItem.RawSource?.subcategory,
-          status: matchedItem
-            ? Object.keys(Status).find(
-                (key) => Status[key] === matchedItem.Status
-              )
-            : "Open",
+          status: checkItem.Status,
           description: checkItem.RawSource?.text,
           waf: checkItem.RawSource?.waf,
-          service: checkItem.RawSource?.service,
           id: checkItem.RawSource?.id,
           severity: checkItem.RawSource?.severity,
           training: checkItem.RawSource?.training,
@@ -604,7 +606,7 @@ function populateAllItemsTable() {
   const tableBody = document.getElementById("table-body-all-items");
   const coveredItems = getCoveredItems();
   const categories = [
-    ...new Set(coveredItems.map((item) => item.RawSource?.category)),
+    ...new Set(coveredItems.map((item) => item.category)),
   ];
 
   categories.forEach((category) => {
@@ -637,7 +639,6 @@ function populateAllItemsTable() {
       "Status",
       "Description",
       "WAF Category",
-      "Service",
       "id",
       "Severity",
       "Training",
@@ -651,7 +652,7 @@ function populateAllItemsTable() {
     contentRowGroup.appendChild(contentHeaderRow);
 
     coveredItems
-      .filter((item) => item.RawSource?.category === category)
+      .filter((item) => item.category === category)
       .forEach((item) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -660,7 +661,6 @@ function populateAllItemsTable() {
   "<td>" + item.status + "</td>" +
   "<td>" + item.description + "</td>" +
   "<td>" + item.waf + "</td>" +
-  "<td>" + item.service + "</td>" +
   "<td>" + item.id + "</td>" +
   "<td>" + item.severity + "</td>" +
   "<td><a href='" + item.training + "'>Training</a></td>" +
@@ -672,18 +672,313 @@ function populateAllItemsTable() {
   });
 }
 
+// Placeholder for ErrorLog.csv content
+const errorLogData = `__ERRORLOGDATA__`;
+
+function populateErrorLogTable() {
+    const errorLogContainer = document.getElementById('error-log-container');
+    errorLogContainer.innerHTML = ''; // Clear previous content
+
+    const categories = [...new Set(errorLogData.errorsArray.map(error => error.Category))];
+
+    categories.forEach(category => {
+        // Create collapsible header
+        const header = document.createElement('div');
+        header.className = 'collapsible-header';
+        header.innerHTML = "<h4>" + category + "</h4>";
+        header.onclick = function () {
+            this.nextElementSibling.classList.toggle('active');
+        };
+        errorLogContainer.appendChild(header);
+
+        // Create collapsible content
+        const content = document.createElement('div');
+        content.className = 'collapsible-content';
+        const table = document.createElement('table');
+        table.className = 'fixed-header-table';
+        table.innerHTML = `
+            "<thead>" +
+                "<tr>" +
+                    "<th>Question ID</th>" +
+                    "<th>Question Text</th>" +
+                    "<th>Function Name</th>" +
+                    "<th>Error Message</th>" +
+                "</tr>" +
+            "</thead>" +
+            "<tbody>"
+            ${errorLogData.errorsArray
+                .filter(error => error.Category === category)
+                .map(error => `
+                    "<tr>" +
+                        "<td>" + error.QuestionID + "</td>" +
+                        "<td>" + error.QuestionText + "</td>" +
+                        "<td>" + error.FunctionName + "</td>" + 
+                        "<td>" + error.ErrorMessage + "</td>" +
+                    "</tr>").join('')}
+            "</tbody>"
+        content.appendChild(table);
+        errorLogContainer.appendChild(content);
+    });
+}
+
  window.onload = function () {
   populateTable();
   updateWAFChart();
   populateAllItemsTable();
+  populateErrorLogTable();
 };
 </script>
 "@
 }
 
-# Function to generate the HTML footer
+function Generate-JavaScript {
+  @"
+<script>
+const jsonReportListData = __REPORTLISTDATA__;
+const errorLogData = __ERRORLOGDATA__;
+
+const categoryMapping = {
+  "Azure Billing and Microsoft Entra ID Tenants": "Billing",
+  "Identity and Access Management": "IAM",
+  "Network Topology and Connectivity": "Network",
+  Security: "Security",
+  Management: "Management",
+  "Resource Organization": "ResourceOrganization",
+  "Platform Automation and DevOps": "DevOps",
+  Governance: "Governance",
+};
+
+const Status = {
+  Implemented: 1,
+  PartialImplemented: 2,
+  NotImplemented: 3,
+  Unknown: 4,
+  ManualVerificationRequired: 5,
+  NotApplicable: 6,
+  Error: 7,
+};
+
+// Main initialization function
+window.onload = function () {
+  populateOverallStatusTable();
+  populatePieChart();
+  populateCategoryStatusTable();
+  populateRadarChart();
+  populateDetailsTable();
+  populateErrorLogTable();
+};
+
+// Functions
+${GenerateOverallStatusTableFunction()}
+${GeneratePieChartFunction()}
+${GenerateCategoryStatusTableFunction()}
+${GenerateRadarChartFunction()}
+${GenerateDetailsTableFunction()}
+${GenerateErrorLogTableFunction()}
+</script>
+"@
+}
+
+function GenerateOverallStatusTableFunction {
+  @"
+function populateOverallStatusTable() {
+  const tableBody = document.getElementById("table-body-overall");
+  const statusData = calculateStatusData();
+
+  let total = {
+      Implemented: 0,
+      PartialImplemented: 0,
+      NotImplemented: 0,
+      Unknown: 0,
+      ManualVerificationRequired: 0,
+      NotApplicable: 0,
+      NotDeveloped: 0,
+      Error: 0
+  };
+
+  Object.keys(statusData).forEach(severity => {
+      const row = statusData[severity];
+      Object.keys(total).forEach(key => total[key] += row[key]);
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+          "<td>" + severity + "</td>" +
+          "<td>" + row.Implemented + "</td>" +
+          "<td>" + row.PartialImplemented + "</td>" +
+          "<td>" + row.NotImplemented + "</td>" +
+          "<td>" + row.Unknown + "</td>" +
+          "<td>" + row.ManualVerificationRequired + "</td>" +
+          "<td>" + row.NotApplicable + "</td>" +
+          "<td>" + row.NotDeveloped + "</td>" +
+          "<td>" + row.Error + "</td>";
+      tableBody.appendChild(tr);
+  });
+
+  const totalRow = document.createElement("tr");
+  totalRow.innerHTML = `
+      "<td><strong>Total</strong></td>" +
+      Object.keys(total).map(key => "<td><strong>" + total[key] + "</strong></td>").join("");
+  tableBody.appendChild(totalRow);
+}
+"@
+}
+
+function GeneratePieChartFunction {
+  @"
+function populatePieChart() {
+  const totals = calculateStatusDataTotals();
+  const ctx = document.getElementById("designAreaPieChart").getContext("2d");
+  new Chart(ctx, {
+      type: "pie",
+      data: {
+          labels: Object.keys(totals),
+          datasets: [{
+              data: Object.values(totals),
+              backgroundColor: ["#4caf50", "#2196f3", "#ff5722", "#ffc107", "#9c27b0", "#00bcd4", "#607d8b", "#e91e63"]
+          }]
+      },
+      options: {
+          responsive: true,
+          plugins: {
+              legend: { position: "top" },
+              title: { display: true, text: "Overall Status Pie Chart" }
+          }
+      }
+  });
+}
+"@
+}
+
+function GenerateCategoryStatusTableFunction {
+  @"
+function populateCategoryStatusTable() {
+  const tableBody = document.getElementById("table-body-category");
+  const categoryStatusData = calculateCategoryStatusData();
+
+  Object.keys(categoryStatusData).forEach(category => {
+      const row = categoryStatusData[category];
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+          "<td>" + category + "</td>" +
+          "<td>" + row.NotVerified + "</td>" +
+          "<td>" + row.Open + "</td>" +
+          "<td>" + row.Closed + "</td>" +
+          "<td>" + row.Total + "</td>" +
+          "<td>" + row.Progress.toFixed(2) + "%</td>";
+      tableBody.appendChild(tr);
+  });
+}
+"@
+}
+
+function GenerateRadarChartFunction {
+  @"
+function populateRadarChart() {
+  const categoryStatusData = calculateCategoryStatusData();
+  const labels = Object.keys(categoryStatusData);
+  const data = labels.map(category => categoryStatusData[category].Progress);
+
+  const ctx = document.getElementById("lowRadarChart").getContext("2d");
+  new Chart(ctx, {
+      type: "radar",
+      data: {
+          labels: labels,
+          datasets: [{
+              label: "Progress",
+              data: data,
+              backgroundColor: "rgba(54, 162, 235, 0.2)",
+              borderColor: "rgba(54, 162, 235, 1)",
+              borderWidth: 1
+          }]
+      },
+      options: {
+          responsive: true,
+          plugins: {
+              title: { display: true, text: "Progress by Category" }
+          },
+          scales: {
+              r: { beginAtZero: true }
+          }
+      }
+  });
+}
+"@
+}
+
+function GenerateDetailsTableFunction {
+  @"
+function populateDetailsTable() {
+  const tableBody = document.getElementById("table-body-all-items");
+  const coveredItems = getCoveredItems();
+
+  coveredItems.forEach(item => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+          "<td>" + item.category + "</td>" +
+          "<td>" + item.subcategory + "</td>" +
+          "<td>" + item.status + "</td>" +
+          "<td>" + item.description + "</td>" +
+          "<td>" + item.waf + "</td>" +
+          "<td>" + item.id + "</td>" +
+          "<td>" + item.severity + "</td>" +
+          "<td><a href='" + item.training + "'>Training</a></td>" +
+          "<td><a href='" + item.reference + "'>Reference</a></td>";
+      tableBody.appendChild(tr);
+  });
+}
+"@
+}
+
+function GenerateErrorLogTableFunction {
+  @"
+function populateErrorLogTable() {
+  const errorLogContainer = document.getElementById('error-log-container');
+  errorLogContainer.innerHTML = '';
+
+  const categories = [...new Set(errorLogData.errorsArray.map(error => error.Category))];
+
+  categories.forEach(category => {
+      const header = document.createElement('div');
+      header.className = 'collapsible-header';
+      header.innerHTML = "<h4>" + category + "</h4>";
+      header.onclick = function () {
+          this.nextElementSibling.classList.toggle('active');
+      };
+      errorLogContainer.appendChild(header);
+
+      const content = document.createElement('div');
+      content.className = 'collapsible-content';
+      const table = document.createElement('table');
+      table.className = 'fixed-header-table';
+      table.innerHTML = `
+          "<thead>" +
+              "<tr>" +
+                  "<th>Question ID</th>" +
+                  "<th>Question Text</th>" +
+                  "<th>Function Name</th>" +
+                  "<th>Error Message</th>" +
+              "</tr>" +
+          "</thead>" +
+          "<tbody>"
+          ${errorLogData.errorsArray
+              .filter(error => error.Category === category)
+              .map(error => `
+                  "<tr>" +
+                      "<td>" + error.QuestionID + "</td>" +
+                      "<td>" + error.QuestionText + "</td>" +
+                      "<td>" + error.FunctionName + "</td>" +
+                      "<td>" + error.ErrorMessage + "</td>" +
+                  "</tr>").join('')}
+          "</tbody>"
+      content.appendChild(table);
+      errorLogContainer.appendChild(content);
+  });
+}
+"@
+}
+
 function Generate-HTMLFooter {
-    @"
+  @"
   </body>
 </html>
 "@
@@ -691,35 +986,60 @@ function Generate-HTMLFooter {
 
 # Function to generate the complete HTML
 function Generate-HTML {
-    $html = @()
-    $html += Generate-HTMLHead
-    $html += "<body>"
-    $html += Generate-HTMLHeader
-    $html += Generate-MainSection
-    $html += Generate-JavaScript
-    $html += Generate-HTMLFooter
-    $html -join "`n"
+  $html = @()
+  $html += Generate-HTMLHead
+  $html += "<body>"
+  $html += Generate-HTMLHeader
+  $html += Generate-MainSection
+  $html += Generate-JavaScript2
+  $html += Generate-HTMLFooter
+  $html -join "`n"
 }
 
 # Replace the placeholder __REPORTLISTDATA__ with content from the JSON file
 function Replace-ReportDataPlaceholder {
-    param (
-        [string]$HTMLContent,
-        [string]$ReportJsonPath
-    )
+  param (
+    [string]$HTMLContent,
+    [string]$ReportJsonPath
+  )
 
-    # Read the JSON file
-    $reportJsonContent = Get-Content -Path $ReportJsonPath -Raw
-    # Replace the placeholder with the JSON content
-    return $HTMLContent -replace "__REPORTLISTDATA__", $reportJsonContent
+  # Read the JSON file
+  $reportJsonContent = Get-Content -Path $ReportJsonPath -Raw
+  # Replace the placeholder with the JSON content
+  return $HTMLContent -replace "__REPORTLISTDATA__", $reportJsonContent
 }
 
-# Define the path to the report.json file
+# Replace the placeholder __ERRORLOGDATA__ with content from the CSV file
+function Replace-ErrorLogDataPlaceholder {
+  param (
+      [string]$HTMLContent,
+      [string]$ErrorLogPath
+  )
+
+  # Read the ErrorLog.json file
+  $jsonContent = Get-Content -Path $ErrorLogPath -Raw
+
+  # Escape JSON for embedding in JavaScript
+  $escapedJsonContent = $jsonContent -replace '"', '\"' -replace "`r?`n", ""
+
+  # Replace the placeholder with the escaped JSON content
+  return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
+}
+
+
+
+
+#   MAIN CODE
+
+
+
+$errorLogPath = "$PSScriptRoot/../reports/ErrorLog.json"
 $reportJsonPath = "$PSScriptRoot/../reports/report.json"
 
 # Generate the HTML and replace the placeholder
 $htmlContent = Generate-HTML
 $htmlContent = Replace-ReportDataPlaceholder -HTMLContent $htmlContent -ReportJsonPath $reportJsonPath
+$htmlContent = Replace-ErrorLogDataPlaceholder -HTMLContent $htmlContent -ErrorLogPath $errorLogPath
 
 # Save the final HTML to a file
 $outputPath = "$PSScriptRoot/../web/index.html"

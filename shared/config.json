@@ -5,12 +5,12 @@
     "AlzChecklist": "alz_checklist.en.json",
     "DesignAreas": {
         "Billing": true,
-        "IAM": true,
+        "IAM": false,
         "ResourceOrganization": true,
         "Network": false,
         "Governance": true,
-        "Security": true,
-        "DevOps": true,
-        "Management": true
+        "Security": false,
+        "DevOps": false,
+        "Management": false
     }
 }

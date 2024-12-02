@@ -77,6 +77,9 @@ function Test-QuestionF0101 {
     $rawData = $null
 
     try {
+        # Question: Use tagging to define data classification and retention policies for sensitive data in Azure resources.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/concepts/definition-structure#tags
+
         # Get all subscriptions
         $subscriptions = $global:AzData.Subscriptions
 
@@ -213,6 +216,9 @@ function Test-QuestionF0103 {
     $rawData = $null
 
     try {
+        # Question: Configure logging and auditing for data plane and management plane operations for sensitive data and resources.
+        # Reference: https://learn.microsoft.com/azure/azure-monitor/essentials/logs-overview
+
         # Get all subscriptions
         $subscriptions = $global:AzData.Subscriptions
 
@@ -336,6 +342,9 @@ function Test-QuestionF0105 {
     $estimatedPercentageApplied = 0
 
     try {
+        # Question: Enable Microsoft Defender for Cloud to protect sensitive data and resources by detecting potential threats.
+        # Reference: https://learn.microsoft.com/azure/defender-for-cloud/defender-for-cloud-introduction
+
         $subscriptions = $global:AzData.Subscriptions
 
         if ($subscriptions.Count -eq 0) {
@@ -348,7 +357,6 @@ function Test-QuestionF0105 {
             $compliantVms = 0
 
             foreach ($subscription in $subscriptions) {
-                # Filtrar VMs para a subscrição atual
                 $vms = $global:AzData.Resources | Where-Object {
                     $_.ResourceType -eq "Microsoft.Compute/virtualMachines" -and
                     $_.SubscriptionId -eq $subscription.Id
@@ -359,7 +367,6 @@ function Test-QuestionF0105 {
                 foreach ($vm in $vms) {
                     $isCompliant = $true
 
-                    # Encontrar estados de conformidade para esta VM
                     $complianceStates = $global:AzData.Policies | Where-Object {
                         $_.ResourceId -eq $vm.Id -and
                         $_.PolicyDefinitionAction -eq 'deployIfNotExists' -and
@@ -378,7 +385,6 @@ function Test-QuestionF0105 {
             }
 
             if ($totalVms -eq 0) {
-                # No VMs found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
             }
@@ -411,144 +417,334 @@ function Test-QuestionF0105 {
     return $result
 }
 
-# Function for Management item F01.06
 function Test-QuestionF0106 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Question: Encrypt sensitive data at rest using customer-managed keys (CMK).
+        # Reference: https://learn.microsoft.com/azure/security/fundamentals/encryption-atrest
+
+        $resourcesWithCMK = 0
+        $totalResources = 0
+
+        $resources = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in @("Microsoft.Storage/storageAccounts", "Microsoft.Sql/servers", "Microsoft.KeyVault/vaults")
+        }
+
+        if (-not $resources -or $resources.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No resources of the specified types are configured in this environment."
+        } else {
+            $totalResources = $resources.Count
+
+            foreach ($resource in $resources) {
+                switch ($resource.ResourceType) {
+                    "Microsoft.Storage/storageAccounts" {
+                        $storageAccount = Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
+                        if ($storageAccount.EnableEncryptionService && $storageAccount.KeyVaultProperties) {
+                            $resourcesWithCMK++
+                        }
+                    }
+                    "Microsoft.Sql/servers" {
+                        $sqlServer = Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name
+                        if ($sqlServer.EncryptionProtector -and $sqlServer.EncryptionProtector.ServerKeyType -eq "AzureKeyVault") {
+                            $resourcesWithCMK++
+                        }
+                    }
+                    "Microsoft.KeyVault/vaults" {
+                        $keyVault = Get-AzKeyVault -VaultName $resource.Name -ResourceGroupName $resource.ResourceGroupName
+                        if ($keyVault.Properties.EnablePurgeProtection -and $keyVault.Properties.VaultUri) {
+                            $resourcesWithCMK++
+                        }
+                    }
+                }
+            }
+
+            if ($resourcesWithCMK -eq $totalResources) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($resourcesWithCMK -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($resourcesWithCMK / $totalResources) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            }
+
+            $rawData = @{
+                TotalResources      = $totalResources
+                ResourcesWithCMK    = $resourcesWithCMK
+                ResourcesWithoutCMK = $totalResources - $resourcesWithCMK
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.07
 function Test-QuestionF0107 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Question: Encrypt sensitive data in transit using TLS 1.2 or higher.
+        # Reference: https://learn.microsoft.com/azure/security/fundamentals/data-encryption-best-practices
+
+        $resourcesChecked = 0
+        $resourcesCompliant = 0
+
+        $resources = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in @("Microsoft.Sql/servers", "Microsoft.Web/sites", "Microsoft.Storage/storageAccounts")
+        }
+
+        if (-not $resources -or $resources.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No resources of the specified types are configured in this environment."
+        } else {
+            foreach ($resource in $resources) {
+                $resourcesChecked++
+
+                switch ($resource.ResourceType) {
+                    "Microsoft.Sql/servers" {
+                        $sqlServer = Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name
+                        if ($sqlServer.MinimalTlsVersion -ge "1.2") {
+                            $resourcesCompliant++
+                        }
+                    }
+                    "Microsoft.Web/sites" {
+                        $webApp = Get-AzWebApp -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
+                        if ($webApp.HttpsOnly -eq $true) {
+                            $resourcesCompliant++
+                        }
+                    }
+                    "Microsoft.Storage/storageAccounts" {
+                        $storageAccount = Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
+                        if ($storageAccount.MinimumTlsVersion -eq "TLS1_2") {
+                            $resourcesCompliant++
+                        }
+                    }
+                }
+            }
+
+            if ($resourcesCompliant -eq $resourcesChecked) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($resourcesCompliant -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($resourcesCompliant / $resourcesChecked) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            }
+
+            $rawData = @{
+                ResourcesChecked     = $resourcesChecked
+                ResourcesCompliant   = $resourcesCompliant
+                ResourcesNonCompliant = $resourcesChecked - $resourcesCompliant
+            }
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.08
 function Test-QuestionF0108 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Question: Use Azure Key Vault to store and manage access to secrets, keys, and certificates securely.
+        # Reference: https://learn.microsoft.com/azure/key-vault/general/basic-concepts
+
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.KeyVault/vaults" }
+        $compliantVaults = 0
+
+        foreach ($keyVault in $keyVaults) {
+            $properties = Get-AzKeyVault -VaultName $keyVault.Name -ResourceGroupName $keyVault.ResourceGroupName
+            if ($properties.EnableSoftDelete -and $properties.EnablePurgeProtection) {
+                $compliantVaults++
+            }
+        }
+
+        if ($compliantVaults -eq $keyVaults.Count) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($compliantVaults -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($compliantVaults / $keyVaults.Count) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalVaults    = $keyVaults.Count
+            CompliantVaults = $compliantVaults
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.09
 function Test-QuestionF0109 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Question: Regularly rotate secrets, keys, and certificates stored in Azure Key Vault.
+        # Reference: https://learn.microsoft.com/azure/key-vault/general/overview
+
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.KeyVault/vaults" }
+        $vaultsWithRotationPolicy = 0
+
+        foreach ($keyVault in $keyVaults) {
+            $keys = Get-AzKeyVaultKey -VaultName $keyVault.Name
+            foreach ($key in $keys) {
+                if ($key.Attributes.Expires -and ($key.Attributes.Expires -gt (Get-Date))) {
+                    $vaultsWithRotationPolicy++
+                    break
+                }
+            }
+        }
+
+        if ($vaultsWithRotationPolicy -eq $keyVaults.Count) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($vaultsWithRotationPolicy -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($vaultsWithRotationPolicy / $keyVaults.Count) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalVaults         = $keyVaults.Count
+            VaultsWithRotation  = $vaultsWithRotationPolicy
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.10
 function Test-QuestionF0110 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
+        # Question: Ensure proper backup of sensitive data stored in Azure resources.
+        # Reference: https://learn.microsoft.com/azure/backup/backup-overview
+
+        $resourcesWithBackup = 0
+        $totalResources = 0
+
+        $resources = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in @("Microsoft.Sql/servers", "Microsoft.Storage/storageAccounts", "Microsoft.KeyVault/vaults")
+        }
+
+        foreach ($resource in $resources) {
+            $totalResources++
+            if ($resource.Tags["backup"] -eq "enabled") {
+                $resourcesWithBackup++
+            }
+        }
+
+        if ($resourcesWithBackup -eq $totalResources) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($resourcesWithBackup -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($resourcesWithBackup / $totalResources) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalResources         = $totalResources
+            ResourcesWithBackup    = $resourcesWithBackup
+        }
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for Management item F01.11

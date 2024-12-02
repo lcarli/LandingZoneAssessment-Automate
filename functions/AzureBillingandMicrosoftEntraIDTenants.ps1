@@ -64,7 +64,7 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
 function Test-QuestionA0101 {
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -119,7 +119,7 @@ function Test-QuestionA0102 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -173,7 +173,7 @@ function Test-QuestionA0103 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
@@ -251,7 +251,7 @@ function Test-QuestionA0201 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
@@ -318,7 +318,7 @@ function Test-QuestionA0202 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -329,40 +329,41 @@ function Test-QuestionA0202 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-cloud-solution-provider#design-recommendations
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         # Initialize flag to indicate presence of CSP subscriptions
         $hasCspSubscription = $false
 
         foreach ($subscription in $subscriptions) {
             # Check the SubscriptionPolicies for the SubscriptionType
-            $subscriptionContext = Get-AzSubscription -SubscriptionId $subscription.Id
-            $subscriptionPolicies = $subscriptionContext.SubscriptionPolicies
+            $subscriptionContext = $subscriptions | Where-Object { ($_.id -eq $subscription.Id) 
+                $subscriptionPolicies = $subscriptionContext.SubscriptionPolicies
 
-            if ($subscriptionPolicies -and $subscriptionPolicies.SubscriptionType -eq 'CSP') {
-                $hasCspSubscription = $true
-                break
+                if ($subscriptionPolicies -and $subscriptionPolicies.SubscriptionType -eq 'CSP') {
+                    $hasCspSubscription = $true
+                    break
+                }
             }
-        }
 
-        if (-not $hasCspSubscription) {
-            # No CSP subscriptions found
-            $status = [Status]::NotApplicable
-            $estimatedPercentageApplied = 100
-        }
-        else {
-            # CSP subscriptions are present
-            # Since we cannot programmatically verify documentation of support request and escalation process,
-            # we will assume that this needs to be manually verified.
+            if (-not $hasCspSubscription) {
+                # No CSP subscriptions found
+                $status = [Status]::NotApplicable
+                $estimatedPercentageApplied = 100
+            }
+            else {
+                # CSP subscriptions are present
+                # Since we cannot programmatically verify documentation of support request and escalation process,
+                # we will assume that this needs to be manually verified.
 
-            $status = [Status]::ManualVerificationRequired
-            $estimatedPercentageApplied = 0
-        }
+                $status = [Status]::ManualVerificationRequired
+                $estimatedPercentageApplied = 0
+            }
 
-        $score = ($weight * $estimatedPercentageApplied) / 100
-        $rawData = @{
-            Subscriptions      = $subscriptions
-            HasCspSubscription = $hasCspSubscription
+            $score = ($weight * $estimatedPercentageApplied) / 100
+            $rawData = @{
+                Subscriptions      = $subscriptions
+                HasCspSubscription = $hasCspSubscription
+            }
         }
     }
     catch {
@@ -386,7 +387,7 @@ function Test-QuestionA0203 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -401,7 +402,7 @@ function Test-QuestionA0203 {
         $hasBudgets = $false
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         # Check for Cost Management Exports at the subscription level
         foreach ($subscription in $subscriptions) {
@@ -458,7 +459,7 @@ function Test-QuestionA0301 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -560,7 +561,7 @@ function Test-QuestionA0302 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -648,7 +649,7 @@ function Test-QuestionA0304 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
@@ -751,7 +752,7 @@ function Test-QuestionA0305 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -762,7 +763,7 @@ function Test-QuestionA0305 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription -TenantId $TenantId
+        $subscriptions = $global:AzData.Subscriptions
 
         # Initialize counters
         $totalSubscriptions = $subscriptions.Count
@@ -841,7 +842,7 @@ function Test-QuestionA0401 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -928,7 +929,7 @@ function Test-QuestionA0402 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -1019,7 +1020,7 @@ function Test-QuestionA0403 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
@@ -1030,7 +1031,7 @@ function Test-QuestionA0403 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-microsoft-customer-agreement#design-recommendations
 
         # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         # Initialize counters
         $totalSubscriptions = $subscriptions.Count
@@ -1099,7 +1100,7 @@ function Test-QuestionA0404 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    $status = [Status]::Unknown
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0

@@ -7,7 +7,7 @@ function Export-AzureTenantInfo {
 
     try {
         Write-Host "Getting info from tenant..."
-        $tenant = Get-AzTenant -TenantId $TenantId $TenantId
+        $tenant = Get-AzTenant -TenantId $TenantId
 
         $tenantInfo = @{
             Tenant = $tenant
@@ -15,7 +15,7 @@ function Export-AzureTenantInfo {
         }
 
         Write-Host "Getting subscriptions..."
-        $subscriptions = Get-AzSubscription -TenantId $TenantId $TenantId
+        $subscriptions = Get-AzSubscription -TenantId $TenantId
 
         foreach ($subscription in $subscriptions) {
             Write-Host "Processing subscription: $($subscription.Name)..."
@@ -24,7 +24,7 @@ function Export-AzureTenantInfo {
                 ResourceGroups = @()
             }
 
-            Set-AzContext -SubscriptionId $subscription.Id
+            Set-AzContext -SubscriptionId $subscription.Id -TenantId $TenantId
 
             $resourceGroups = Get-AzResourceGroup
 
