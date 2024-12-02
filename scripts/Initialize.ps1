@@ -193,12 +193,32 @@ function Set-GlobalChecklist {
 }
 
 function New-ReportFolder {
-    Write-Host "Creating folder Report if necessary"
+    Write-Host "Ensuring 'reports' folder exists and clearing previous log files..."
+
+    # Define the reports directory path
     $reportsDirectory = "$PSScriptRoot/../reports"
+    $errorLogPath = Join-Path -Path $reportsDirectory -ChildPath "ErrorLog.json"
+    $reportPath = Join-Path -Path $reportsDirectory -ChildPath "report.json"
+
+    # Check if the reports directory exists; if not, create it
     if (!(Test-Path -Path $reportsDirectory)) {
         New-Item -ItemType Directory -Path $reportsDirectory -Force
+        Write-Host "Created 'reports' folder."
+    }
+
+    # Remove ErrorLog.json if it exists
+    if (Test-Path -Path $errorLogPath) {
+        Remove-Item -Path $errorLogPath -Force
+        Write-Host "Deleted 'ErrorLog.json'."
+    }
+
+    # Remove report.json if it exists
+    if (Test-Path -Path $reportPath) {
+        Remove-Item -Path $reportPath -Force
+        Write-Host "Deleted 'report.json'."
     }
 }
+
 
 
 function Initialize-Environment {

@@ -1,6 +1,6 @@
 # Function to generate the HTML <head> section
 function Generate-HTMLHead {
-    @"
+  @"
 <!DOCTYPE html>
 <html lang='en'>
   <head>
@@ -16,7 +16,7 @@ function Generate-HTMLHead {
 
 # Function to generate the header section
 function Generate-HTMLHeader {
-    @"
+  @"
 <header>
   <h1>Azure Review Checklist</h1>
 </header>
@@ -25,7 +25,7 @@ function Generate-HTMLHeader {
 
 # Function to generate the main content section
 function Generate-MainSection {
-    @"
+  @"
 <main>
   <section>
     <div class='container'>
@@ -85,6 +85,13 @@ function Generate-MainSection {
           <tbody id='table-body-all-items'></tbody>
         </table>
       </div>
+      </br>
+      <div class="section chart-xx-large">
+        <h3>Error Log</h3>
+        <div id="error-log-container">
+            <!-- Error Log Categories and Details will be populated via JS -->
+        </div>
+      </div>
     </div>
   </section>
 </main>
@@ -93,7 +100,7 @@ function Generate-MainSection {
 
 # Function to generate the JavaScript section
 function Generate-JavaScript {
-    @"
+  @"
 <script>
 const jsonReportListData =
     __REPORTLISTDATA__
@@ -243,7 +250,7 @@ function calculateCategoryStatusData() {
             categoryStatusCounts[categoryName].Closed++;
             break;
           case Status.PartialImplemented:
-            categoryStatusCounts[categoryName].NotVerified++;
+            categoryStatusCounts[categoryName].Open++;
             break;
           case Status.NotImplemented:
             categoryStatusCounts[categoryName].Open++;
@@ -252,7 +259,7 @@ function calculateCategoryStatusData() {
             categoryStatusCounts[categoryName].NotVerified++;
             break;
           case Status.ManualVerificationRequired:
-            categoryStatusCounts[categoryName].Open++;
+            categoryStatusCounts[categoryName].NotVerified++;
             break;
           case Status.NotApplicable:
             categoryStatusCounts[categoryName].Closed++;
@@ -261,7 +268,7 @@ function calculateCategoryStatusData() {
             categoryStatusCounts[categoryName].NotVerified++;
             break;
           case Status.Error:
-            categoryStatusCounts[categoryName].Open++;
+            categoryStatusCounts[categoryName].NotVerified++;
             break;
           default:
             categoryStatusCounts[categoryName].NotVerified++;
@@ -579,14 +586,9 @@ function getCoveredItems() {
         coveredItems.push({
           category: categoryKey,
           subcategory: checkItem.RawSource?.subcategory,
-          status: matchedItem
-            ? Object.keys(Status).find(
-                (key) => Status[key] === matchedItem.Status
-              )
-            : "Open",
+          status: checkItem.Status,
           description: checkItem.RawSource?.text,
           waf: checkItem.RawSource?.waf,
-          service: checkItem.RawSource?.service,
           id: checkItem.RawSource?.id,
           severity: checkItem.RawSource?.severity,
           training: checkItem.RawSource?.training,
@@ -637,7 +639,6 @@ function populateAllItemsTable() {
       "Status",
       "Description",
       "WAF Category",
-      "Service",
       "id",
       "Severity",
       "Training",
@@ -660,7 +661,6 @@ function populateAllItemsTable() {
   "<td>" + item.status + "</td>" +
   "<td>" + item.description + "</td>" +
   "<td>" + item.waf + "</td>" +
-  "<td>" + item.service + "</td>" +
   "<td>" + item.id + "</td>" +
   "<td>" + item.severity + "</td>" +
   "<td><a href='" + item.training + "'>Training</a></td>" +
@@ -672,10 +672,60 @@ function populateAllItemsTable() {
   });
 }
 
+// Placeholder for ErrorLog.csv content
+const errorLogData = `__ERRORLOGDATA__`;
+
+function populateErrorLogTable() {
+    const errorLogContainer = document.getElementById('error-log-container');
+    errorLogContainer.innerHTML = ''; // Clear previous content
+
+    const categories = [...new Set(errorLogData.errorsArray.map(error => error.Category))];
+
+    categories.forEach(category => {
+        // Create collapsible header
+        const header = document.createElement('div');
+        header.className = 'collapsible-header';
+        header.innerHTML = "<h4>" + category + "</h4>";
+        header.onclick = function () {
+            this.nextElementSibling.classList.toggle('active');
+        };
+        errorLogContainer.appendChild(header);
+
+        // Create collapsible content
+        const content = document.createElement('div');
+        content.className = 'collapsible-content';
+        const table = document.createElement('table');
+        table.className = 'fixed-header-table';
+        table.innerHTML = `
+            "<thead>" +
+                "<tr>" +
+                    "<th>Question ID</th>" +
+                    "<th>Question Text</th>" +
+                    "<th>Function Name</th>" +
+                    "<th>Error Message</th>" +
+                "</tr>" +
+            "</thead>" +
+            "<tbody>"
+            ${errorLogData.errorsArray
+                .filter(error => error.Category === category)
+                .map(error => `
+                    "<tr>" +
+                        "<td>" + error.QuestionID + "</td>" +
+                        "<td>" + error.QuestionText + "</td>" +
+                        "<td>" + error.FunctionName + "</td>" + 
+                        "<td>" + error.ErrorMessage + "</td>" +
+                    "</tr>").join('')}
+            "</tbody>"
+        content.appendChild(table);
+        errorLogContainer.appendChild(content);
+    });
+}
+
  window.onload = function () {
   populateTable();
   updateWAFChart();
   populateAllItemsTable();
+  populateErrorLogTable();
 };
 </script>
 "@
@@ -683,7 +733,7 @@ function populateAllItemsTable() {
 
 # Function to generate the HTML footer
 function Generate-HTMLFooter {
-    @"
+  @"
   </body>
 </html>
 "@
@@ -691,35 +741,55 @@ function Generate-HTMLFooter {
 
 # Function to generate the complete HTML
 function Generate-HTML {
-    $html = @()
-    $html += Generate-HTMLHead
-    $html += "<body>"
-    $html += Generate-HTMLHeader
-    $html += Generate-MainSection
-    $html += Generate-JavaScript
-    $html += Generate-HTMLFooter
-    $html -join "`n"
+  $html = @()
+  $html += Generate-HTMLHead
+  $html += "<body>"
+  $html += Generate-HTMLHeader
+  $html += Generate-MainSection
+  $html += Generate-JavaScript
+  $html += Generate-HTMLFooter
+  $html -join "`n"
 }
 
 # Replace the placeholder __REPORTLISTDATA__ with content from the JSON file
 function Replace-ReportDataPlaceholder {
-    param (
-        [string]$HTMLContent,
-        [string]$ReportJsonPath
-    )
+  param (
+    [string]$HTMLContent,
+    [string]$ReportJsonPath
+  )
 
-    # Read the JSON file
-    $reportJsonContent = Get-Content -Path $ReportJsonPath -Raw
-    # Replace the placeholder with the JSON content
-    return $HTMLContent -replace "__REPORTLISTDATA__", $reportJsonContent
+  # Read the JSON file
+  $reportJsonContent = Get-Content -Path $ReportJsonPath -Raw
+  # Replace the placeholder with the JSON content
+  return $HTMLContent -replace "__REPORTLISTDATA__", $reportJsonContent
 }
 
 # Define the path to the report.json file
 $reportJsonPath = "$PSScriptRoot/../reports/report.json"
 
+# Replace the placeholder __ERRORLOGDATA__ with content from the CSV file
+function Replace-ErrorLogDataPlaceholder {
+  param (
+      [string]$HTMLContent,
+      [string]$ErrorLogPath
+  )
+
+  # Read the ErrorLog.json file
+  $jsonContent = Get-Content -Path $ErrorLogPath -Raw
+
+  # Escape JSON for embedding in JavaScript
+  $escapedJsonContent = $jsonContent -replace '"', '\"' -replace "`r?`n", ""
+
+  # Replace the placeholder with the escaped JSON content
+  return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
+}
+
+$errorLogPath = "$PSScriptRoot/../reports/ErrorLog.json"
+
 # Generate the HTML and replace the placeholder
 $htmlContent = Generate-HTML
 $htmlContent = Replace-ReportDataPlaceholder -HTMLContent $htmlContent -ReportJsonPath $reportJsonPath
+$htmlContent = Replace-ErrorLogDataPlaceholder -HTMLContent $htmlContent -ErrorLogPath $errorLogPath
 
 # Save the final HTML to a file
 $outputPath = "$PSScriptRoot/../web/index.html"

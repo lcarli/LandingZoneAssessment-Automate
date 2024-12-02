@@ -1,5 +1,5 @@
-reports/ErrorLog.csv
+reports/*.csv
+reports/*.json
 scripts/tmp.json
 logs/*.log
-reports/report.json
 web/index.html
