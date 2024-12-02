@@ -281,28 +281,28 @@ function calculateCategoryStatusData() {
     if (categoryName) {
       items.forEach((item) => {
         switch (item.Status) {
-          case Status.Implemented:
+          case "Implemented":
             categoryStatusCounts[categoryName].Closed++;
             break;
-          case Status.PartialImplemented:
+          case "PartialImplemented":
             categoryStatusCounts[categoryName].Open++;
             break;
-          case Status.NotImplemented:
+          case "NotImplemented":
             categoryStatusCounts[categoryName].Open++;
             break;
-          case Status.Unknown:
+          case "Unknown":
             categoryStatusCounts[categoryName].NotVerified++;
             break;
-          case Status.ManualVerificationRequired:
+          case "ManualVerificationRequired":
             categoryStatusCounts[categoryName].NotVerified++;
             break;
-          case Status.NotApplicable:
+          case "NotApplicable":
             categoryStatusCounts[categoryName].Closed++;
             break;
-          case Status.NotDeveloped:
+          case "NotDeveloped":
             categoryStatusCounts[categoryName].NotVerified++;
             break;
-          case Status.Error:
+          case "Error":
             categoryStatusCounts[categoryName].NotVerified++;
             break;
           default:
