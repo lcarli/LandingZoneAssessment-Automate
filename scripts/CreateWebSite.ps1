@@ -1,4 +1,3 @@
-# Function to generate the HTML <head> section
 function Generate-HTMLHead {
   @"
 <!DOCTYPE html>
@@ -14,7 +13,6 @@ function Generate-HTMLHead {
 "@
 }
 
-# Function to generate the header section
 function Generate-HTMLHeader {
   @"
 <header>
@@ -23,7 +21,6 @@ function Generate-HTMLHeader {
 "@
 }
 
-# Function to generate the main content section
 function Generate-MainSection {
   @"
 <main>
@@ -88,9 +85,9 @@ function Generate-MainSection {
       </br>
       <div class="section chart-xx-large">
         <h3>Error Log</h3>
-        <div id="error-log-container">
-            <!-- Error Log Categories and Details will be populated via JS -->
-        </div>
+        <table class='fixed-header-table'>
+          <tbody id='table-body-error-items'></tbody>
+        </table>
       </div>
     </div>
   </section>
@@ -545,55 +542,72 @@ function populateDetailsTable() {
 }
 "@
 }
+
 function GeneratePopulateErrorLogTableFunction {
   @"
 function populateErrorLogTable() {
-const errorLogContainer = document.getElementById('error-log-container');
+    const errorLogContainer = document.getElementById('table-body-error-items');
     errorLogContainer.innerHTML = ''; // Clear previous content
 
     const categories = [...new Set(errorLogData.errorsArray.map(error => error.Category))];
 
     categories.forEach(category => {
         // Create collapsible header
-        const header = document.createElement('div');
-        header.className = 'collapsible-header';
-        header.innerHTML = "<h4>" + category + "</h4>";
-        header.onclick = function () {
-            this.nextElementSibling.classList.toggle('active');
+        const headerRowE = document.createElement("tr");
+        const headerCellE = document.createElement("td");
+        headerCellE.colSpan = 10;
+        headerCellE.className = 'collapsible';
+        headerCellE.innerText = category;
+        headerCellE.onclick = function () {
+          this.classList.toggle("active");
+          const content = this.parentElement.nextElementSibling;
+          if (content && content.classList.contains("content")) {
+            if (content.style.display === "table-row-group") {
+              content.style.display = "none";
+            } else {
+              content.style.display = "table-row-group";
+            }
+          }
         };
-        errorLogContainer.appendChild(header);
+        headerRowE.appendChild(headerCellE);
+        errorLogContainer.appendChild(headerRowE);
 
-        // Create collapsible content
-        const content = document.createElement('div');
-        content.className = 'collapsible-content';
-        const table = document.createElement('table');
-        table.className = 'fixed-header-table';
-        table.innerHTML = `
-            "<thead>" +
-                "<tr>" +
-                    "<th>Question ID</th>" +
-                    "<th>Question Text</th>" +
-                    "<th>Function Name</th>" +
-                    "<th>Error Message</th>" +
-                "</tr>" +
-            "</thead>" +
-            "<tbody>"
-            ${errorLogData.errorsArray
+        const contentRowGroupE = document.createElement("tbody");
+        contentRowGroupE.className = "content";
+
+        const contentHeaderRowE = document.createElement("tr");
+        const headersE = [
+          "Question ID",
+          "Question Text",
+          "Function Name",
+          "Error Message",
+        ];
+        headersE.forEach((headerText) => {
+          const th = document.createElement("th");
+          th.innerText = headerText;
+          contentHeaderRowE.appendChild(th);
+        });
+        contentRowGroupE.appendChild(contentHeaderRowE);
+
+
+
+        errorLogData.errorsArray
                 .filter(error => error.Category === category)
-                .map(error => `
-                    "<tr>" +
+                .forEach(error => {
+                  const tr = document.createElement("tr");
+                  tr.innerHTML = `
                         "<td>" + error.QuestionID + "</td>" +
                         "<td>" + error.QuestionText + "</td>" +
                         "<td>" + error.FunctionName + "</td>" + 
-                        "<td>" + error.ErrorMessage + "</td>" +
-                    "</tr>").join('')}
-            "</tbody>"
-        content.appendChild(table);
-        errorLogContainer.appendChild(content);
+                        "<td>" + error.ErrorMessage + "</td>";
+                  contentRowGroupE.appendChild(tr);
+        });
+        errorLogContainer.appendChild(contentRowGroupE);
     });
 }
 "@
 }
+
 function GeneratePieChartFunction {
   @"
 function populatePieChart(totals) {
