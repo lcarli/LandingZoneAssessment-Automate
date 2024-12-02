@@ -604,7 +604,7 @@ function populateAllItemsTable() {
   const tableBody = document.getElementById("table-body-all-items");
   const coveredItems = getCoveredItems();
   const categories = [
-    ...new Set(coveredItems.map((item) => item.RawSource?.category)),
+    ...new Set(coveredItems.map((item) => item.category)),
   ];
 
   categories.forEach((category) => {
@@ -651,7 +651,7 @@ function populateAllItemsTable() {
     contentRowGroup.appendChild(contentHeaderRow);
 
     coveredItems
-      .filter((item) => item.RawSource?.category === category)
+      .filter((item) => item.category === category)
       .forEach((item) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
