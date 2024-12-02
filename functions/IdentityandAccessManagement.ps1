@@ -170,6 +170,9 @@ function Test-QuestionB0302 {
     $rawData = $null
 
     try {
+        # Question: Use managed identities instead of service principals for authentication to Azure services.
+        # Reference: https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview
+        
         # Get all service principals
         $servicePrincipals = Get-AzADServicePrincipal
 
@@ -237,6 +240,9 @@ function Test-QuestionB030201 {
     $rawData = $null
 
     try {
+        # Question: Only use the authentication type Work or school account for all account types. Avoid using the Microsoft account.
+        # Reference: https://learn.microsoft.com/learn/modules/explore-basic-services-identity-types/
+
         # Get all Azure AD users
         $users = Get-AzADUser
 
@@ -308,6 +314,9 @@ function Test-QuestionB0303 {
     $rawData = $null
 
     try {
+        # Question: Only use groups to assign permissions across all subscriptions. Add on-premises groups to the Entra ID only group if a group management system is already in place.
+        # Reference: https://learn.microsoft.com/azure/role-based-access-control/groups
+
         # Get all subscriptions in the current tenant
         $subscriptions = $global:AzData.Subscriptions
 
@@ -396,6 +405,10 @@ function Test-QuestionB0304 {
     $rawData = $null
 
     try {
+        # Question: Enforce Microsoft Entra ID Conditional Access policies for any user with rights to Azure environments.
+        # Reference: https://learn.microsoft.com/azure/active-directory/conditional-access/overview
+
+
         # Connect to Microsoft Graph
         Connect-MgGraph -Scopes "Policy.Read.All", "Directory.Read.All" -TenantId $TenantId
 
@@ -489,6 +502,9 @@ function Test-QuestionB0305 {
     $rawData = $null
 
     try {
+        # Question: Enforce multi-factor authentication for any user with rights to the Azure environments.
+        # Reference: https://learn.microsoft.com/azure/active-directory/authentication/howto-mfa-getstarted
+
         # Get all role assignments for Azure resources
         $roleAssignments = Get-AzRoleAssignment
 
@@ -593,6 +609,10 @@ function Test-QuestionB0306 {
     $rawData = $null
 
     try {
+        # Question: Enforce centralized and delegated responsibilities to manage resources deployed inside the landing zone, based on role and security requirements.
+        # Reference: https://learn.microsoft.com/azure/role-based-access-control/overview
+
+
         # Assess role assignments across management groups
         $managementGroups = Get-AzManagementGroup | Where-Object { $_.TenantId -eq $TenantId }
         $totalGroups = 0
@@ -686,6 +706,10 @@ function Test-QuestionB0307 {
     $rawData = $null
 
     try {
+        # Question: Enforce Microsoft Entra ID Privileged Identity Management (PIM) to establish zero standing access and least privilege.
+        # Reference: https://learn.microsoft.com/azure/active-directory/privileged-identity-management/pim-configure
+
+
         # Connect to Microsoft Graph with appropriate scopes for PIM
         Connect-MgGraph -Scopes "PrivilegedAccess.Read.AzureAD" -TenantId $TenantId
 
@@ -758,6 +782,10 @@ function Test-QuestionB0308 {
     $rawData = $null
 
     try {
+        # Question: When deploying Active Directory Domain Controllers, use a location with Availability Zones and deploy at least two VMs across these zones. If not available, deploy in an Availability Set.
+        # Reference: https://learn.microsoft.com/azure/virtual-machines/availability
+
+
         # Check if Availability Zones are available
         $location = "YourLocation" # Replace "YourLocation" with the relevant Azure region
         $availabilityZones = Get-AzAvailabilityZone -Location $location
@@ -831,6 +859,9 @@ function Test-QuestionB0309 {
     $rawData = $null
 
     try {
+        # Question: Use Azure custom RBAC roles for the following key roles to provide fine-grain access across your ALZ: Azure platform owner, network management, security operations, subscription owner, application owner. Align these roles to teams and responsibilities within your business.
+        # Reference: https://learn.microsoft.com/azure/role-based-access-control/custom-roles
+
         # Get all custom roles in the tenant
         $customRoles = Get-AzRoleDefinition | Where-Object { $_.IsCustom -eq $true }
 
@@ -902,6 +933,9 @@ function Test-QuestionB0310 {
     $rawData = $null
 
     try {
+        # Question: If planning to switch from Active Directory Domain Services to Entra domain services, evaluate the compatibility of all workloads.
+        # Reference: https://learn.microsoft.com/azure/active-directory-domain-services/overview
+
         # Get all Custom RBAC Roles
         $customRoles = Get-AzRoleDefinition | Where-Object { $_.IsCustom -eq $true }
 
@@ -976,6 +1010,9 @@ function Test-QuestionB0311 {
     $rawData = "This question requires manual verification to evaluate the compatibility of all workloads when planning to switch from Active Directory Domain Services (AD DS) to Entra Domain Services (ED DS)."
 
     try {
+        # Question: When using Microsoft Entra Domain Services use replica sets. Replica sets will improve the resiliency of your managed domain and allow you to deploy to additional regions.
+        # Reference: https://learn.microsoft.com/azure/active-directory-domain-services/replica-sets
+
         # No automated logic is implemented here
         $status = [Status]::ManualVerificationRequired
     } catch {
@@ -1002,6 +1039,9 @@ function Test-QuestionB0312 {
     $rawData = $null
 
     try {
+        # Question: Integrate Microsoft Entra ID logs with the platform-central Azure Monitor. Azure Monitor allows for a single source of truth around log and monitoring data in Azure, giving organizations a cloud native option to meet requirements around log collection and retention.
+        # Reference: https://learn.microsoft.com/azure/active-directory/reports-monitoring/howto-integrate-activity-logs-with-log-analytics
+
         # Get all Entra Domain Services configurations
         $entraDomains = Get-AzADDomainService
 
@@ -1064,6 +1104,9 @@ function Test-QuestionB0313 {
     $rawData = $null
 
     try {
+        # Question: Implement an emergency access or break-glass account to prevent tenant-wide account lockout.
+        # Reference: https://learn.microsoft.com/azure/active-directory/roles/security-emergency-access
+
         # Get Diagnostic Settings for Microsoft Entra ID
         $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId "/providers/microsoft.aadiam/diagnosticSettings"
 
@@ -1121,6 +1164,9 @@ function Test-QuestionB0314 {
     $rawData = $null
 
     try {
+        # Question: When deploying Microsoft Entra Connect, use a staging server for high availability/disaster recovery.
+        # Reference: https://learn.microsoft.com/azure/active-directory/hybrid/how-to-connect-sync-staging-server
+
         # Get all Azure AD users
         $users = Get-AzADUser
 
@@ -1182,6 +1228,9 @@ function Test-QuestionB0315 {
     $rawData = $null
 
     try {
+        # Question: Do not use on-premises synced accounts for Microsoft Entra ID role assignments, unless you have a scenario that specifically requires it.
+        # Reference: https://learn.microsoft.com/azure/active-directory/hybrid/plan-connect-design-concepts
+
         # Get all Entra Connect servers
         $connectServers = Get-AzADConnectSyncServer
 
@@ -1239,6 +1288,9 @@ function Test-QuestionB0316 {
     $rawData = $null
 
     try {
+        # Question: When using Microsoft Entra ID Application Proxy to give remote users access to applications, manage it as a Platform resource as you can only have one instance per tenant.
+        # Reference: https://learn.microsoft.com/azure/active-directory/app-proxy/what-is-application-proxy
+
         # Get all role assignments in Microsoft Entra ID
         $roleAssignments = Get-AzRoleAssignment
 
@@ -1303,6 +1355,9 @@ function Test-QuestionB0317 {
     $rawData = $null
 
     try {
+        # Question: Configure Identity network segmentation through the use of a virtual network and peer back to the hub. Providing authentication inside application landing zone (legacy).
+        # Reference: https://learn.microsoft.com/azure/active-directory/fundamentals/identity-secure-score
+
         # Check for Microsoft Entra ID Application Proxy connectors
         $appProxyConnectors = Get-AzADApplicationProxyConnectorGroup
 
@@ -1369,6 +1424,9 @@ function Test-QuestionB0401 {
     $rawData = $null
 
     try {
+        # Question: Configure Identity network segmentation through the use of a virtual network and peer back to the hub. Providing authentication inside application landing zone (legacy).
+        # Reference: https://learn.microsoft.com/azure/architecture/example-scenario/shared-services/hub-spoke
+
         # Retrieve all VNets in the environment
         $vnets = Get-AzVirtualNetwork
 
@@ -1444,6 +1502,9 @@ function Test-QuestionB0402 {
     $rawData = $null
 
     try {
+        # Question: Use Azure RBAC to manage data plane access to resources, if possible. E.g., Data Operations across Key Vault, Storage Account and Database Services.
+        # Reference: https://learn.microsoft.com/azure/role-based-access-control/role-assignments-data-plane
+
         # Define the resource types to check for RBAC usage
         $resourceTypes = @("Microsoft.KeyVault/vaults", "Microsoft.Storage/storageAccounts", "Microsoft.Sql/servers")
 
@@ -1540,6 +1601,9 @@ function Test-QuestionB0403 {
     $rawData = $null
 
     try {
+        # Question: Use Microsoft Entra ID PIM access reviews to periodically validate resource entitlements.
+        # Reference: https://learn.microsoft.com/azure/active-directory/privileged-identity-management/pim-how-to-start-security-review
+
         # Connect to Microsoft Graph with appropriate permissions
         Connect-MgGraph -Scopes "AccessReview.Read.All"
 
