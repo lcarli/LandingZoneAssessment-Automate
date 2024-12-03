@@ -82,11 +82,16 @@ function Generate-MainSection {
           <tbody id='table-body-all-items'></tbody>
         </table>
       </div>
-      </br>
       <div class="section chart-xx-large">
         <h3>Error Log</h3>
         <table class='fixed-header-table'>
           <tbody id='table-body-error-items'></tbody>
+        </table>
+      </div>
+      <div class="section chart-xx-large">
+        <h3>Exceptions</h3>
+        <table class='fixed-header-table'>
+          <tbody id='table-body-exceptions'></tbody>
         </table>
       </div>
     </div>
@@ -107,6 +112,7 @@ function Generate-JavaScriptConstants {
   @"
 const jsonReportListData = __REPORTLISTDATA__;
 const errorLogData = __ERRORLOGDATA__;
+const exceptionsData = __EXCEPTIONSDATA__;
 
 const categoryMapping = {
 "Azure Billing and Microsoft Entra ID Tenants": "Billing",
@@ -138,6 +144,7 @@ window.onload = function () {
   updateWAFChart();
   populateDetailsTable();
   populateErrorLogTable();
+  populateExceptionsTable();
 };
 "@
 }
@@ -150,6 +157,7 @@ function Generate-JavaScriptFunctions {
   $functions += GeneratePopulateCategoryTableFunction
   $functions += GeneratePopulateDetailsTableFunction
   $functions += GeneratePopulateErrorLogTableFunction
+  $functions += GeneratePopulateExceptionsTableFunction
   $functions += GeneratePieChartFunction
   $functions += GenerateRadarChartFunction
   $functions += GenerateWAFChartFunction
@@ -606,6 +614,71 @@ function populateErrorLogTable() {
 "@
 }
 
+function GeneratePopulateExceptionsTableFunction {
+  @"
+function populateExceptionsTable() {
+    const exceptionsContainer = document.getElementById('table-body-exceptions');
+    exceptionsContainer.innerHTML = ''; // Clear previous content
+
+    const categories = [...new Set(exceptionsData.exceptions.map(exception => exception.Category))];
+
+    categories.forEach(category => {
+        // Create collapsible header
+        const headerRowX = document.createElement("tr");
+        const headerCellX = document.createElement("td");
+        headerCellX.colSpan = 10;
+        headerCellX.className = 'collapsible';
+        headerCellX.innerText = category;
+        headerCellX.onclick = function () {
+          this.classList.toggle("active");
+          const content = this.parentElement.nextElementSibling;
+          if (content && content.classList.contains("content")) {
+            if (content.style.display === "table-row-group") {
+              content.style.display = "none";
+            } else {
+              content.style.display = "table-row-group";
+            }
+          }
+        };
+        headerRowX.appendChild(headerCellX);
+        exceptionsContainer.appendChild(headerRowX);
+
+        const contentRowGroupX = document.createElement("tbody");
+        contentRowGroupX.className = "content";
+
+        const contentHeaderRowX = document.createElement("tr");
+        const headersX = [
+          "Question ID",
+          "Question Text",
+          "Status Report",
+          "New Status",
+        ];
+        headersX.forEach((headerText) => {
+          const th = document.createElement("th");
+          th.innerText = headerText;
+          contentHeaderRowX.appendChild(th);
+        });
+        contentRowGroupX.appendChild(contentHeaderRowX);
+
+
+
+        exceptionsData.exceptions
+                .filter(exception => exception.Category === category)
+                .forEach(exception => {
+                  const tr = document.createElement("tr");
+                  tr.innerHTML = `
+                        "<td>" + exception.QuestionID + "</td>" +
+                        "<td>" + exception.QuestionText + "</td>" +
+                        "<td>" + exception.StatusReport + "</td>" +
+                        "<td>" + exception.NewStatus + "</td>";
+                  contentRowGroupX.appendChild(tr);
+        });
+        exceptionsContainer.appendChild(contentRowGroupX);
+    });
+}
+"@
+}
+
 function GeneratePieChartFunction {
   @"
 function populatePieChart(totals) {
@@ -812,11 +885,18 @@ function Replace-ReportDataPlaceholder {
       [string]$ExceptionsJsonPath
   )
 
-  $updatedReportContent = Apply-ExceptionsToReport -ReportJsonPath $ReportJsonPath -ExceptionsJsonPath $ExceptionsJsonPath
+  # Apply exceptions and get updated report content
+  $result = Apply-ExceptionsToReport -ReportJsonPath $ReportJsonPath -ExceptionsJsonPath $ExceptionsJsonPath
 
-  return $HTMLContent -replace "__REPORTLISTDATA__", $updatedReportContent
+  $alteredReportJson = $result.ReportData
+  $exceptionsApplied = $result.ExceptionsApplied | ConvertTo-Json -Depth 15
+
+  # Replace the placeholder with updated report JSON
+  $updatedHTMLContent = $HTMLContent -replace "__REPORTLISTDATA__", $alteredReportJson
+
+  # Add exceptions data to the HTML
+  return $updatedHTMLContent -replace "__EXCEPTIONSDATA__", $exceptionsApplied
 }
-
 
 function Replace-ErrorLogDataPlaceholder {
   param (
@@ -825,13 +905,18 @@ function Replace-ErrorLogDataPlaceholder {
   )
 
   # Read the ErrorLog.json file
-  $jsonContent = Get-Content -Path $ErrorLogPath -Raw
+  if (Test-Path -Path $ErrorLogPath) {
+      $jsonContent = Get-Content -Path $ErrorLogPath -Raw
 
-  # Escape JSON for embedding in JavaScript
-  $escapedJsonContent = $jsonContent -replace '"', '\"' -replace "`r?`n", ""
+      # Escape JSON for embedding in JavaScript
+      $escapedJsonContent = $jsonContent -replace '"', '\"' -replace "`r?`n", ""
 
-  # Replace the placeholder with the escaped JSON content
-  return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
+      # Replace the placeholder with the escaped JSON content
+      return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
+  } else {
+      Write-Error "Error log file not found at $ErrorLogPath"
+      return $HTMLContent
+  }
 }
 
 function Apply-ExceptionsToReport {
@@ -840,7 +925,7 @@ function Apply-ExceptionsToReport {
       [string]$ExceptionsJsonPath
   )
 
-  $reportData = @{}
+  $reportData = @{ }
   if (Test-Path -Path $ReportJsonPath) {
       $reportData = Get-Content -Path $ReportJsonPath | ConvertFrom-Json
   } else {
@@ -854,33 +939,51 @@ function Apply-ExceptionsToReport {
   }
 
   $categories = @('Billing', 'IAM', 'ResourceOrganization', 'Network', 'Governance', 'Security', 'DevOps', 'Management')
+  $exceptionsApplied = @()
+
   foreach ($category in $categories) {
       if ($reportData.$category -is [System.Collections.IEnumerable]) {
           foreach ($item in $reportData.$category) {
               $exception = $exceptionsData.exceptions | Where-Object { $_.id -eq $item.RawSource.id }
               if ($exception) {
-                  if ($exception.status -ne $item.Status) {
-                      $item.Status = $exception.status
+                  if ($exception.newStatus -ne $item.Status) {
+                      $exceptionsApplied += [PSCustomObject]@{
+                          Category         = $item.RawSource.category  
+                          QuestionID       = $item.RawSource.id
+                          QuestionText     = $item.RawSource.text
+                          StatusReport     = $item.Status
+                          NewStatus        = $exception.status
+                      }
+
+                      # Update the status in the report
+                      $item.Status = $exception.newStatus
                       Write-Host "Exception applied for $($item.RawSource.id) in category $category"
                   }
+
+                  # Update the status in exceptions for tracking
+                  $exception.status = $item.Status
               }
           }
       }
   }
 
-  $reportData | ConvertTo-Json -Depth 15
+  return @{
+      ReportData         = $reportData | ConvertTo-Json -Depth 15
+      ExceptionsApplied  = @{ exceptions = $exceptionsApplied }
+  }
 }
 
-
-
-
-#   MAIN CODE
-
-
+# Main Code
 
 $errorLogPath = "$PSScriptRoot/../reports/ErrorLog.json"
 $reportJsonPath = "$PSScriptRoot/../reports/report.json"
+$reportJsonPath = "$PSScriptRoot/../reports/report.json"
 $exceptionsJsonPath = "$PSScriptRoot/../shared/exceptions.json"
+
+# Apply exceptions to the report
+$result = Apply-ExceptionsToReport -ReportJsonPath $ReportJsonPath -ExceptionsJsonPath $ExceptionsJsonPath
+$alteredReportJson = $result.ReportData
+$exceptionsApplied = $result.ExceptionsApplied | ConvertTo-Json -Depth 15
 
 # Generate the HTML and replace the placeholder
 $htmlContent = Generate-HTML
