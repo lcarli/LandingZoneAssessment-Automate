@@ -579,7 +579,6 @@ function populateErrorLogTable() {
         const headersE = [
           "Question ID",
           "Question Text",
-          "Function Name",
           "Error Message",
         ];
         headersE.forEach((headerText) => {
@@ -598,7 +597,6 @@ function populateErrorLogTable() {
                   tr.innerHTML = `
                         "<td>" + error.QuestionID + "</td>" +
                         "<td>" + error.QuestionText + "</td>" +
-                        "<td>" + error.FunctionName + "</td>" + 
                         "<td>" + error.ErrorMessage + "</td>";
                   contentRowGroupE.appendChild(tr);
         });
