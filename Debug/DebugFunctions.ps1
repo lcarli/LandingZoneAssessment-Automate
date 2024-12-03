@@ -53,7 +53,7 @@ function Test-Custom {
 
 # Main script
 if (-not $FunctionName) {
-    Write-Host "Please provide the function name as a parameter. Example: .\DebugFunctions.ps1 -FunctionName 'Assess-EANotificationContacts'"
+    Write-Host "Please provide the function name as a parameter. Example: .\DebugFunctions.ps1 -FunctionName 'Test-QuestionB0304'"
     exit
 } else {
     Test-Custom -functionName $FunctionName

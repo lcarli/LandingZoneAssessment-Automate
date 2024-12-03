@@ -409,9 +409,6 @@ function Test-QuestionB0304 {
         # Reference: https://learn.microsoft.com/azure/active-directory/conditional-access/overview
 
 
-        # Connect to Microsoft Graph
-        Connect-MgGraph -Scopes "Policy.Read.All", "Directory.Read.All" -TenantId $TenantId
-
         # Get all role assignments for Azure resources
         $roleAssignments = Get-AzRoleAssignment
 
@@ -425,12 +422,12 @@ function Test-QuestionB0304 {
             $uniqueUsers = @()
 
             # Get all Conditional Access policies
-            $conditionalAccessPolicies = Get-MgConditionalAccessPolicy
+            $conditionalAccessPolicies = Get-MgIdentityConditionalAccessPolicy
 
             # Store unique user principal names from role assignments
             foreach ($assignment in $roleAssignments) {
-                if ($assignment.PrincipalType -eq "User") {
-                    $uniqueUsers += $assignment.PrincipalName
+                if ($assignment.ObjectType -eq "User") {
+                    $uniqueUsers += $assignment.DisplayName
                 }
             }
 
@@ -708,10 +705,6 @@ function Test-QuestionB0307 {
     try {
         # Question: Enforce Microsoft Entra ID Privileged Identity Management (PIM) to establish zero standing access and least privilege.
         # Reference: https://learn.microsoft.com/azure/active-directory/privileged-identity-management/pim-configure
-
-
-        # Connect to Microsoft Graph with appropriate scopes for PIM
-        Connect-MgGraph -Scopes "PrivilegedAccess.Read.AzureAD" -TenantId $TenantId
 
         # Get all PIM roles and check for standing access
         $pimRoles = Get-MgPrivilegedRoleAssignment | Where-Object { $_.RoleDefinitionName -in @("Global Administrator", "Privileged Role Administrator", "Security Administrator") }
