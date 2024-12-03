@@ -807,20 +807,19 @@ function Generate-HTML {
   $html -join "`n"
 }
 
-# Replace the placeholder __REPORTLISTDATA__ with content from the JSON file
 function Replace-ReportDataPlaceholder {
   param (
-    [string]$HTMLContent,
-    [string]$ReportJsonPath
+      [string]$HTMLContent,
+      [string]$ReportJsonPath,
+      [string]$ExceptionsJsonPath
   )
 
-  # Read the JSON file
-  $reportJsonContent = Get-Content -Path $ReportJsonPath -Raw
-  # Replace the placeholder with the JSON content
-  return $HTMLContent -replace "__REPORTLISTDATA__", $reportJsonContent
+  $updatedReportContent = Apply-ExceptionsToReport -ReportJsonPath $ReportJsonPath -ExceptionsJsonPath $ExceptionsJsonPath
+
+  return $HTMLContent -replace "__REPORTLISTDATA__", $updatedReportContent
 }
 
-# Replace the placeholder __ERRORLOGDATA__ with content from the CSV file
+
 function Replace-ErrorLogDataPlaceholder {
   param (
       [string]$HTMLContent,
@@ -837,6 +836,43 @@ function Replace-ErrorLogDataPlaceholder {
   return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
 }
 
+function Apply-ExceptionsToReport {
+  param (
+      [string]$ReportJsonPath,
+      [string]$ExceptionsJsonPath
+  )
+
+  $reportData = @{}
+  if (Test-Path -Path $ReportJsonPath) {
+      $reportData = Get-Content -Path $ReportJsonPath | ConvertFrom-Json
+  } else {
+      Write-Error "Report file not found at $ReportJsonPath"
+      return
+  }
+
+  $exceptionsData = @{ exceptions = @() }
+  if (Test-Path -Path $ExceptionsJsonPath) {
+      $exceptionsData = Get-Content -Path $ExceptionsJsonPath | ConvertFrom-Json
+  }
+
+  $categories = @('Billing', 'IAM', 'ResourceOrganization', 'Network', 'Governance', 'Security', 'DevOps', 'Management')
+  foreach ($category in $categories) {
+      if ($reportData.$category -is [System.Collections.IEnumerable]) {
+          foreach ($item in $reportData.$category) {
+              $exception = $exceptionsData.exceptions | Where-Object { $_.id -eq $item.RawSource.id }
+              if ($exception) {
+                  if ($exception.status -ne $item.Status) {
+                      $item.Status = $exception.status
+                      Write-Host "Exception applied for $($item.RawSource.id) in category $category"
+                  }
+              }
+          }
+      }
+  }
+
+  $reportData | ConvertTo-Json -Depth 15
+}
+
 
 
 
@@ -846,10 +882,11 @@ function Replace-ErrorLogDataPlaceholder {
 
 $errorLogPath = "$PSScriptRoot/../reports/ErrorLog.json"
 $reportJsonPath = "$PSScriptRoot/../reports/report.json"
+$exceptionsJsonPath = "$PSScriptRoot/../shared/exceptions.json"
 
 # Generate the HTML and replace the placeholder
 $htmlContent = Generate-HTML
-$htmlContent = Replace-ReportDataPlaceholder -HTMLContent $htmlContent -ReportJsonPath $reportJsonPath
+$htmlContent = Replace-ReportDataPlaceholder -HTMLContent $htmlContent -ReportJsonPath $reportJsonPath -ExceptionsJsonPath $exceptionsJsonPath
 $htmlContent = Replace-ErrorLogDataPlaceholder -HTMLContent $htmlContent -ErrorLogPath $errorLogPath
 
 # Save the final HTML to a file

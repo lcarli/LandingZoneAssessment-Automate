@@ -93,7 +93,7 @@ function Export-Report {
 
     # Create JSON file
     $jsonPath = "$PSScriptRoot/../reports/report.json"
-    $generalResult | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonPath
+    $generalResult | ConvertTo-Json -Depth 15 | Out-File -FilePath $jsonPath
 
     Write-Host "Creating the web site..."
     & "$PSScriptRoot/CreateWebSite.ps1"
