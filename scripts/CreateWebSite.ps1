@@ -1,4 +1,3 @@
-# Function to generate the HTML <head> section
 function Generate-HTMLHead {
   @"
 <!DOCTYPE html>
@@ -14,7 +13,6 @@ function Generate-HTMLHead {
 "@
 }
 
-# Function to generate the header section
 function Generate-HTMLHeader {
   @"
 <header>
@@ -23,7 +21,6 @@ function Generate-HTMLHeader {
 "@
 }
 
-# Function to generate the main content section
 function Generate-MainSection {
   @"
 <main>
@@ -85,12 +82,17 @@ function Generate-MainSection {
           <tbody id='table-body-all-items'></tbody>
         </table>
       </div>
-      </br>
       <div class="section chart-xx-large">
         <h3>Error Log</h3>
-        <div id="error-log-container">
-            <!-- Error Log Categories and Details will be populated via JS -->
-        </div>
+        <table class='fixed-header-table'>
+          <tbody id='table-body-error-items'></tbody>
+        </table>
+      </div>
+      <div class="section chart-xx-large">
+        <h3>Exceptions</h3>
+        <table class='fixed-header-table'>
+          <tbody id='table-body-exceptions'></tbody>
+        </table>
       </div>
     </div>
   </section>
@@ -98,35 +100,72 @@ function Generate-MainSection {
 "@
 }
 
-# Function to generate the JavaScript section
-function Generate-JavaScript2 {
+function Generate-JavaScript {
+  $js = @()
+  $js += Generate-JavaScriptConstants
+  $js += Generate-JavaScriptInitialization
+  $js += Generate-JavaScriptFunctions
+  $js -join "`n"
+}
+
+function Generate-JavaScriptConstants {
   @"
-<script>
-const jsonReportListData =
-    __REPORTLISTDATA__
-;
+const jsonReportListData = __REPORTLISTDATA__;
+const errorLogData = __ERRORLOGDATA__;
+const exceptionsData = __EXCEPTIONSDATA__;
 
 const categoryMapping = {
-  "Azure Billing and Microsoft Entra ID Tenants": "Billing",
-  "Identity and Access Management": "IAM",
-  "Network Topology and Connectivity": "Network",
-  Security: "Security",
-  Management: "Management",
-  "Resource Organization": "ResourceOrganization",
-  "Platform Automation and DevOps": "DevOps",
-  Governance: "Governance",
+"Azure Billing and Microsoft Entra ID Tenants": "Billing",
+"Identity and Access Management": "IAM",
+"Network Topology and Connectivity": "Network",
+"Security": "Security",
+"Management": "Management",
+"Resource Organization": "ResourceOrganization",
+"Platform Automation and DevOps": "DevOps",
+"Governance": "Governance",
 };
 
 const Status = {
-    Implemented: 1,
-    PartialImplemented: 2,
-    NotImplemented: 3,
-    Unknown: 4,
-    ManualVerificationRequired: 5,
-    NotApplicable: 6,
-    Error: 7,
+Implemented: 1,
+PartialImplemented: 2,
+NotImplemented: 3,
+Unknown: 4,
+ManualVerificationRequired: 5,
+NotApplicable: 6,
+Error: 7,
 };
+"@
+}
 
+function Generate-JavaScriptInitialization {
+  @"
+window.onload = function () {
+  populateOverallStatusTable();
+  updateWAFChart();
+  populateDetailsTable();
+  populateErrorLogTable();
+  populateExceptionsTable();
+};
+"@
+}
+
+function Generate-JavaScriptFunctions {
+  $functions = @()
+  $functions += GenerateCalculateStatusDataFunction
+  $functions += GenerateCalculateCategoryStatusDataFunction
+  $functions += GeneratePopulateOverallStatusTableFunction
+  $functions += GeneratePopulateCategoryTableFunction
+  $functions += GeneratePopulateDetailsTableFunction
+  $functions += GeneratePopulateErrorLogTableFunction
+  $functions += GeneratePopulateExceptionsTableFunction
+  $functions += GeneratePieChartFunction
+  $functions += GenerateRadarChartFunction
+  $functions += GenerateWAFChartFunction
+  $functions -join "`n"
+}
+
+function GenerateCalculateStatusDataFunction {
+  @"
 function calculateStatusData() {
     const statusCounts = {
         High: {
@@ -225,7 +264,11 @@ function calculateStatusData() {
 
     return statusCounts;
 }
+"@
+}
 
+function GenerateCalculateCategoryStatusDataFunction {
+  @"
 function calculateCategoryStatusData() {
   const categoryStatusCounts = {};
 
@@ -246,28 +289,28 @@ function calculateCategoryStatusData() {
     if (categoryName) {
       items.forEach((item) => {
         switch (item.Status) {
-          case Status.Implemented:
+          case "Implemented":
             categoryStatusCounts[categoryName].Closed++;
             break;
-          case Status.PartialImplemented:
+          case "PartialImplemented":
             categoryStatusCounts[categoryName].Open++;
             break;
-          case Status.NotImplemented:
+          case "NotImplemented":
             categoryStatusCounts[categoryName].Open++;
             break;
-          case Status.Unknown:
+          case "Unknown":
             categoryStatusCounts[categoryName].NotVerified++;
             break;
-          case Status.ManualVerificationRequired:
+          case "ManualVerificationRequired":
             categoryStatusCounts[categoryName].NotVerified++;
             break;
-          case Status.NotApplicable:
+          case "NotApplicable":
             categoryStatusCounts[categoryName].Closed++;
             break;
-          case Status.NotDeveloped:
+          case "NotDeveloped":
             categoryStatusCounts[categoryName].NotVerified++;
             break;
-          case Status.Error:
+          case "Error":
             categoryStatusCounts[categoryName].NotVerified++;
             break;
           default:
@@ -290,29 +333,13 @@ function calculateCategoryStatusData() {
 
   return categoryStatusCounts;
 }
-  
-function populateCategoryTable() {
-  const tableBody = document.getElementById("table-body-category");
-  const categoryStatusData = calculateCategoryStatusData();
-
-  Object.keys(categoryStatusData).forEach((category) => {
-    const row = categoryStatusData[category];
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-  "<td>" + category + "</td>" +
-  "<td>" + row.NotVerified + "</td>" +
-  "<td>" + row.Open + "</td>" +
-  "<td>" + row.Closed + "</td>" +
-  "<td>" + row.Total + "</td>" +
-  "<td>" + row.Progress.toFixed(2) + "%</td>";
-    tableBody.appendChild(tr);
-  });
-  // Update the radar chart with the category data
-  updateRadarChart(categoryStatusData);
+"@
 }
 
-function populateTable() {
-  const tableBody = document.getElementById("table-body-overall");
+function GeneratePopulateOverallStatusTableFunction {
+  @"
+function populateOverallStatusTable() {
+const tableBody = document.getElementById("table-body-overall");
   const statusData = calculateStatusData();
 
   let totalImplemented = 0;
@@ -364,7 +391,7 @@ function populateTable() {
   tableBody.appendChild(totalRow);
 
   // Update the pie chart with the totals
-  updatePieChart({
+  populatePieChart({
     Implemented: totalImplemented,
     PartialImplemented: totalPartialImplemented,
     NotImplemented: totalNotImplemented,
@@ -378,184 +405,35 @@ function populateTable() {
   // Populate the category table
   populateCategoryTable();
 }
-
-function updatePieChart(totals) {
-  const ctxDesignAreaPie = document
-    .getElementById("designAreaPieChart")
-    .getContext("2d");
-  const designAreaPieChart = new Chart(ctxDesignAreaPie, {
-    type: "pie",
-    data: {
-      labels: [
-        "Implemented",
-        "Partial Implemented",
-        "Not Implemented",
-        "Unknown",
-        "Manual Verification Required",
-        "Not Applicable",
-        "Not Developed",
-        "Error",
-      ],
-      datasets: [
-        {
-          label: "Overall Status",
-          data: [
-            totals.Implemented,
-            totals.PartialImplemented,
-            totals.NotImplemented,
-            totals.Unknown,
-            totals.ManualVerificationRequired,
-            totals.NotApplicable,
-            totals.NotDeveloped,
-            totals.Error,
-          ],
-          backgroundColor: [
-            "rgba(75, 192, 192, 0.2)",
-            "rgba(54, 162, 235, 0.2)",
-            "rgba(255, 99, 132, 0.2)",
-            "rgba(255, 206, 86, 0.2)",
-            "rgba(153, 102, 255, 0.2)",
-            "rgba(255, 159, 64, 0.2)",
-            "rgba(255, 159, 108, 0.2)",
-            "rgba(201, 203, 207, 0.2)",
-          ],
-          borderColor: [
-            "rgba(75, 192, 192, 1)",
-            "rgba(54, 162, 235, 1)",
-            "rgba(255, 99, 132, 1)",
-            "rgba(255, 206, 86, 1)",
-            "rgba(153, 102, 255, 1)",
-            "rgba(255, 159, 64, 1)",
-            "rgba(255, 159, 108, 1)",
-            "rgba(201, 203, 207, 1)",
-          ],
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: {
-          position: "top",
-        },
-        title: {
-          display: true,
-          text: "Overall Status Pie Chart",
-        },
-      },
-    },
-  });
+"@
 }
 
-function updateRadarChart(categoryStatusData) {
-  const labels = Object.keys(categoryStatusData);
-  const data = labels.map(
-    (category) => categoryStatusData[category].Progress
-  );
+function GeneratePopulateCategoryTableFunction {
+  @"
+function populateCategoryTable() {
+  const tableBody = document.getElementById("table-body-category");
+  const categoryStatusData = calculateCategoryStatusData();
 
-  const ctxLowRadar = document
-    .getElementById("lowRadarChart")
-    .getContext("2d");
-  const lowRadarChart = new Chart(ctxLowRadar, {
-    type: "radar",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: "Progress",
-          data: data,
-          backgroundColor: "rgba(54, 162, 235, 0.2)",
-          borderColor: "rgba(54, 162, 235, 1)",
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: "Progress by Category",
-        },
-      },
-      scales: {
-        r: {
-          angleLines: {
-            display: true,
-          },
-          suggestedMin: 0,
-          suggestedMax: 100,
-        },
-      },
-    },
+  Object.keys(categoryStatusData).forEach((category) => {
+    const row = categoryStatusData[category];
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+  "<td>" + category + "</td>" +
+  "<td>" + row.NotVerified + "</td>" +
+  "<td>" + row.Open + "</td>" +
+  "<td>" + row.Closed + "</td>" +
+  "<td>" + row.Total + "</td>" +
+  "<td>" + row.Progress.toFixed(2) + "%</td>";
+    tableBody.appendChild(tr);
   });
+  // Update the radar chart with the category data
+  populateRadarChart(categoryStatusData);
+}
+"@
 }
 
-
-function calculateWAFData() {
-  const wafCounts = {};
-
-  Object.values(jsonReportListData).forEach((category) => {
-      (category || []).forEach((item) => {
-          const waf = item.RawSource?.waf || "Unknown";
-          if (!wafCounts[waf]) {
-            wafCounts[waf] = 0;
-          }
-          const reportItem = Object.values(jsonReportListData)
-            .flat()
-            .find((report) => report.RawSource?.id === item.RawSource?.id);
-          if (reportItem) {
-            wafCounts[waf]++;
-          }
-      });
-  });
-
-  return wafCounts;
-}
-
-function updateWAFChart() {
-  const wafData = calculateWAFData();
-  const labels = Object.keys(wafData);
-  const data = Object.values(wafData);
-
-  const ctxWAFChart = document
-    .getElementById("wafChart")
-    .getContext("2d");
-  const wafChart = new Chart(ctxWAFChart, {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: "WAF Indicator",
-          data: data,
-          backgroundColor: "rgba(75, 192, 192, 0.2)",
-          borderColor: "rgba(75, 192, 192, 1)",
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: {
-          position: "top",
-        },
-        title: {
-          display: true,
-          text: "WAF Indicator Chart",
-        },
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-        },
-      },
-    },
-  });
-}
-
+function GeneratePopulateDetailsTableFunction {
+  @"
 function getCoveredItems() {
   const coveredItems = [];
 
@@ -601,8 +479,7 @@ function getCoveredItems() {
   return coveredItems;
 }
 
-
-function populateAllItemsTable() {
+function populateDetailsTable() {
   const tableBody = document.getElementById("table-body-all-items");
   const coveredItems = getCoveredItems();
   const categories = [
@@ -671,201 +548,205 @@ function populateAllItemsTable() {
     tableBody.appendChild(contentRowGroup);
   });
 }
+"@
+}
 
-// Placeholder for ErrorLog.csv content
-const errorLogData = `__ERRORLOGDATA__`;
-
+function GeneratePopulateErrorLogTableFunction {
+  @"
 function populateErrorLogTable() {
-    const errorLogContainer = document.getElementById('error-log-container');
+    const errorLogContainer = document.getElementById('table-body-error-items');
     errorLogContainer.innerHTML = ''; // Clear previous content
 
     const categories = [...new Set(errorLogData.errorsArray.map(error => error.Category))];
 
     categories.forEach(category => {
         // Create collapsible header
-        const header = document.createElement('div');
-        header.className = 'collapsible-header';
-        header.innerHTML = "<h4>" + category + "</h4>";
-        header.onclick = function () {
-            this.nextElementSibling.classList.toggle('active');
+        const headerRowE = document.createElement("tr");
+        const headerCellE = document.createElement("td");
+        headerCellE.colSpan = 10;
+        headerCellE.className = 'collapsible';
+        headerCellE.innerText = category;
+        headerCellE.onclick = function () {
+          this.classList.toggle("active");
+          const content = this.parentElement.nextElementSibling;
+          if (content && content.classList.contains("content")) {
+            if (content.style.display === "table-row-group") {
+              content.style.display = "none";
+            } else {
+              content.style.display = "table-row-group";
+            }
+          }
         };
-        errorLogContainer.appendChild(header);
+        headerRowE.appendChild(headerCellE);
+        errorLogContainer.appendChild(headerRowE);
 
-        // Create collapsible content
-        const content = document.createElement('div');
-        content.className = 'collapsible-content';
-        const table = document.createElement('table');
-        table.className = 'fixed-header-table';
-        table.innerHTML = `
-            "<thead>" +
-                "<tr>" +
-                    "<th>Question ID</th>" +
-                    "<th>Question Text</th>" +
-                    "<th>Function Name</th>" +
-                    "<th>Error Message</th>" +
-                "</tr>" +
-            "</thead>" +
-            "<tbody>"
-            ${errorLogData.errorsArray
+        const contentRowGroupE = document.createElement("tbody");
+        contentRowGroupE.className = "content";
+
+        const contentHeaderRowE = document.createElement("tr");
+        const headersE = [
+          "Question ID",
+          "Question Text",
+          "Error Message",
+        ];
+        headersE.forEach((headerText) => {
+          const th = document.createElement("th");
+          th.innerText = headerText;
+          contentHeaderRowE.appendChild(th);
+        });
+        contentRowGroupE.appendChild(contentHeaderRowE);
+
+
+
+        errorLogData.errorsArray
                 .filter(error => error.Category === category)
-                .map(error => `
-                    "<tr>" +
+                .forEach(error => {
+                  const tr = document.createElement("tr");
+                  tr.innerHTML = `
                         "<td>" + error.QuestionID + "</td>" +
                         "<td>" + error.QuestionText + "</td>" +
-                        "<td>" + error.FunctionName + "</td>" + 
-                        "<td>" + error.ErrorMessage + "</td>" +
-                    "</tr>").join('')}
-            "</tbody>"
-        content.appendChild(table);
-        errorLogContainer.appendChild(content);
+                        "<td>" + error.ErrorMessage + "</td>";
+                  contentRowGroupE.appendChild(tr);
+        });
+        errorLogContainer.appendChild(contentRowGroupE);
     });
 }
-
- window.onload = function () {
-  populateTable();
-  updateWAFChart();
-  populateAllItemsTable();
-  populateErrorLogTable();
-};
-</script>
 "@
 }
 
-function Generate-JavaScript {
+function GeneratePopulateExceptionsTableFunction {
   @"
-<script>
-const jsonReportListData = __REPORTLISTDATA__;
-const errorLogData = __ERRORLOGDATA__;
+function populateExceptionsTable() {
+    const exceptionsContainer = document.getElementById('table-body-exceptions');
+    exceptionsContainer.innerHTML = ''; // Clear previous content
 
-const categoryMapping = {
-  "Azure Billing and Microsoft Entra ID Tenants": "Billing",
-  "Identity and Access Management": "IAM",
-  "Network Topology and Connectivity": "Network",
-  Security: "Security",
-  Management: "Management",
-  "Resource Organization": "ResourceOrganization",
-  "Platform Automation and DevOps": "DevOps",
-  Governance: "Governance",
-};
+    const categories = [...new Set(exceptionsData.exceptions.map(exception => exception.Category))];
 
-const Status = {
-  Implemented: 1,
-  PartialImplemented: 2,
-  NotImplemented: 3,
-  Unknown: 4,
-  ManualVerificationRequired: 5,
-  NotApplicable: 6,
-  Error: 7,
-};
+    categories.forEach(category => {
+        // Create collapsible header
+        const headerRowX = document.createElement("tr");
+        const headerCellX = document.createElement("td");
+        headerCellX.colSpan = 10;
+        headerCellX.className = 'collapsible';
+        headerCellX.innerText = category;
+        headerCellX.onclick = function () {
+          this.classList.toggle("active");
+          const content = this.parentElement.nextElementSibling;
+          if (content && content.classList.contains("content")) {
+            if (content.style.display === "table-row-group") {
+              content.style.display = "none";
+            } else {
+              content.style.display = "table-row-group";
+            }
+          }
+        };
+        headerRowX.appendChild(headerCellX);
+        exceptionsContainer.appendChild(headerRowX);
 
-// Main initialization function
-window.onload = function () {
-  populateOverallStatusTable();
-  populatePieChart();
-  populateCategoryStatusTable();
-  populateRadarChart();
-  populateDetailsTable();
-  populateErrorLogTable();
-};
+        const contentRowGroupX = document.createElement("tbody");
+        contentRowGroupX.className = "content";
 
-// Functions
-${GenerateOverallStatusTableFunction()}
-${GeneratePieChartFunction()}
-${GenerateCategoryStatusTableFunction()}
-${GenerateRadarChartFunction()}
-${GenerateDetailsTableFunction()}
-${GenerateErrorLogTableFunction()}
-</script>
-"@
-}
+        const contentHeaderRowX = document.createElement("tr");
+        const headersX = [
+          "Question ID",
+          "Question Text",
+          "Status Report",
+          "New Status",
+        ];
+        headersX.forEach((headerText) => {
+          const th = document.createElement("th");
+          th.innerText = headerText;
+          contentHeaderRowX.appendChild(th);
+        });
+        contentRowGroupX.appendChild(contentHeaderRowX);
 
-function GenerateOverallStatusTableFunction {
-  @"
-function populateOverallStatusTable() {
-  const tableBody = document.getElementById("table-body-overall");
-  const statusData = calculateStatusData();
 
-  let total = {
-      Implemented: 0,
-      PartialImplemented: 0,
-      NotImplemented: 0,
-      Unknown: 0,
-      ManualVerificationRequired: 0,
-      NotApplicable: 0,
-      NotDeveloped: 0,
-      Error: 0
-  };
 
-  Object.keys(statusData).forEach(severity => {
-      const row = statusData[severity];
-      Object.keys(total).forEach(key => total[key] += row[key]);
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-          "<td>" + severity + "</td>" +
-          "<td>" + row.Implemented + "</td>" +
-          "<td>" + row.PartialImplemented + "</td>" +
-          "<td>" + row.NotImplemented + "</td>" +
-          "<td>" + row.Unknown + "</td>" +
-          "<td>" + row.ManualVerificationRequired + "</td>" +
-          "<td>" + row.NotApplicable + "</td>" +
-          "<td>" + row.NotDeveloped + "</td>" +
-          "<td>" + row.Error + "</td>";
-      tableBody.appendChild(tr);
-  });
-
-  const totalRow = document.createElement("tr");
-  totalRow.innerHTML = `
-      "<td><strong>Total</strong></td>" +
-      Object.keys(total).map(key => "<td><strong>" + total[key] + "</strong></td>").join("");
-  tableBody.appendChild(totalRow);
+        exceptionsData.exceptions
+                .filter(exception => exception.Category === category)
+                .forEach(exception => {
+                  const tr = document.createElement("tr");
+                  tr.innerHTML = `
+                        "<td>" + exception.QuestionID + "</td>" +
+                        "<td>" + exception.QuestionText + "</td>" +
+                        "<td>" + exception.StatusReport + "</td>" +
+                        "<td>" + exception.NewStatus + "</td>";
+                  contentRowGroupX.appendChild(tr);
+        });
+        exceptionsContainer.appendChild(contentRowGroupX);
+    });
 }
 "@
 }
 
 function GeneratePieChartFunction {
   @"
-function populatePieChart() {
-  const totals = calculateStatusDataTotals();
-  const ctx = document.getElementById("designAreaPieChart").getContext("2d");
-  new Chart(ctx, {
-      type: "pie",
-      data: {
-          labels: Object.keys(totals),
-          datasets: [{
-              data: Object.values(totals),
-              backgroundColor: ["#4caf50", "#2196f3", "#ff5722", "#ffc107", "#9c27b0", "#00bcd4", "#607d8b", "#e91e63"]
-          }]
+function populatePieChart(totals) {
+  const ctxDesignAreaPie = document
+    .getElementById("designAreaPieChart")
+    .getContext("2d");
+  const designAreaPieChart = new Chart(ctxDesignAreaPie, {
+    type: "pie",
+    data: {
+      labels: [
+        "Implemented",
+        "Partial Implemented",
+        "Not Implemented",
+        "Unknown",
+        "Manual Verification Required",
+        "Not Applicable",
+        "Not Developed",
+        "Error",
+      ],
+      datasets: [
+        {
+          label: "Overall Status",
+          data: [
+            totals.Implemented,
+            totals.PartialImplemented,
+            totals.NotImplemented,
+            totals.Unknown,
+            totals.ManualVerificationRequired,
+            totals.NotApplicable,
+            totals.NotDeveloped,
+            totals.Error,
+          ],
+          backgroundColor: [
+            "rgba(75, 192, 192, 0.2)",
+            "rgba(54, 162, 235, 0.2)",
+            "rgba(255, 99, 132, 0.2)",
+            "rgba(255, 206, 86, 0.2)",
+            "rgba(153, 102, 255, 0.2)",
+            "rgba(255, 159, 64, 0.2)",
+            "rgba(255, 159, 108, 0.2)",
+            "rgba(201, 203, 207, 0.2)",
+          ],
+          borderColor: [
+            "rgba(75, 192, 192, 1)",
+            "rgba(54, 162, 235, 1)",
+            "rgba(255, 99, 132, 1)",
+            "rgba(255, 206, 86, 1)",
+            "rgba(153, 102, 255, 1)",
+            "rgba(255, 159, 64, 1)",
+            "rgba(255, 159, 108, 1)",
+            "rgba(201, 203, 207, 1)",
+          ],
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "top",
+        },
+        title: {
+          display: true,
+          text: "Overall Status Pie Chart",
+        },
       },
-      options: {
-          responsive: true,
-          plugins: {
-              legend: { position: "top" },
-              title: { display: true, text: "Overall Status Pie Chart" }
-          }
-      }
-  });
-}
-"@
-}
-
-function GenerateCategoryStatusTableFunction {
-  @"
-function populateCategoryStatusTable() {
-  const tableBody = document.getElementById("table-body-category");
-  const categoryStatusData = calculateCategoryStatusData();
-
-  Object.keys(categoryStatusData).forEach(category => {
-      const row = categoryStatusData[category];
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-          "<td>" + category + "</td>" +
-          "<td>" + row.NotVerified + "</td>" +
-          "<td>" + row.Open + "</td>" +
-          "<td>" + row.Closed + "</td>" +
-          "<td>" + row.Total + "</td>" +
-          "<td>" + row.Progress.toFixed(2) + "%</td>";
-      tableBody.appendChild(tr);
+    },
   });
 }
 "@
@@ -873,110 +754,110 @@ function populateCategoryStatusTable() {
 
 function GenerateRadarChartFunction {
   @"
-function populateRadarChart() {
-  const categoryStatusData = calculateCategoryStatusData();
+function populateRadarChart(categoryStatusData) {
   const labels = Object.keys(categoryStatusData);
-  const data = labels.map(category => categoryStatusData[category].Progress);
+  const data = labels.map(
+    (category) => categoryStatusData[category].Progress
+  );
 
-  const ctx = document.getElementById("lowRadarChart").getContext("2d");
+  const ctxLowRadar = document
+    .getElementById("lowRadarChart")
+    .getContext("2d");
+  const lowRadarChart = new Chart(ctxLowRadar, {
+    type: "radar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Progress",
+          data: data,
+          backgroundColor: "rgba(54, 162, 235, 0.2)",
+          borderColor: "rgba(54, 162, 235, 1)",
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: "Progress by Category",
+        },
+      },
+      scales: {
+        r: {
+          angleLines: {
+            display: true,
+          },
+          suggestedMin: 0,
+          suggestedMax: 100,
+        },
+      },
+    },
+  });
+}
+"@
+}
+function GenerateWAFChartFunction {
+  @"
+  function calculateWAFData() {
+    const wafCounts = {};
+
+    Object.values(jsonReportListData).forEach((category) => {
+        (category || []).forEach((item) => {
+            const waf = item.RawSource?.waf || "Unknown";
+            if (!wafCounts[waf]) {
+                wafCounts[waf] = 0;
+            }
+            wafCounts[waf]++;
+        });
+    });
+
+    return wafCounts;
+}
+
+function updateWAFChart() {
+  const wafData = calculateWAFData();
+  const labels = Object.keys(wafData);
+  const data = Object.values(wafData);
+
+  const ctx = document.getElementById('wafChart').getContext('2d');
   new Chart(ctx, {
-      type: "radar",
+      type: 'bar',
       data: {
           labels: labels,
-          datasets: [{
-              label: "Progress",
-              data: data,
-              backgroundColor: "rgba(54, 162, 235, 0.2)",
-              borderColor: "rgba(54, 162, 235, 1)",
-              borderWidth: 1
-          }]
+          datasets: [
+              {
+                  label: 'WAF Indicator',
+                  data: data,
+                  backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                  borderColor: 'rgba(75, 192, 192, 1)',
+                  borderWidth: 1,
+              },
+          ],
       },
       options: {
           responsive: true,
           plugins: {
-              title: { display: true, text: "Progress by Category" }
+              legend: {
+                  position: 'top',
+              },
+              title: {
+                  display: true,
+                  text: 'WAF Indicator Chart',
+              },
           },
           scales: {
-              r: { beginAtZero: true }
-          }
-      }
+              y: {
+                  beginAtZero: true,
+              },
+          },
+      },
   });
 }
 "@
 }
-
-function GenerateDetailsTableFunction {
-  @"
-function populateDetailsTable() {
-  const tableBody = document.getElementById("table-body-all-items");
-  const coveredItems = getCoveredItems();
-
-  coveredItems.forEach(item => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-          "<td>" + item.category + "</td>" +
-          "<td>" + item.subcategory + "</td>" +
-          "<td>" + item.status + "</td>" +
-          "<td>" + item.description + "</td>" +
-          "<td>" + item.waf + "</td>" +
-          "<td>" + item.id + "</td>" +
-          "<td>" + item.severity + "</td>" +
-          "<td><a href='" + item.training + "'>Training</a></td>" +
-          "<td><a href='" + item.reference + "'>Reference</a></td>";
-      tableBody.appendChild(tr);
-  });
-}
-"@
-}
-
-function GenerateErrorLogTableFunction {
-  @"
-function populateErrorLogTable() {
-  const errorLogContainer = document.getElementById('error-log-container');
-  errorLogContainer.innerHTML = '';
-
-  const categories = [...new Set(errorLogData.errorsArray.map(error => error.Category))];
-
-  categories.forEach(category => {
-      const header = document.createElement('div');
-      header.className = 'collapsible-header';
-      header.innerHTML = "<h4>" + category + "</h4>";
-      header.onclick = function () {
-          this.nextElementSibling.classList.toggle('active');
-      };
-      errorLogContainer.appendChild(header);
-
-      const content = document.createElement('div');
-      content.className = 'collapsible-content';
-      const table = document.createElement('table');
-      table.className = 'fixed-header-table';
-      table.innerHTML = `
-          "<thead>" +
-              "<tr>" +
-                  "<th>Question ID</th>" +
-                  "<th>Question Text</th>" +
-                  "<th>Function Name</th>" +
-                  "<th>Error Message</th>" +
-              "</tr>" +
-          "</thead>" +
-          "<tbody>"
-          ${errorLogData.errorsArray
-              .filter(error => error.Category === category)
-              .map(error => `
-                  "<tr>" +
-                      "<td>" + error.QuestionID + "</td>" +
-                      "<td>" + error.QuestionText + "</td>" +
-                      "<td>" + error.FunctionName + "</td>" +
-                      "<td>" + error.ErrorMessage + "</td>" +
-                  "</tr>").join('')}
-          "</tbody>"
-      content.appendChild(table);
-      errorLogContainer.appendChild(content);
-  });
-}
-"@
-}
-
 function Generate-HTMLFooter {
   @"
   </body>
@@ -984,32 +865,39 @@ function Generate-HTMLFooter {
 "@
 }
 
-# Function to generate the complete HTML
 function Generate-HTML {
   $html = @()
   $html += Generate-HTMLHead
   $html += "<body>"
   $html += Generate-HTMLHeader
   $html += Generate-MainSection
-  $html += Generate-JavaScript2
+  $html += "<script>"
+  $html += Generate-JavaScript
+  $html += "</script>"
   $html += Generate-HTMLFooter
   $html -join "`n"
 }
 
-# Replace the placeholder __REPORTLISTDATA__ with content from the JSON file
 function Replace-ReportDataPlaceholder {
   param (
-    [string]$HTMLContent,
-    [string]$ReportJsonPath
+      [string]$HTMLContent,
+      [string]$ReportJsonPath,
+      [string]$ExceptionsJsonPath
   )
 
-  # Read the JSON file
-  $reportJsonContent = Get-Content -Path $ReportJsonPath -Raw
-  # Replace the placeholder with the JSON content
-  return $HTMLContent -replace "__REPORTLISTDATA__", $reportJsonContent
+  # Apply exceptions and get updated report content
+  $result = Apply-ExceptionsToReport -ReportJsonPath $ReportJsonPath -ExceptionsJsonPath $ExceptionsJsonPath
+
+  $alteredReportJson = $result.ReportData
+  $exceptionsApplied = $result.ExceptionsApplied | ConvertTo-Json -Depth 15
+
+  # Replace the placeholder with updated report JSON
+  $updatedHTMLContent = $HTMLContent -replace "__REPORTLISTDATA__", $alteredReportJson
+
+  # Add exceptions data to the HTML
+  return $updatedHTMLContent -replace "__EXCEPTIONSDATA__", $exceptionsApplied
 }
 
-# Replace the placeholder __ERRORLOGDATA__ with content from the CSV file
 function Replace-ErrorLogDataPlaceholder {
   param (
       [string]$HTMLContent,
@@ -1017,28 +905,89 @@ function Replace-ErrorLogDataPlaceholder {
   )
 
   # Read the ErrorLog.json file
-  $jsonContent = Get-Content -Path $ErrorLogPath -Raw
+  if (Test-Path -Path $ErrorLogPath) {
+      $jsonContent = Get-Content -Path $ErrorLogPath -Raw
 
-  # Escape JSON for embedding in JavaScript
-  $escapedJsonContent = $jsonContent -replace '"', '\"' -replace "`r?`n", ""
+      # Escape JSON for embedding in JavaScript
+      $escapedJsonContent = $jsonContent -replace '"', '\"' -replace "`r?`n", ""
 
-  # Replace the placeholder with the escaped JSON content
-  return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
+      # Replace the placeholder with the escaped JSON content
+      return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
+  } else {
+      Write-Error "Error log file not found at $ErrorLogPath"
+      return $HTMLContent
+  }
 }
 
+function Apply-ExceptionsToReport {
+  param (
+      [string]$ReportJsonPath,
+      [string]$ExceptionsJsonPath
+  )
 
+  $reportData = @{ }
+  if (Test-Path -Path $ReportJsonPath) {
+      $reportData = Get-Content -Path $ReportJsonPath | ConvertFrom-Json
+  } else {
+      Write-Error "Report file not found at $ReportJsonPath"
+      return
+  }
 
+  $exceptionsData = @{ exceptions = @() }
+  if (Test-Path -Path $ExceptionsJsonPath) {
+      $exceptionsData = Get-Content -Path $ExceptionsJsonPath | ConvertFrom-Json
+  }
 
-#   MAIN CODE
+  $categories = @('Billing', 'IAM', 'ResourceOrganization', 'Network', 'Governance', 'Security', 'DevOps', 'Management')
+  $exceptionsApplied = @()
 
+  foreach ($category in $categories) {
+      if ($reportData.$category -is [System.Collections.IEnumerable]) {
+          foreach ($item in $reportData.$category) {
+              $exception = $exceptionsData.exceptions | Where-Object { $_.id -eq $item.RawSource.id }
+              if ($exception) {
+                  if ($exception.newStatus -ne $item.Status) {
+                      $exceptionsApplied += [PSCustomObject]@{
+                          Category         = $item.RawSource.category  
+                          QuestionID       = $item.RawSource.id
+                          QuestionText     = $item.RawSource.text
+                          StatusReport     = $item.Status
+                          NewStatus        = $exception.status
+                      }
 
+                      # Update the status in the report
+                      $item.Status = $exception.newStatus
+                      Write-Host "Exception applied for $($item.RawSource.id) in category $category"
+                  }
+
+                  # Update the status in exceptions for tracking
+                  $exception.status = $item.Status
+              }
+          }
+      }
+  }
+
+  return @{
+      ReportData         = $reportData | ConvertTo-Json -Depth 15
+      ExceptionsApplied  = @{ exceptions = $exceptionsApplied }
+  }
+}
+
+# Main Code
 
 $errorLogPath = "$PSScriptRoot/../reports/ErrorLog.json"
 $reportJsonPath = "$PSScriptRoot/../reports/report.json"
+$reportJsonPath = "$PSScriptRoot/../reports/report.json"
+$exceptionsJsonPath = "$PSScriptRoot/../shared/exceptions.json"
+
+# Apply exceptions to the report
+$result = Apply-ExceptionsToReport -ReportJsonPath $ReportJsonPath -ExceptionsJsonPath $ExceptionsJsonPath
+$alteredReportJson = $result.ReportData
+$exceptionsApplied = $result.ExceptionsApplied | ConvertTo-Json -Depth 15
 
 # Generate the HTML and replace the placeholder
 $htmlContent = Generate-HTML
-$htmlContent = Replace-ReportDataPlaceholder -HTMLContent $htmlContent -ReportJsonPath $reportJsonPath
+$htmlContent = Replace-ReportDataPlaceholder -HTMLContent $htmlContent -ReportJsonPath $reportJsonPath -ExceptionsJsonPath $exceptionsJsonPath
 $htmlContent = Replace-ErrorLogDataPlaceholder -HTMLContent $htmlContent -ErrorLogPath $errorLogPath
 
 # Save the final HTML to a file

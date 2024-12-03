@@ -1,0 +1,10 @@
+{
+  "exceptions": [
+    //SAMPLE EXCEPTION
+  //   {
+  //     "id": "B03.04",
+  //     "text": "Enforce Microsoft Entra ID Conditional Access policies for any user with rights to Azure environments.", 
+  //     "status": "Implemented"
+  //   }
+  // ]
+}
