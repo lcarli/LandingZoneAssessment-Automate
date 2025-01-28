@@ -172,6 +172,7 @@ function Test-QuestionH0105 {
 
     try {
         # Question: Include unit tests for IaC and application code as part of your build process.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/development-strategy-development-lifecycle#automated-builds
         $status = [Status]::ManualVerificationRequired
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -198,6 +199,7 @@ function Test-QuestionH0106 {
 
     try {
         # Question: Ensure end-to-end tests are included in your deployment pipeline.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/development-strategy-development-lifecycle#automated-builds
         $status = [Status]::ManualVerificationRequired
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -224,6 +226,7 @@ function Test-QuestionH0107 {
 
     try {
         # Question: Validate code quality gates in your pipelines.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/subscription-vending
         $status = [Status]::ManualVerificationRequired
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -250,6 +253,7 @@ function Test-QuestionH0201 {
 
     try {
         # Question: Use Infrastructure as Code (IaC) in deployment pipelines.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/infrastructure-as-code
         $status = [Status]::ManualVerificationRequired
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -276,6 +280,7 @@ function Test-QuestionH0202 {
 
     try {
         # Question: Ensure RBAC compliance in deployment pipelines.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/development-strategy-development-lifecycle
         $status = [Status]::ManualVerificationRequired
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -302,6 +307,7 @@ function Test-QuestionH0203 {
 
     try {
         # Question: Use artifact repositories to manage shared libraries in pipelines.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/development-strategy-development-lifecycle
         $status = [Status]::ManualVerificationRequired
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -328,6 +334,7 @@ function Test-QuestionH0204 {
 
     try {
         # Question: Integrate secrets management in deployment pipelines.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/management-platform
         $status = [Status]::ManualVerificationRequired
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -354,6 +361,7 @@ function Test-QuestionH0301 {
 
     try {
         # Question: Ensure appropriate processes and practices are in place for H03.01.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/infrastructure-as-code
         $status = [Status]::ManualVerificationRequired
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -380,6 +388,7 @@ function Test-QuestionH0401 {
 
     try {
         # Question: Ensure appropriate processes and practices are in place for H04.01.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/landing-zone-security#secure
         $status = [Status]::ManualVerificationRequired
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
