@@ -69,18 +69,25 @@ function Invoke-SecurityAssessment {
 
 # Function for Security item G01.01
 function Test-QuestionG0101 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
+        # Question: Determine the incident response plan for Azure services before allowing it into production.
+        # Reference: https://learn.microsoft.com/security/benchmark/azure/security-control-incident-response
+
+        # This question requires manual verification as it involves planning and documentation.
+        $status = [Status]::ManualVerificationRequired
+        $rawData = "Incident response plan needs to be documented and verified manually."
         $estimatedPercentageApplied = 0
     }
     catch {
@@ -90,26 +97,53 @@ function Test-QuestionG0101 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for Security item G01.02
 function Test-QuestionG0102 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
-
+    
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+        
     $status = [Status]::Unknown
-
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+    
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
+        # Question: Apply a zero-trust approach for access to the Azure platform.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/security-zero-trust
+    
+        # Retrieve all Conditional Access Policies
+        $conditionalAccessPolicies = Get-AzConditionalAccessPolicy
+            
+        if ($conditionalAccessPolicies.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No Conditional Access Policies are configured."
+            $estimatedPercentageApplied = 0
+        }
+        else {
+            $mfaPolicies = $conditionalAccessPolicies | Where-Object { $_.Conditions.Users.IncludeUsers -contains 'All' -and $_.Controls.Mfa } 
+            $rbacPolicies = Get-AzRoleAssignment | Where-Object { $_.RoleDefinitionName -match "Owner|Contributor" -and $_.Scope -match "/subscriptions/" }
+                
+            if ($mfaPolicies.Count -gt 0 -and $rbacPolicies.Count -gt 0) {
+                $status = [Status]::Implemented
+                $rawData = "Zero Trust approach is enforced with MFA and RBAC policies."
+                $estimatedPercentageApplied = 100
+            }
+            else {
+                $status = [Status]::PartiallyImplemented
+                $rawData = @{
+                    MFA_PoliciesConfigured  = $mfaPolicies.Count
+                    RBAC_PoliciesConfigured = $rbacPolicies.Count
+                }
+                $estimatedPercentageApplied = ($mfaPolicies.Count -gt 0 ? 50 : 0) + ($rbacPolicies.Count -gt 0 ? 50 : 0)
+            }
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -117,27 +151,43 @@ function Test-QuestionG0102 {
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-
+    
 # Function for Security item G02.01
 function Test-QuestionG0201 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
+        # Question: Use Azure Key Vault to store your secrets and credentials.
+        # Reference: https://learn.microsoft.com/azure/key-vault/general/overview
+
+        # Retrieve all Key Vaults in the subscriptions
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
+
+        if ($keyVaults.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No Azure Key Vaults are configured in the current subscriptions."
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::Implemented
+            $rawData = @{
+                KeyVaultCount = $keyVaults.Count
+                KeyVaultNames = $keyVaults.Name
+            }
+            $estimatedPercentageApplied = 100
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -146,26 +196,59 @@ function Test-QuestionG0201 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for Security item G02.02
 function Test-QuestionG0202 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
+        # Question: Use different Azure Key Vaults for different applications and regions to avoid transaction scale limits and restrict access to secrets.
+        # Reference: https://learn.microsoft.com/azure/key-vault/general/overview-throttling
+
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
+
+        if ($keyVaults.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No Azure Key Vaults are configured in the current subscriptions."
+            $estimatedPercentageApplied = 0
+        } else {
+            $uniqueLocations = $keyVaults.Location | Select-Object -Unique
+            
+            $managementGroupNames = @("landing zone", "landingzone", "zone daccueil", "zone des charges")
+            $landingZoneSubscriptions = $global:AzData.ManagementGroups | Where-Object {
+                $managementGroupNames -contains $_.Name
+            } | ForEach-Object {
+                $_.Subscriptions
+            } | Select-Object -ExpandProperty SubscriptionId
+
+            $subscriptionsWithKeyVaults = $keyVaults | Group-Object -Property SubscriptionId
+
+            if ($uniqueLocations.Count -gt 1 -or $subscriptionsWithKeyVaults.Count -ge $landingZoneSubscriptions.Count) {
+                $status = [Status]::Implemented
+                $rawData = @{
+                    TotalKeyVaults           = $keyVaults.Count
+                    UniqueLocations          = $uniqueLocations
+                    SubscriptionsWithKeyVaults = $subscriptionsWithKeyVaults | Select-Object Name, Count
+                }
+                $estimatedPercentageApplied = 100
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $rawData = "Key Vaults are not sufficiently distributed across regions or subscriptions."
+                $estimatedPercentageApplied = 50
+            }
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -174,26 +257,57 @@ function Test-QuestionG0202 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for Security item G02.03
 function Test-QuestionG0203 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
+        # Question: Provision Azure Key Vault with the soft delete and purge policies enabled to allow retention protection for deleted objects.
+        # Reference: https://learn.microsoft.com/azure/key-vault/general/best-practices
+
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
+
+        if ($keyVaults.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No Azure Key Vaults are configured in the current subscriptions."
+            $estimatedPercentageApplied = 0
+        } else {
+            $vaultStatus = $keyVaults | ForEach-Object {
+                [PSCustomObject]@{
+                    VaultName       = $_.Name
+                    SoftDelete      = $_.Properties.enableSoftDelete
+                    PurgeProtection = $_.Properties.enablePurgeProtection
+                }
+            }
+
+            $nonCompliantVaults = $vaultStatus | Where-Object { -not ($_.SoftDelete -and $_.PurgeProtection) }
+
+            if ($nonCompliantVaults.Count -eq 0) {
+                $status = [Status]::Implemented
+                $rawData = "All Key Vaults have soft delete and purge protection enabled."
+                $estimatedPercentageApplied = 100
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $rawData = @{
+                    TotalKeyVaults        = $keyVaults.Count
+                    NonCompliantVaults    = $nonCompliantVaults
+                }
+                $estimatedPercentageApplied = [Math]::Round((($keyVaults.Count - $nonCompliantVaults.Count) / $keyVaults.Count) * 100, 2)
+            }
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -202,26 +316,61 @@ function Test-QuestionG0203 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for Security item G02.04
 function Test-QuestionG0204 {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
+        # Question: Use a single Key Vault for certificates, secrets, and keys. Use tags to distinguish different types of secrets.
+        # Reference: https://learn.microsoft.com/azure/key-vault/general/best-practices
+
+        # Retrieve all Key Vaults using AzData.Resources
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
+
+        if ($keyVaults.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No Azure Key Vaults are configured in the current subscriptions."
+            $estimatedPercentageApplied = 0
+        } else {
+            # Check Key Vault configuration for certificates, secrets, keys, and tags
+            $vaultStatus = $keyVaults | ForEach-Object {
+                [PSCustomObject]@{
+                    VaultName    = $_.Name
+                    HasCertificates = ($_ | Get-AzKeyVaultCertificate -ErrorAction SilentlyContinue) -ne $null
+                    HasSecrets   = ($_ | Get-AzKeyVaultSecret -ErrorAction SilentlyContinue) -ne $null
+                    HasKeys      = ($_ | Get-AzKeyVaultKey -ErrorAction SilentlyContinue) -ne $null
+                    HasTags      = ($_.Tags -ne $null -and $_.Tags.Count -gt 0)
+                }
+            }
+
+            $nonCompliantVaults = $vaultStatus | Where-Object { -not ($_.HasCertificates -and $_.HasSecrets -and $_.HasKeys -and $_.HasTags) }
+
+            if ($nonCompliantVaults.Count -eq 0) {
+                $status = [Status]::Implemented
+                $rawData = "All Key Vaults are compliant with the requirement."
+                $estimatedPercentageApplied = 100
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $rawData = @{
+                    TotalKeyVaults       = $keyVaults.Count
+                    NonCompliantVaults   = $nonCompliantVaults
+                }
+                $estimatedPercentageApplied = [Math]::Round((($keyVaults.Count - $nonCompliantVaults.Count) / $keyVaults.Count) * 100, 2)
+            }
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -230,10 +379,9 @@ function Test-QuestionG0204 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
+
 
 # Function for Security item G02.05
 function Test-QuestionG0205 {

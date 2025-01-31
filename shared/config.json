@@ -4,13 +4,13 @@
     "ContractType": "EnterpriseAgreement",  // Options: EnterpriseAgreement, MicrosoftCustomerAgreement, CloudSolutionProvider, MicrosoftEntraIDTenants
     "AlzChecklist": "alz_checklist.en.json",
     "DesignAreas": {
-        "Billing": true,
+        "Billing": false,
         "IAM": true,
-        "ResourceOrganization": true,
+        "ResourceOrganization": false,
         "Network": false,
-        "Governance": true,
-        "Security": true,
-        "DevOps": true,
-        "Management": true
+        "Governance": false,
+        "Security": false,
+        "DevOps": false,
+        "Management": false
     }
 }

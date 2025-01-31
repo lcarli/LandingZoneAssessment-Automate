@@ -71,7 +71,8 @@ function Get-AzModules {
         'Az.ResourceGraph',
         'Az.ManagedServices'
         'Az.CostManagement',
-        'Microsoft.Graph'
+        'Microsoft.Graph',
+        'Microsoft.Graph.Beta'
     )
 
     foreach ($module in $requiredModules) {
@@ -130,7 +131,7 @@ function Initialize-Connect {
         $graphContext = Get-MgContext
         if (-not $graphContext) {
             Write-Host "You are not connected to Microsoft Graph. Please sign in."
-            Connect-MgGraph -TenantId $TenantId -NoWelcome
+            Connect-MgGraph -TenantId $TenantId -NoWelcome -Scopes "Directory.Read.All Reports.Read.All Policy.Read.All UserAuthenticationMethod.Read.All"
         }
         else {
             Write-Host "You are already connected to Microsoft Graph."
@@ -138,7 +139,7 @@ function Initialize-Connect {
     }
     catch {
         Write-Host "You are not connected to Microsoft Graph. Please sign in."
-        Connect-MgGraph -TenantId $TenantId -NoWelcome
+        Connect-MgGraph -TenantId $TenantId -NoWelcome -Scopes "Directory.Read.All Reports.Read.All Policy.Read.All UserAuthenticationMethod.Read.All"
     }
 }
 

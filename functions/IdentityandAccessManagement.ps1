@@ -345,7 +345,7 @@ function Test-QuestionB0303 {
 
                 # Loop through each role assignment and check if it's assigned to a group
                 foreach ($assignment in $roleAssignments) {
-                    if ($assignment.PrincipalType -eq "Group") {
+                    if ($assignment.ObjectType -eq "Group") {
                         $groupAssignments++
                     }
                 }
@@ -514,21 +514,18 @@ function Test-QuestionB0305 {
             $usersWithMFA = 0
             $uniqueUsers = @()
 
-            # Store unique user principal IDs from role assignments
             foreach ($assignment in $roleAssignments) {
                 if ($assignment.ObjectType -eq "User") {
-                    $uniqueUsers += $assignment.ObjectId  # Use ObjectId to check MFA methods
+                    $uniqueUsers += $assignment.ObjectId
                 }
             }
 
             $uniqueUsers = $uniqueUsers | Sort-Object -Unique
 
-            # Iterate through each user and check if MFA is enabled
             foreach ($userId in $uniqueUsers) {
                 $isMFAEnabled = $false
 
                 try {
-                    # Check MFA methods for the user
                     $mfaMethods = Get-MgUserAuthenticationMethod -UserId $userId
 
                     if ($mfaMethods.Count -gt 0) {
@@ -539,9 +536,8 @@ function Test-QuestionB0305 {
                     Write-Host "Failed to get MFA methods for user: $userId" -ForegroundColor Yellow
                 }
 
-                # Check if Conditional Access policy enforcing MFA exists for the user
                 if (-not $isMFAEnabled) {
-                    $conditionalAccessPolicies = Get-MgConditionalAccessPolicy
+                    $conditionalAccessPolicies = Get-MgIdentityConditionalAccessPolicy
                     foreach ($policy in $conditionalAccessPolicies) {
                         if (($policy.Conditions.Users.IncludeUsers -contains $userId) -and ($policy.GrantControls.BuiltInControls -contains "mfa")) {
                             $isMFAEnabled = $true
@@ -555,7 +551,6 @@ function Test-QuestionB0305 {
                 }
             }
 
-            # Calculate the percentage of users with MFA enabled
             if ($usersWithMFA -eq $uniqueUsers.Count) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
@@ -707,7 +702,7 @@ function Test-QuestionB0307 {
         # Reference: https://learn.microsoft.com/azure/active-directory/privileged-identity-management/pim-configure
 
         # Get all PIM roles and check for standing access
-        $pimRoles = Get-MgPrivilegedRoleAssignment | Where-Object { $_.RoleDefinitionName -in @("Global Administrator", "Privileged Role Administrator", "Security Administrator") }
+        $pimRoles = Get-MgBetaPrivilegedRoleRoleAssignment | Where-Object { $_.RoleDefinitionName -in @("Global Administrator", "Privileged Role Administrator", "Security Administrator") }
 
         if ($pimRoles.Count -eq 0) {
             # No privileged roles found
