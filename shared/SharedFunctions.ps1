@@ -113,14 +113,67 @@ function Measure-ExecutionTime {
 
     # Record the start time
     $startTime = Get-Date
+    $originalErrorActionPreference = $ErrorActionPreference
+    $originalProgressPreference = $ProgressPreference
 
-    # Execute the script block
-    & $ScriptBlock
+    try {
+        # Create a runspace to execute the script block
+        # This approach isolates the execution to prevent issues when interrupted with Ctrl+C
+        $runspace = [runspacefactory]::CreateRunspace()
+        $runspace.Open()
+        $runspace.SessionStateProxy.SetVariable("ScriptBlock", $ScriptBlock)
+        $runspace.SessionStateProxy.SetVariable("ErrorActionPreference", $ErrorActionPreference)
+        $runspace.SessionStateProxy.SetVariable("ProgressPreference", $ProgressPreference)
+        
+        $powershell = [powershell]::Create()
+        $powershell.Runspace = $runspace
+        $powershell.AddScript({
+            # Execute the script block in an isolated context
+            & $ScriptBlock
+        }) | Out-Null
 
-    # Record the end time
-    $endTime = Get-Date
+        # Execute the script and handle interruptions
+        $asyncResult = $powershell.BeginInvoke()
+        
+        # Wait for the script to complete or be interrupted
+        while (-not $asyncResult.IsCompleted) {
+            # Check if Ctrl+C was pressed
+            if ([Console]::KeyAvailable -and [Console]::ReadKey($true).Key -eq [ConsoleKey]::C -and [Console]::KeyAvailable -and [Console]::ReadKey($true).Modifiers -eq [ConsoleModifiers]::Control) {
+                Write-Host "`nExecution canceled by user (Ctrl+C). Cleaning up resources..."
+                $powershell.Stop()
+                break
+            }
+            # Add small delay to reduce CPU usage
+            Start-Sleep -Milliseconds 100
+        }
 
-    # Calculate and output the duration
-    $executionTime = $endTime - $startTime
-    Write-Host "Function '$FunctionName' Execution Time: $($executionTime.TotalSeconds) seconds"
+        # Get the result (if not interrupted)
+        if ($asyncResult.IsCompleted) {
+            $powershell.EndInvoke($asyncResult)
+        }
+    }
+    catch {
+        Write-Host "An error occurred during execution: $_"
+    }
+    finally {
+        # Ensure resources are properly disposed
+        if ($powershell) {
+            $powershell.Dispose()
+        }
+        if ($runspace) {
+            $runspace.Close()
+            $runspace.Dispose()
+        }
+        
+        # Restore original preferences
+        $ErrorActionPreference = $originalErrorActionPreference
+        $ProgressPreference = $originalProgressPreference
+
+        # Record the end time
+        $endTime = Get-Date
+
+        # Calculate and output the duration
+        $executionTime = $endTime - $startTime
+        Write-Host "Function '$FunctionName' Execution Time: $($executionTime.TotalSeconds) seconds"
+    }
 }

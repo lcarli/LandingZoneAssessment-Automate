@@ -43,7 +43,7 @@ function Invoke-ResourceOrganizationAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.12") }) | Test-QuestionC0212
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.13") }) | Test-QuestionC0213
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.14") }) | Test-QuestionC0214
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.15") }) | Test-QuestionC0215
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.16") }) | Test-QuestionC0216
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C03.01") }) | Test-QuestionC0301
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C03.02") }) | Test-QuestionC0302
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C03.03") }) | Test-QuestionC0303
