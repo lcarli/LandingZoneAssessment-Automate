@@ -100,6 +100,14 @@ function Export-Report {
 }
 
 
+# Register a Ctrl+C handler
+$null = [Console]::CancelKeyPress.Register({
+    param($sender, $e)
+    Write-Host "`n`nCtrl+C detected. Cleaning up resources and exiting gracefully..." -ForegroundColor Yellow
+    # Set the Cancel property to True to prevent the process from terminating immediately
+    $e.Cancel = $true
+})
+
 # Call the main function
 try {
     Measure-ExecutionTime -ScriptBlock {
@@ -107,8 +115,16 @@ try {
     } -FunctionName "Main"
 }
 catch {
-    Write-Host "An error occurred: $_"
+    Write-Host "An error occurred: $_" -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace -ForegroundColor Red
 }
 finally {
+    # Cleanup global resources if any exist
+    if ($global:AzData) {
+        Write-Host "Cleaning up global resources..." -ForegroundColor Cyan
+        $global:AzData = $null
+    }
+    
+    # Stop transcript
     Stop-Transcript
 }
