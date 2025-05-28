@@ -205,7 +205,11 @@ function Test-QuestionC0203 {
         # Question: Enforce a platform management group under the root management group to support common platform policy and Azure role assignment.
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/resource-org-management-groups#management-group-recommendations
 
-        $platformMG = $global:AzData.ManagementGroups | Where-Object { $_.Name -eq "Platform" }
+        $searchTerms = @("platform", "plateforme")
+        $platformMG = $global:AzData.ManagementGroups | Where-Object {
+            $groupName = $_.DisplayName.ToLower()
+            $searchTerms | ForEach-Object { $groupName -like "*$_*" }
+        }
 
         if ($platformMG) {
             $status = [Status]::Implemented
