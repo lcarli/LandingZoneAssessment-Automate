@@ -2,4 +2,4 @@ reports/*.csv
 reports/*.json
 scripts/tmp.json
 logs/*.log
-web/index.html
+web/index*.html
