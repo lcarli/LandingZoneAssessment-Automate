@@ -393,11 +393,107 @@ function Test-QuestionG0205 {
 
     Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
+        # Question: Automate the certificate management and renewal process with public certificate authorities to ease administration.
+        # Reference: https://learn.microsoft.com/azure/key-vault/general/best-practices
+        
+        # Get all Key Vaults in the environment
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
+        
+        if ($keyVaults.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No Azure Key Vaults are configured in the current subscriptions."
+            $estimatedPercentageApplied = 0
+        } else {
+            # Initialize counters
+            $totalCertificates = 0
+            $automatedCertificates = 0
+            $automationDetails = @()
+            
+            # Loop through each Key Vault to check certificates
+            foreach ($keyVault in $keyVaults) {
+                # Set the context to the subscription containing the Key Vault
+                Set-AzContext -Subscription $keyVault.SubscriptionId | Out-Null
+                
+                try {
+                    # Get all certificates in the Key Vault
+                    $certificates = Get-AzKeyVaultCertificate -VaultName $keyVault.Name -ErrorAction SilentlyContinue
+                    
+                    if ($certificates.Count -gt 0) {
+                        foreach ($cert in $certificates) {
+                            $totalCertificates++
+                            $isAutomated = $false
+                            $issuerInfo = $null
+                            
+                            # Get the certificate issuer - this indicates if it's using a public CA
+                            try {
+                                $issuer = Get-AzKeyVaultCertificateIssuer -VaultName $keyVault.Name -Name $cert.Certificate.Issuer.Split("=")[1].Split(",")[0] -ErrorAction SilentlyContinue
+                                $issuerInfo = $issuer
+                                
+                                # Check if certificate uses automated renewal
+                                # Automated certificates typically have an IssuerProvider set and policy with auto-renewal settings
+                                $policy = Get-AzKeyVaultCertificatePolicy -VaultName $keyVault.Name -Name $cert.Name -ErrorAction SilentlyContinue
+                                
+                                if ($issuer -and $issuer.IssuerProvider -and 
+                                    $policy -and $policy.LifetimeActions -and 
+                                    $policy.LifetimeActions.Count -gt 0) {
+                                    $isAutomated = $true
+                                    $automatedCertificates++
+                                }
+                            }
+                            catch {
+                                # If we can't get the issuer details, default to not automated
+                                $issuerInfo = "Unknown"
+                            }
+                            
+                            $automationDetails += [PSCustomObject]@{
+                                KeyVaultName = $keyVault.Name
+                                CertificateName = $cert.Name
+                                Issuer = $cert.Certificate.Issuer
+                                IssuerProvider = $issuerInfo.IssuerProvider
+                                ExpiresOn = $cert.Expires
+                                IsAutomated = $isAutomated
+                            }
+                        }
+                    }
+                }
+                catch {
+                    Write-Host "Error accessing certificates in Key Vault $($keyVault.Name): $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+            }
+            
+            # Determine the status based on findings
+            if ($totalCertificates -eq 0) {
+                $status = [Status]::NotImplemented
+                $rawData = "No certificates found in any Key Vaults."
+                $estimatedPercentageApplied = 0
+            }
+            else {
+                if ($automatedCertificates -eq $totalCertificates) {
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                }
+                elseif ($automatedCertificates -gt 0) {
+                    $status = [Status]::PartiallyImplemented
+                    $estimatedPercentageApplied = [Math]::Round(($automatedCertificates / $totalCertificates) * 100, 2)
+                }
+                else {
+                    $status = [Status]::NotImplemented
+                    $estimatedPercentageApplied = 0
+                }
+                
+                $rawData = @{
+                    TotalKeyVaults = $keyVaults.Count
+                    TotalCertificates = $totalCertificates
+                    AutomatedCertificates = $automatedCertificates
+                    AutomationPercentage = $estimatedPercentageApplied
+                    CertificateDetails = $automationDetails
+                }
+            }
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
