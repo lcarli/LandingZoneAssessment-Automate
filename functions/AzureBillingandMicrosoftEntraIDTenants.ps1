@@ -40,10 +40,10 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.01") }) | Test-QuestionA0201
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.02") }) | Test-QuestionA0202
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.03") }) | Test-QuestionA0203
-        }
-        elseif ($ContractType -eq "EnterpriseAgreement") {
+        }        elseif ($ContractType -eq "EnterpriseAgreement") {
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.01") }) | Test-QuestionA0301
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.02") }) | Test-QuestionA0302
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.03") }) | Test-QuestionA0303
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.04") }) | Test-QuestionA0304
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.05") }) | Test-QuestionA0305
         }
@@ -626,6 +626,142 @@ function Test-QuestionA0302 {
             BillingAccounts    = $billingAccounts
             StructuredAccounts = $structuredAccounts
             TotalAccounts      = $totalAccounts
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $score = 0
+        $rawData = $_.Exception.Message
+    }
+
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionA0303 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+    $status = [Status]::NotImplemented
+    $estimatedPercentageApplied = 0
+    $weight = 1
+    $score = 0
+    $rawData = $null
+
+    try {
+        # Question: Assign a budget for each department and account, and establish an alert associated with the budget
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-considerations
+
+        $departmentBudgets = @()
+        $accountBudgets = @()
+        $budgetsWithAlerts = 0
+        $totalBudgets = 0
+
+        # Get Enterprise Agreement billing accounts if available
+        $billingAccounts = Get-AzBillingAccount -ErrorAction SilentlyContinue
+
+        if ($billingAccounts) {
+            foreach ($billingAccount in $billingAccounts) {
+                # Check for department-level budgets
+                try {
+                    $departments = Get-AzBillingProfile -BillingAccountName $billingAccount.Name -ErrorAction SilentlyContinue
+                    foreach ($department in $departments) {
+                        $departmentScope = "/providers/Microsoft.Billing/billingAccounts/$($billingAccount.Name)/billingProfiles/$($department.Name)"
+                        $budgets = Get-AzConsumptionBudget -Scope $departmentScope -ErrorAction SilentlyContinue
+                        
+                        if ($budgets) {
+                            $departmentBudgets += $budgets
+                            $totalBudgets += $budgets.Count
+                            
+                            # Check for alerts on each budget
+                            foreach ($budget in $budgets) {
+                                if ($budget.Notification -and $budget.Notification.Count -gt 0) {
+                                    $budgetsWithAlerts++
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    Write-Verbose "Could not retrieve department budgets: $($_.Exception.Message)"
+                }
+
+                # Check for account-level budgets within billing profiles
+                try {
+                    $billingProfiles = Get-AzBillingProfile -BillingAccountName $billingAccount.Name -ErrorAction SilentlyContinue
+                    foreach ($profile in $billingProfiles) {
+                        $invoiceSections = Get-AzInvoiceSection -BillingAccountName $billingAccount.Name -BillingProfileName $profile.Name -ErrorAction SilentlyContinue
+                        foreach ($section in $invoiceSections) {
+                            $accountScope = "/providers/Microsoft.Billing/billingAccounts/$($billingAccount.Name)/billingProfiles/$($profile.Name)/invoiceSections/$($section.Name)"
+                            $budgets = Get-AzConsumptionBudget -Scope $accountScope -ErrorAction SilentlyContinue
+                            
+                            if ($budgets) {
+                                $accountBudgets += $budgets
+                                $totalBudgets += $budgets.Count
+                                
+                                # Check for alerts on each budget
+                                foreach ($budget in $budgets) {
+                                    if ($budget.Notification -and $budget.Notification.Count -gt 0) {
+                                        $budgetsWithAlerts++
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    Write-Verbose "Could not retrieve account budgets: $($_.Exception.Message)"
+                }
+            }
+        }
+
+        # Also check subscription-level budgets as fallback for Enterprise Agreement scenarios
+        $subscriptions = $global:AzData.Subscriptions
+        $subscriptionBudgets = @()
+        
+        foreach ($subscription in $subscriptions) {
+            $budgets = Get-AzConsumptionBudget -Scope "/subscriptions/$($subscription.Id)" -ErrorAction SilentlyContinue
+            if ($budgets) {
+                $subscriptionBudgets += $budgets
+                $totalBudgets += $budgets.Count
+                
+                # Check for alerts on each budget
+                foreach ($budget in $budgets) {
+                    if ($budget.Notification -and $budget.Notification.Count -gt 0) {
+                        $budgetsWithAlerts++
+                    }
+                }
+            }
+        }
+
+        # Determine status based on findings
+        if ($totalBudgets -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } elseif ($budgetsWithAlerts -eq $totalBudgets) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($budgetsWithAlerts -gt 0) {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = [Math]::Round(($budgetsWithAlerts / $totalBudgets) * 100, 2)
+        } else {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        }
+
+        $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            DepartmentBudgets    = $departmentBudgets
+            AccountBudgets       = $accountBudgets
+            SubscriptionBudgets  = $subscriptionBudgets
+            TotalBudgets         = $totalBudgets
+            BudgetsWithAlerts    = $budgetsWithAlerts
+            BudgetsWithoutAlerts = $totalBudgets - $budgetsWithAlerts
         }
     }
     catch {

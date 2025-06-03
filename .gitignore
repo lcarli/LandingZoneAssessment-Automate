@@ -3,3 +3,4 @@ reports/*.json
 scripts/tmp.json
 logs/*.log
 web/index*.html
+comparison_results.json
