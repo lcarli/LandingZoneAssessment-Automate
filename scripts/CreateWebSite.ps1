@@ -957,7 +957,7 @@ function Apply-ExceptionsToReport {
 
                       # Update the status in the report
                       $item.Status = $exception.newStatus
-                      Write-Host "Exception applied for $($item.RawSource.id) in category $category"
+                      Write-Output "Exception applied for $($item.RawSource.id) in category $category"
                   }
 
                   # Update the status in exceptions for tracking

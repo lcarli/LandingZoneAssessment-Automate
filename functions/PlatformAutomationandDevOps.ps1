@@ -54,7 +54,7 @@ function Test-QuestionH0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires a manual verification of the organizational setup, roles, and responsibilities for the Azure Landing Zone DevOps Platform Team."
@@ -81,7 +81,7 @@ function Test-QuestionH0102 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires a manual verification to ensure that Azure Landing Zone Platform team functions are well-defined and documented."
@@ -108,7 +108,7 @@ function Test-QuestionH0103 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires a manual verification to ensure that RBAC roles are defined and applied appropriately for application workload team self-sufficiency."
@@ -136,7 +136,7 @@ function Test-QuestionH0104 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires a manual verification to ensure that RBAC roles are defined and applied appropriately for application workload team self-sufficiency."
@@ -165,7 +165,7 @@ function Test-QuestionH0105 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification of unit test integration in build pipelines."
@@ -192,7 +192,7 @@ function Test-QuestionH0106 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure proper implementation of end-to-end tests."
@@ -219,7 +219,7 @@ function Test-QuestionH0107 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to validate code quality gates in your pipelines."
@@ -246,7 +246,7 @@ function Test-QuestionH0201 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to confirm proper use of IaC in deployment pipelines."
@@ -273,7 +273,7 @@ function Test-QuestionH0202 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification for RBAC compliance within deployment pipelines."
@@ -300,7 +300,7 @@ function Test-QuestionH0203 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification for artifact repository management in pipelines."
@@ -327,7 +327,7 @@ function Test-QuestionH0204 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification of secrets management integration in pipelines."
@@ -354,7 +354,7 @@ function Test-QuestionH0301 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that processes and policies are aligned."
@@ -381,7 +381,7 @@ function Test-QuestionH0401 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that processes and policies are aligned."

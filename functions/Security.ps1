@@ -25,7 +25,7 @@ function Invoke-SecurityAssessment {
         [object]$Checklist
     )
     Measure-ExecutionTime -ScriptBlock {
-        Write-Host "Evaluating the Security design area..."
+        Write-Output "Evaluating the Security design area..."
 
         $results = @()
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G01.01") }) | Test-QuestionG0101
@@ -75,7 +75,7 @@ function Test-QuestionG0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -108,7 +108,7 @@ function Test-QuestionG0102 {
         [Object]$checklistItem
     )
     
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
         
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -163,7 +163,7 @@ function Test-QuestionG0201 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -207,7 +207,7 @@ function Test-QuestionG0202 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -268,7 +268,7 @@ function Test-QuestionG0203 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -327,7 +327,7 @@ function Test-QuestionG0204 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -338,9 +338,7 @@ function Test-QuestionG0204 {
         # Reference: https://learn.microsoft.com/azure/key-vault/general/best-practices
 
         # Retrieve all Key Vaults using AzData.Resources
-        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
-
-        if ($keyVaults.Count -eq 0) {
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }        if ($keyVaults.Count -eq 0) {
             $status = [Status]::NotImplemented
             $rawData = "No Azure Key Vaults are configured in the current subscriptions."
             $estimatedPercentageApplied = 0
@@ -348,11 +346,11 @@ function Test-QuestionG0204 {
             # Check Key Vault configuration for certificates, secrets, keys, and tags
             $vaultStatus = $keyVaults | ForEach-Object {
                 [PSCustomObject]@{
-                    VaultName    = $_.Name
-                    HasCertificates = ($_ | Get-AzKeyVaultCertificate -ErrorAction SilentlyContinue) -ne $null
-                    HasSecrets   = ($_ | Get-AzKeyVaultSecret -ErrorAction SilentlyContinue) -ne $null
-                    HasKeys      = ($_ | Get-AzKeyVaultKey -ErrorAction SilentlyContinue) -ne $null
-                    HasTags      = ($_.Tags -ne $null -and $_.Tags.Count -gt 0)
+                    VaultName       = $_.Name
+                    HasCertificates = $null -ne ($_ | Get-AzKeyVaultCertificate -ErrorAction SilentlyContinue)
+                    HasSecrets      = $null -ne ($_ | Get-AzKeyVaultSecret -ErrorAction SilentlyContinue)
+                    HasKeys         = $null -ne ($_ | Get-AzKeyVaultKey -ErrorAction SilentlyContinue)
+                    HasTags         = ($null -ne $_.Tags -and $_.Tags.Count -gt 0)
                 }
             }
 
@@ -391,7 +389,7 @@ function Test-QuestionG0205 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -461,7 +459,7 @@ function Test-QuestionG0205 {
                     }
                 }
                 catch {
-                    Write-Host "Error accessing certificates in Key Vault $($keyVault.Name): $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Output "Error accessing certificates in Key Vault $($keyVault.Name): $($_.Exception.Message)" -ForegroundColor Yellow
                 }
             }
             
@@ -515,7 +513,7 @@ function Test-QuestionG0206 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -543,7 +541,7 @@ function Test-QuestionG0207 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -571,7 +569,7 @@ function Test-QuestionG0208 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -599,7 +597,7 @@ function Test-QuestionG0209 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -627,7 +625,7 @@ function Test-QuestionG0210 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -655,7 +653,7 @@ function Test-QuestionG0211 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -683,7 +681,7 @@ function Test-QuestionG0212 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -711,7 +709,7 @@ function Test-QuestionG0213 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -739,7 +737,7 @@ function Test-QuestionG0301 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -767,7 +765,7 @@ function Test-QuestionG0302 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -795,7 +793,7 @@ function Test-QuestionG0303 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -823,7 +821,7 @@ function Test-QuestionG0304 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -851,7 +849,7 @@ function Test-QuestionG0305 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -879,7 +877,7 @@ function Test-QuestionG0306 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -907,7 +905,7 @@ function Test-QuestionG0307 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -935,7 +933,7 @@ function Test-QuestionG0308 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -963,7 +961,7 @@ function Test-QuestionG0309 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -991,7 +989,7 @@ function Test-QuestionG0310 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -1019,7 +1017,7 @@ function Test-QuestionG0311 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -1047,7 +1045,7 @@ function Test-QuestionG0312 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -1075,7 +1073,7 @@ function Test-QuestionG0401 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -1103,7 +1101,7 @@ function Test-QuestionG0402 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -1131,7 +1129,7 @@ function Test-QuestionG0501 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -1159,7 +1157,7 @@ function Test-QuestionG0601 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -1187,7 +1185,7 @@ function Test-QuestionG0602 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {

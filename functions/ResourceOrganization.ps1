@@ -25,7 +25,7 @@ function Invoke-ResourceOrganizationAssessment {
         [object]$Checklist
     )
 
-    Write-Host "Evaluating the Resource Organization design area..."
+    Write-Output "Evaluating the Resource Organization design area..."
     Measure-ExecutionTime -ScriptBlock {
         $results = @()
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C01.01") }) | Test-QuestionC0101
@@ -62,7 +62,7 @@ function Test-QuestionC0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that processes and policies are aligned."
@@ -89,7 +89,7 @@ function Test-QuestionC0201 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -149,7 +149,7 @@ function Test-QuestionC0202 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -196,7 +196,7 @@ function Test-QuestionC0203 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -243,7 +243,7 @@ function Test-QuestionC0204 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -292,7 +292,7 @@ function Test-QuestionC0205 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -336,7 +336,7 @@ function Test-QuestionC0206 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -383,7 +383,7 @@ function Test-QuestionC0207 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that management groups under the root are categorized based on workload needs (security, compliance, connectivity, and features)."
@@ -411,7 +411,7 @@ function Test-QuestionC0208 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that resource owners are informed of their roles and responsibilities, access reviews are conducted, budgets are reviewed, and policy compliance is remediated as necessary."
@@ -439,7 +439,7 @@ function Test-QuestionC0209 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure all subscription owners and IT core team members are informed about subscription quotas and their impact on resource provisioning."
@@ -467,7 +467,7 @@ function Test-QuestionC0210 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -528,7 +528,7 @@ function Test-QuestionC0211 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -586,7 +586,7 @@ function Test-QuestionC0212 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to confirm if a detailed cost management plan has been implemented using the 'Managed cloud costs' process."
@@ -614,7 +614,7 @@ function Test-QuestionC0213 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to confirm if a detailed cost management plan has been implemented using the 'Managed cloud costs' process."
@@ -642,7 +642,7 @@ function Test-QuestionC0214 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to confirm that tags are consistently used across resources for cost management and reporting."
@@ -670,7 +670,7 @@ function Test-QuestionC0216 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that cost management processes are aligned with organizational policies and procedures."
@@ -698,7 +698,7 @@ function Test-QuestionC0301 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -746,7 +746,7 @@ function Test-QuestionC0302 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -795,7 +795,7 @@ function Test-QuestionC0303 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that a threat detection strategy is defined and applied across all environments."

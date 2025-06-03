@@ -6,7 +6,7 @@ function Export-AzureTenantInfo {
     )
 
     try {
-        Write-Host "Getting info from tenant..."
+        Write-Output "Getting info from tenant..."
         $tenant = Get-AzTenant -TenantId $TenantId
 
         $tenantInfo = @{
@@ -14,11 +14,11 @@ function Export-AzureTenantInfo {
             Subscriptions = @()
         }
 
-        Write-Host "Getting subscriptions..."
+        Write-Output "Getting subscriptions..."
         $subscriptions = Get-AzSubscription -TenantId $TenantId
 
         foreach ($subscription in $subscriptions) {
-            Write-Host "Processing subscription: $($subscription.Name)..."
+            Write-Output "Processing subscription: $($subscription.Name)..."
             $subscriptionInfo = @{
                 Subscription = $subscription
                 ResourceGroups = @()
@@ -29,7 +29,7 @@ function Export-AzureTenantInfo {
             $resourceGroups = Get-AzResourceGroup
 
             foreach ($rg in $resourceGroups) {
-                Write-Host "Processing resource group: $($rg.ResourceGroupName)..."
+                Write-Output "Processing resource group: $($rg.ResourceGroupName)..."
                 $rgInfo = @{
                     ResourceGroup = $rg
                     Resources = @()
@@ -47,11 +47,11 @@ function Export-AzureTenantInfo {
             $tenantInfo.Subscriptions += $subscriptionInfo
         }
 
-        Write-Host "Saving JSON..."
+        Write-Output "Saving JSON..."
         $json = $tenantInfo | ConvertTo-Json -Depth 100
         Set-Content -Path $OutputPath -Value $json -Encoding UTF8
 
-        Write-Host "Exporting with success. File saved: $OutputPath"
+        Write-Output "Exporting with success. File saved: $OutputPath"
 
     } catch {
         Write-Error "Error: $_"

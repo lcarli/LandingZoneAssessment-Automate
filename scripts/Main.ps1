@@ -40,7 +40,7 @@ Measure-ExecutionTime -ScriptBlock {
 # Main function
 function Main {
     $contractType = $config.ContractType
-    Write-Host "Contract Type: $contractType"
+    Write-Output "Contract Type: $contractType"
 
     $generalResult = [PSCustomObject]@{
         Billing              = @()
@@ -90,23 +90,25 @@ function Export-Report {
         [Parameter(Mandatory = $true)]
         [PSCustomObject]$generalResult
     )
-
+    
     # Create JSON file
     $jsonPath = "$PSScriptRoot/../reports/report.json"
     $generalResult | ConvertTo-Json -Depth 15 | Out-File -FilePath $jsonPath
 
-    Write-Host "Creating the web site..."
+    Write-Output "Creating the web site..."
     & "$PSScriptRoot/CreateWebSite.ps1"
 }
 
 
 # Register a Ctrl+C handler
-$null = [Console]::CancelKeyPress.Register({
-    param($sender, $e)
-    Write-Host "`n`nCtrl+C detected. Cleaning up resources and exiting gracefully..." -ForegroundColor Yellow
-    # Set the Cancel property to True to prevent the process from terminating immediately
-    $e.Cancel = $true
-})
+$null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
+    Write-Output "`n`nScript exiting. Cleaning up resources..."
+    # Cleanup global resources if any exist
+    if ($global:AzData) {
+        Write-Output "Cleaning up global resources..."
+        $global:AzData = $null
+    }
+}
 
 # Call the main function
 try {
@@ -115,16 +117,22 @@ try {
     } -FunctionName "Main"
 }
 catch {
-    Write-Host "An error occurred: $_" -ForegroundColor Red
-    Write-Host $_.ScriptStackTrace -ForegroundColor Red
+    Write-Output "An error occurred: $_"
+    Write-Output $_.ScriptStackTrace
 }
 finally {
     # Cleanup global resources if any exist
     if ($global:AzData) {
-        Write-Host "Cleaning up global resources..." -ForegroundColor Cyan
+        Write-Output "Cleaning up global resources..."
         $global:AzData = $null
     }
     
-    # Stop transcript
-    Stop-Transcript
+    # Stop transcript safely
+    try {
+        Stop-Transcript -ErrorAction SilentlyContinue
+    }
+    catch {
+        # Transcript may not be running
+        Write-Output "Transcript stopped or was not running."
+    }
 }

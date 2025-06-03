@@ -26,7 +26,7 @@ function Invoke-ManagementAssessment {
         [object]$Checklist
     )
 
-    Write-Host "Evaluating the Management design area..."
+    Write-Output "Evaluating the Management design area..."
     Measure-ExecutionTime -ScriptBlock {
         $results = @()
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.01") }) | Test-QuestionF0101
@@ -69,7 +69,7 @@ function Test-QuestionF0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
@@ -208,7 +208,7 @@ function Test-QuestionF0103 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
@@ -337,7 +337,7 @@ function Test-QuestionF0105 {
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
 
@@ -424,7 +424,7 @@ function Test-QuestionF0106 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -506,7 +506,7 @@ function Test-QuestionF0107 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -588,7 +588,7 @@ function Test-QuestionF0108 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -641,7 +641,7 @@ function Test-QuestionF0109 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -697,7 +697,7 @@ function Test-QuestionF0110 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -755,7 +755,7 @@ function Test-QuestionF0111 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -820,7 +820,7 @@ function Test-QuestionF0112 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -888,7 +888,7 @@ function Test-QuestionF0113 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     # Since this question involves organizational practices and policies,
     # it cannot be fully automated or analyzed purely via code.
@@ -915,7 +915,7 @@ function Test-QuestionF0115 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -980,7 +980,7 @@ function Test-QuestionF0116 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     # Since this question involves a decision-making process ("WHEN necessary"),
     # it cannot be fully automated or analyzed purely via code.
@@ -1007,7 +1007,7 @@ function Test-QuestionF0117 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1067,7 +1067,7 @@ function Test-QuestionF0118 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1135,7 +1135,7 @@ function Test-QuestionF0119 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     # Since this question involves implementing a specific framework (AMBA),
     # it requires a manual decision and implementation verification.
@@ -1162,7 +1162,7 @@ function Test-QuestionF0120 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1231,7 +1231,7 @@ function Test-QuestionF0121 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1288,7 +1288,7 @@ function Test-QuestionF0201 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1346,7 +1346,7 @@ function Test-QuestionF0301 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1410,7 +1410,7 @@ function Test-QuestionF0302 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1484,7 +1484,7 @@ function Test-QuestionF0401 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1548,7 +1548,7 @@ function Test-QuestionF0402 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1626,7 +1626,7 @@ function Test-QuestionF0403 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1690,7 +1690,7 @@ function Test-QuestionF0601 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1757,7 +1757,7 @@ function Test-QuestionF0602 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null

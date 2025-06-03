@@ -25,7 +25,7 @@ function Invoke-NetworkTopologyandConnectivityAssessment {
         [Parameter(Mandatory = $true)]
         [object]$Checklist
     )
-    Write-Host "Evaluating the NetworkTopologyandConnectivity design area..."
+    Write-Output "Evaluating the NetworkTopologyandConnectivity design area..."
     Measure-ExecutionTime -ScriptBlock {
         $results = @()
 
@@ -92,7 +92,7 @@ function Test-QuestionD0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     # Based on assumption that usually a hub and spoke can be identified if there's a vnet with 2 or more peering 
@@ -157,7 +157,7 @@ function Test-QuestionD0102 {
         [Object]$rawDataD0101
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -224,7 +224,7 @@ function Test-QuestionD0103 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -288,7 +288,7 @@ function Test-QuestionD0103HS {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -326,7 +326,7 @@ function Test-QuestionD0104 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -378,7 +378,7 @@ function Test-QuestionD0106 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -431,7 +431,7 @@ function Test-QuestionD0107 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
@@ -500,7 +500,7 @@ function Test-QuestionD0201 {
         [Object]$checklistItem
     ) 
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $estimatedPercentageApplied = 0
     $status = [Status]::NotDeveloped
@@ -516,7 +516,7 @@ function Test-QuestionD0202 {
         [Object]$checklistItem
     ) 
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $estimatedPercentageApplied = 0
     try {
