@@ -38,9 +38,7 @@ function Invoke-SecurityAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.06") }) | Test-QuestionG0206
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.07") }) | Test-QuestionG0207
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.08") }) | Test-QuestionG0208
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.09") }) | Test-QuestionG0209
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.10") }) | Test-QuestionG0210
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.11") }) | Test-QuestionG0211
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.09") }) | Test-QuestionG0209        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.10") }) | Test-QuestionG0210
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.12") }) | Test-QuestionG0212
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.13") }) | Test-QuestionG0213
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.01") }) | Test-QuestionG0301
@@ -619,34 +617,6 @@ function Test-QuestionG0209 {
 
 # Function for Security item G02.10
 function Test-QuestionG0210 {
-    [cmdletbinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-
-    try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-# Function for Security item G02.11
-function Test-QuestionG0211 {
     [cmdletbinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]

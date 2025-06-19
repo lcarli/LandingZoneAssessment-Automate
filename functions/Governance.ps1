@@ -37,8 +37,8 @@ function Invoke-GovernanceAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.09") }) | Test-QuestionE0109
         $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.10") }) | Test-QuestionE0110
         $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.11") }) | Test-QuestionE0111
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.12") }) | Test-QuestionE0112
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.13") }) | Test-QuestionE0113
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.12") }) | Test-QuestionE0112        $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.13") }) | Test-QuestionE0113
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E02.02") }) | Test-QuestionE0202
 
         $script:FunctionResult = $results
     } -FunctionName "Invoke-GovernanceAssessment"

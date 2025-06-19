@@ -66,16 +66,12 @@ Write-Host "Found $($implementedQuestions.Count) implemented questions in functi
 
 # Create comparison lists
 $newQuestions = @()
-$changedQuestions = @()
 $removedQuestions = @()
-$unchangedQuestions = @()
 
 # Find new questions (in updated checklist but not implemented)
 foreach ($questionId in $updatedQuestions.Keys) {
     if (-not $implementedQuestions.ContainsKey($questionId)) {
         $newQuestions += $updatedQuestions[$questionId]
-    } else {
-        $unchangedQuestions += $questionId
     }
 }
 
@@ -86,29 +82,55 @@ foreach ($questionId in $implementedQuestions.Keys) {
     }
 }
 
-# Generate summary report
+# Generate category-based summary report
 Write-Host "`n=== COMPARISON SUMMARY ===" -ForegroundColor Cyan
 Write-Host "Updated Checklist Questions: $($updatedQuestions.Count)" -ForegroundColor White
 Write-Host "Currently Implemented: $($implementedQuestions.Count)" -ForegroundColor White
 Write-Host "New Questions to Implement: $($newQuestions.Count)" -ForegroundColor Green
 Write-Host "Questions Removed: $($removedQuestions.Count)" -ForegroundColor Red
-Write-Host "Unchanged Questions: $($unchangedQuestions.Count)" -ForegroundColor Yellow
 
-# Show NEW questions that need to be implemented
-if ($newQuestions.Count -gt 0) {
-    Write-Host "`n=== NEW QUESTIONS TO IMPLEMENT ===" -ForegroundColor Green
-    $newQuestions | Sort-Object Id | ForEach-Object {
-        Write-Host "ID: $($_.Id) | Category: $($_.Category) | Severity: $($_.Severity)" -ForegroundColor Green
-        Write-Host "  Text: $($_.Text.Substring(0, [Math]::Min(100, $_.Text.Length)))..." -ForegroundColor Gray
-        Write-Host ""
+# Generate detailed statistics by category
+Write-Host "`n=== STATISTICS BY CATEGORY ===" -ForegroundColor Cyan
+
+# Get all categories from updated checklist
+$categories = $updatedQuestions.Values | Group-Object Category | Sort-Object Name
+
+# Create summary statistics by category
+$categorySummary = @{}
+foreach ($category in $categories) {
+    $categoryName = $category.Name
+    $totalQuestions = $category.Count
+    
+    # Count implemented questions in this category
+    $implementedInCategory = 0
+    foreach ($question in $category.Group) {
+        if ($implementedQuestions.ContainsKey($question.Id)) {
+            $implementedInCategory++
+        }
     }
-}
-
-# Show REMOVED questions
-if ($removedQuestions.Count -gt 0) {
-    Write-Host "`n=== REMOVED QUESTIONS ===" -ForegroundColor Red
-    $removedQuestions | Sort-Object Id | ForEach-Object {
-        Write-Host "ID: $($_.Id) | File: $($_.File) | Function: $($_.FunctionName)" -ForegroundColor Red
+      # Count new questions in this category (questions that exist in checklist but are not implemented)
+    $newInCategory = $totalQuestions - $implementedInCategory
+    
+    # Count changed questions would require comparison logic - for now, set to 0
+    # This would need the previous version to compare against
+    $changedInCategory = 0
+    
+    $categorySummary[$categoryName] = @{
+        Total = $totalQuestions
+        Implemented = $implementedInCategory
+        New = $newInCategory
+        Changed = $changedInCategory
+    }
+      # Display category statistics
+    Write-Host "`n${categoryName}:" -ForegroundColor Yellow
+    Write-Host "  Total questions: $totalQuestions" -ForegroundColor White
+    Write-Host "  Implemented: $implementedInCategory" -ForegroundColor Green
+    Write-Host "  New questions: $newInCategory" -ForegroundColor Cyan
+    Write-Host "  Changed questions: $changedInCategory" -ForegroundColor Magenta
+    
+    if ($totalQuestions -gt 0) {
+        $implementedPercent = [math]::Round(($implementedInCategory / $totalQuestions) * 100, 1)
+        Write-Host "  Implementation progress: $implementedPercent%" -ForegroundColor Gray
     }
 }
 
@@ -119,27 +141,15 @@ $results = @{
         ImplementedCount = $implementedQuestions.Count
         NewQuestionsCount = $newQuestions.Count
         RemovedQuestionsCount = $removedQuestions.Count
-        UnchangedCount = $unchangedQuestions.Count
+        CategorySummary = $categorySummary
     }
     NewQuestions = $newQuestions | Sort-Object Id
     RemovedQuestions = $removedQuestions | Sort-Object Id
-    UnchangedQuestions = $unchangedQuestions | Sort-Object
-    ImplementedQuestions = $implementedQuestions
-    UpdatedQuestions = $updatedQuestions
+    UpdatedQuestions = $updatedQuestions.Values | Sort-Object Id
 }
 
 $outputPath = "c:\repos\LandingZoneAssessment-Automate\comparison_results.json"
 $results | ConvertTo-Json -Depth 10 | Out-File $outputPath -Encoding UTF8
 
 Write-Host "`nDetailed results saved to: $outputPath" -ForegroundColor Cyan
-
-# Generate organized lists by category
-Write-Host "`n=== NEW QUESTIONS BY CATEGORY ===" -ForegroundColor Green
-$newQuestions | Group-Object Category | Sort-Object Name | ForEach-Object {
-    Write-Host "`n$($_.Name) ($($_.Count) questions):" -ForegroundColor Yellow
-    $_.Group | Sort-Object Id | ForEach-Object {
-        Write-Host "  - $($_.Id): $($_.Text.Substring(0, [Math]::Min(80, $_.Text.Length)))..." -ForegroundColor White
-    }
-}
-
 Write-Host "`nComparison completed successfully!" -ForegroundColor Green

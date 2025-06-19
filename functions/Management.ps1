@@ -42,17 +42,11 @@ function Invoke-ManagementAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.13") }) | Test-QuestionF0113
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.15") }) | Test-QuestionF0115
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.16") }) | Test-QuestionF0116
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.17") }) | Test-QuestionF0117
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.18") }) | Test-QuestionF0118
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.19") }) | Test-QuestionF0119
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.20") }) | Test-QuestionF0120
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.21") }) | Test-QuestionF0121
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.17") }) | Test-QuestionF0117        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.18") }) | Test-QuestionF0118
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F02.01") }) | Test-QuestionF0201
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.01") }) | Test-QuestionF0301
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.02") }) | Test-QuestionF0302
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.01") }) | Test-QuestionF0401
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.02") }) | Test-QuestionF0402
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.03") }) | Test-QuestionF0403
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.01") }) | Test-QuestionF0401        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.02") }) | Test-QuestionF0402
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.01") }) | Test-QuestionF0601
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.02") }) | Test-QuestionF0602
 
@@ -1122,162 +1116,7 @@ function Test-QuestionF0118 {
         $status = $status
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F01.19
-function Test-QuestionF0119 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-    # Since this question involves implementing a specific framework (AMBA),
-    # it requires a manual decision and implementation verification.
-
-    $status = [Status]::ManualVerificationRequired
-    $estimatedPercentageApplied = 0
-    $rawData = "This requires verification that AMBA has been implemented and configured correctly."
-
-    try {
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied 0 -checklistItem $checklistItem -rawData $_.Exception.Message
-    }
-
-    return $result
-}
-
-# Function for Management item F01.20
-function Test-QuestionF0120 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Use Azure Monitoring Agent (AMA). The Log Analytics agent is deprecated since August 31, 2024.
-        # Reference: https://learn.microsoft.com/azure/azure-monitor/agents/azure-monitor-agent-overview
-
-        $resourcesWithAMA = 0
-        $totalResources = 0
-
-        $vmResourceTypes = @(
-            "Microsoft.Compute/virtualMachines",
-            "Microsoft.Compute/virtualMachineScaleSets",
-            "Microsoft.DesktopVirtualization/applicationGroups",
-            "Microsoft.DesktopVirtualization/hostPools"
-        )
-
-        $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $vmResourceTypes
-        }
-
-        foreach ($resource in $resources) {
-            $totalResources++
-
-            # Check for Azure Monitor Agent (AMA) extension
-            $extensions = Get-AzVMExtension -ResourceGroupName $resource.ResourceGroupName -VMName $resource.Name -ErrorAction SilentlyContinue |
-                          Where-Object { $_.Type -eq "AzureMonitorWindowsAgent" -or $_.Type -eq "AzureMonitorLinuxAgent" }
-
-            if ($extensions) {
-                $resourcesWithAMA++
-            }
-        }
-
-        if ($resourcesWithAMA -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithAMA -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithAMA / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalResources       = $totalResources
-            ResourcesWithAMA     = $resourcesWithAMA
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F01.21
-function Test-QuestionF0121 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Ensure that storage accounts are zone or region redundant.
-        # Reference: https://learn.microsoft.com/en-gb/azure/storage/common/redundancy-migration?tabs=portal
-
-        $totalStorageAccounts = 0
-        $compliantStorageAccounts = 0
-
-        $storageAccounts = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -eq "Microsoft.Storage/storageAccounts"
-        }
-
-        foreach ($storageAccount in $storageAccounts) {
-            $totalStorageAccounts++
-            if ($storageAccount.Sku.Name -notin @("Standard_LRS", "Premium_LRS")) {
-                $compliantStorageAccounts++
-            }
-        }
-
-        if ($compliantStorageAccounts -eq $totalStorageAccounts) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($compliantStorageAccounts -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($compliantStorageAccounts / $totalStorageAccounts) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalStorageAccounts      = $totalStorageAccounts
-            CompliantStorageAccounts  = $compliantStorageAccounts
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for Management item F02.01
@@ -1613,73 +1452,7 @@ function Test-QuestionF0402 {
         $status = $status
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F04.03
-function Test-QuestionF0403 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Use Azure-native backup capabilities, or an Azure-compatible, 3rd-party backup solution.
-        # Reference: https://learn.microsoft.com/azure/backup/backup-center-overview
-
-        $totalResources = 0
-        $resourcesWithBackup = 0
-
-        $backupEligibleResources = @("Microsoft.Compute/virtualMachines", "Microsoft.Sql/servers/databases", "Microsoft.Storage/storageAccounts")
-
-        $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $backupEligibleResources
-        }
-
-        foreach ($resource in $resources) {
-            $totalResources++
-
-            # Check for backup configuration in Azure Backup Center
-            $backupItems = Get-AzRecoveryServicesBackupItem -ResourceGroupName $resource.ResourceGroupName -WorkloadType AzureVM -ErrorAction SilentlyContinue |
-                           Where-Object { $_.SourceResourceId -eq $resource.Id }
-
-            if ($backupItems) {
-                $resourcesWithBackup++
-            }
-        }
-
-        if ($resourcesWithBackup -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithBackup -eq 0) {
-            $status = [Status]::ManualVerificationRequired
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithBackup / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalResources       = $totalResources
-            ResourcesWithBackup  = $resourcesWithBackup
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 # Function for Management item F06.01

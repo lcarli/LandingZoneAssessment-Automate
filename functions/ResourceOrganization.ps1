@@ -41,9 +41,7 @@ function Invoke-ResourceOrganizationAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.10") }) | Test-QuestionC0210
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.11") }) | Test-QuestionC0211
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.12") }) | Test-QuestionC0212
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.13") }) | Test-QuestionC0213
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.14") }) | Test-QuestionC0214
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.16") }) | Test-QuestionC0216
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.13") }) | Test-QuestionC0213        $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.14") }) | Test-QuestionC0214
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C03.01") }) | Test-QuestionC0301
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C03.02") }) | Test-QuestionC0302
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C03.03") }) | Test-QuestionC0303
@@ -650,34 +648,6 @@ function Test-QuestionC0214 {
     try {
         # Question: Ensure that tags are consistently used across all resources for cost management and reporting.
         # Reference: https://learn.microsoft.com/azure/azure-resource-manager/management/tag-resources
-
-        $status = [Status]::ManualVerificationRequired
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item C02.16
-function Test-QuestionC0216 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::ManualVerificationRequired
-    $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to ensure that cost management processes are aligned with organizational policies and procedures."
-
-    try {
-        # Question: Align cost management processes with organizational policies and procedures to ensure accountability.
-        # Reference: https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-cost-management-policies
 
         $status = [Status]::ManualVerificationRequired
     } catch {

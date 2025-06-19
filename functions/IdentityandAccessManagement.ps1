@@ -47,6 +47,7 @@ function Invoke-IdentityandAccessManagementAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.15") }) | Test-QuestionB0315
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.16") }) | Test-QuestionB0316
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.17") }) | Test-QuestionB0317
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.18") }) | Test-QuestionB0318
 
         $script:FunctionResult = $results
     } -FunctionName "Invoke-IdentityandAccessManagementAssessment"
@@ -1101,7 +1102,7 @@ function Test-QuestionB0313 {
         if (-not $diagnosticSettings -or $diagnosticSettings.Count -eq 0) {
             # No diagnostic settings found
             $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
+            $estimatedPercentageApplied = 100
             $rawData = "No diagnostic settings are configured for Microsoft Entra ID."
         } else {
             $logsToAzureMonitor = $diagnosticSettings | Where-Object {
@@ -1337,9 +1338,11 @@ function Test-QuestionB0317 {
     )
 
     Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    
+
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
+    $weight = 5
+    $score = 0
     $rawData = $null
 
     try {
@@ -1384,7 +1387,7 @@ function Test-QuestionB0317 {
                     TotalConnectors       = $appProxyConnectors.Count
                     ManagedAsPlatform     = $managedAsPlatform.Count
                     NotManagedAsPlatform  = $appProxyConnectors.Count - $managedAsPlatform.Count
-                    Message               = "Some Application Proxy connectors are managed as platform resources, but not all."
+                    Message               = "Some Microsoft Entra ID Application Proxy connectors are managed as platform resources, but not all."
                 }
             }
         }
@@ -1635,6 +1638,177 @@ function Test-QuestionB0403 {
                     ResourceReviews         = $resourceReviews.Count
                     NonResourceReviews      = $totalAccessReviews - $resourceReviews.Count
                     Message                 = "Some active access reviews are configured for resource entitlements, but not all."
+                }
+            }
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionB0318 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: When using Microsoft Entra ID Application Proxy to give remote users access to applications, manage it as a Platform resource.
+        # Reference: https://learn.microsoft.com/azure/active-directory/app-proxy/what-is-application-proxy
+
+        # Check for Microsoft Entra ID Application Proxy connectors
+        $appProxyConnectors = Get-AzADApplicationProxyConnectorGroup
+
+        if (-not $appProxyConnectors -or $appProxyConnectors.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+            $rawData = "No Microsoft Entra ID Application Proxy connectors are configured in this tenant."
+        } else {
+            # Ensure the Application Proxy is managed as a platform resource
+            $managedAsPlatform = $appProxyConnectors | Where-Object {
+                $_.DisplayName -match "Platform" -or $_.Tags -contains "PlatformResource"
+            }
+
+            if ($managedAsPlatform.Count -eq $appProxyConnectors.Count) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalConnectors       = $appProxyConnectors.Count
+                    ManagedAsPlatform     = $managedAsPlatform.Count
+                    ConnectorDetails      = $appProxyConnectors | Select-Object DisplayName, ConnectorGroupType, Tags
+                    Message               = "All Microsoft Entra ID Application Proxy connectors are managed as platform resources."
+                }
+            } elseif ($managedAsPlatform.Count -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalConnectors   = $appProxyConnectors.Count
+                    ManagedAsPlatform = $managedAsPlatform.Count
+                    Message           = "No Microsoft Entra ID Application Proxy connectors are managed as platform resources. Consider tagging them appropriately. We recommend using 'PlatformResource' tag."
+                }
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($managedAsPlatform.Count / $appProxyConnectors.Count) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalConnectors       = $appProxyConnectors.Count
+                    ManagedAsPlatform     = $managedAsPlatform.Count
+                    NotManagedAsPlatform  = $appProxyConnectors.Count - $managedAsPlatform.Count
+                    Message               = "Some Microsoft Entra ID Application Proxy connectors are managed as platform resources, but not all."
+                }
+            }
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionB0404 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Restrict and minimize the number of account owners within the enrollment to limit administrator access to subscriptions and associated Azure resources.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement
+
+        # Get billing accounts to check for account owners
+        $billingAccounts = Get-AzBillingAccount
+
+        if (-not $billingAccounts -or $billingAccounts.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No billing accounts found in this environment."
+        } else {
+            $totalOwners = 0
+            $enrollmentDetails = @()
+
+            foreach ($billingAccount in $billingAccounts) {
+                $billingAccountName = $billingAccount.Name
+                $billingScope = "/providers/Microsoft.Billing/billingAccounts/$billingAccountName"
+
+                # Get role assignments for the billing account to count account owners
+                $roleAssignments = Get-AzRoleAssignment -Scope $billingScope
+
+                # Count Account Owners or Enrollment Administrators
+                $accountOwners = $roleAssignments | Where-Object { 
+                    $_.RoleDefinitionName -in @("Billing account owner", "Enrollment administrator", "Account owner") 
+                }
+
+                $totalOwners += $accountOwners.Count
+
+                $enrollmentDetails += @{
+                    BillingAccountName = $billingAccountName
+                    AccountType        = $billingAccount.AccountType
+                    OwnerCount         = $accountOwners.Count
+                    Owners             = $accountOwners | Select-Object DisplayName, SignInName, RoleDefinitionName
+                }
+            }
+
+            # Define a threshold for "minimal" number of owners (e.g., 3 or fewer per enrollment)
+            $maxRecommendedOwnersPerAccount = 3
+            $totalAccounts = $billingAccounts.Count
+            $accountsWithMinimalOwners = ($enrollmentDetails | Where-Object { $_.OwnerCount -le $maxRecommendedOwnersPerAccount }).Count
+
+            if ($accountsWithMinimalOwners -eq $totalAccounts) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalBillingAccounts           = $totalAccounts
+                    TotalAccountOwners             = $totalOwners
+                    AccountsWithMinimalOwners      = $accountsWithMinimalOwners
+                    MaxRecommendedOwnersPerAccount = $maxRecommendedOwnersPerAccount
+                    EnrollmentDetails              = $enrollmentDetails
+                    Message                        = "All billing accounts have a minimal number of account owners (≤$maxRecommendedOwnersPerAccount per account)."
+                }
+            } elseif ($accountsWithMinimalOwners -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalBillingAccounts           = $totalAccounts
+                    TotalAccountOwners             = $totalOwners
+                    AccountsWithMinimalOwners      = $accountsWithMinimalOwners
+                    MaxRecommendedOwnersPerAccount = $maxRecommendedOwnersPerAccount
+                    EnrollmentDetails              = $enrollmentDetails
+                    Message                        = "None of the billing accounts have a minimal number of account owners. Consider reducing the number of account owners."
+                }
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($accountsWithMinimalOwners / $totalAccounts) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalBillingAccounts           = $totalAccounts
+                    TotalAccountOwners             = $totalOwners
+                    AccountsWithMinimalOwners      = $accountsWithMinimalOwners
+                    AccountsWithExcessiveOwners    = $totalAccounts - $accountsWithMinimalOwners
+                    MaxRecommendedOwnersPerAccount = $maxRecommendedOwnersPerAccount
+                    EnrollmentDetails              = $enrollmentDetails
+                    Message                        = "Some billing accounts have a minimal number of account owners, but not all. Consider reducing the number of account owners."
                 }
             }
         }

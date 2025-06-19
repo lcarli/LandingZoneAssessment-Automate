@@ -463,10 +463,10 @@ function Test-QuestionA0301 {
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
-    $rawData = $null
+    $rawData = $null   
 
     try {
-        # Configure Notification Contacts to a group mailbox
+        # Set up a Notification Contact email address to ensure notifications are sent to an appropriate group mailbox
         # Reference: https://learn.microsoft.com/azure/cost-management-billing/manage/direct-ea-administration#manage-notification-contacts
 
         # Get the billing accounts
@@ -654,9 +654,8 @@ function Test-QuestionA0303 {
     $weight = 1
     $score = 0
     $rawData = $null
-
     try {
-        # Question: Assign a budget for each department and account, and establish an alert associated with the budget
+        # Assign a budget for each department and account, and establish an alert associated with the budget
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-considerations
 
         $departmentBudgets = @()
@@ -789,10 +788,9 @@ function Test-QuestionA0304 {
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
-    $rawData = $null
-
+    $rawData = $null    
     try {
-        # Enable both DA View Charges and AO View Charges on your EA Enrollments to allow users with the correct perms review Cost and Billing Data
+        # Enable both DA View Charges and AO View Charges on your EA Enrollments to allow users with the correct permissions to review Cost Management Data
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get the billing accounts (EA Enrollment) and relevant scopes
@@ -892,10 +890,8 @@ function Test-QuestionA0305 {
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
-    $rawData = $null
-
-    try {
-        # Ensure use of Enterprise Dev/Test subscriptions for non-production workloads to reduce costs
+    $rawData = $null    try {
+        # Use of Enterprise Dev/Test Subscriptions to reduce costs for non-production workloads
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get all Azure subscriptions
