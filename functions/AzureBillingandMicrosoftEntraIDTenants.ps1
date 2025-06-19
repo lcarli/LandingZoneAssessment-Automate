@@ -890,7 +890,9 @@ function Test-QuestionA0305 {
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
-    $rawData = $null    try {
+    $rawData = $null    
+    
+    try {
         # Use of Enterprise Dev/Test Subscriptions to reduce costs for non-production workloads
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
