@@ -695,58 +695,177 @@ function Test-QuestionB0307 {
     $estimatedPercentageApplied = 0
     $weight = 5
     $score = 0
-    $rawData = $null
-
+    $rawData = $null    
+    
     try {
         # Question: Enforce Microsoft Entra ID Privileged Identity Management (PIM) to establish zero standing access and least privilege.
         # Reference: https://learn.microsoft.com/azure/active-directory/privileged-identity-management/pim-configure
+        # Note: Using new PIM v3 APIs due to migration from deprecated endpoints        # Get privileged role definitions we want to check
+        $privilegedRoleNames = @("Global Administrator", "Privileged Role Administrator", "Security Administrator")
+        
+        # Get role definitions for the privileged roles
+        try {
+            $roleDefinitions = Get-MgRoleManagementDirectoryRoleDefinition -ErrorAction Stop | Where-Object { 
+                $_.DisplayName -in $privilegedRoleNames 
+            }
+        } catch {
+            $errorMessage = $_.Exception.Message
+            if ($errorMessage -like "*PermissionScopeNotGranted*" -or 
+                $errorMessage -like "*Authorization failed*" -or
+                $errorMessage -like "*missing permission scope*" -or
+                $_.Exception.Response.StatusCode -eq 403) {
+                  Write-Warning "PIM assessment requires additional Microsoft Graph permissions. Configure with Connect-MgGraph before running."
+                
+                $status = [Status]::Unknown
+                $estimatedPercentageApplied = 0                
+                $rawData = @{
+                    Error = "Insufficient permissions to read role definitions"
+                    RequiredPermissions = @("RoleManagement.Read.Directory")
+                    Message = "Cannot assess PIM due to insufficient Microsoft Graph permissions."
+                }
+                
+                $score = ($weight * $estimatedPercentageApplied) / 100
+                
+                return @{
+                    Status = $status
+                    EstimatedPercentageApplied = $estimatedPercentageApplied
+                    Score = $score
+                    Weight = $weight
+                    RawData = $rawData
+                }
+            } else {
+                throw $_
+            }
+        }
 
-        # Get all PIM roles and check for standing access
-        $pimRoles = Get-MgBetaPrivilegedRoleRoleAssignment | Where-Object { $_.RoleDefinitionName -in @("Global Administrator", "Privileged Role Administrator", "Security Administrator") }
-
-        if ($pimRoles.Count -eq 0) {
-            # No privileged roles found
+        if ($roleDefinitions.Count -eq 0) {
+            # No privileged role definitions found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
+            $rawData = "No privileged role definitions found"        
         } else {
-            $totalRoles = $pimRoles.Count
-            $rolesWithNoStandingAccess = 0
-
-            foreach ($role in $pimRoles) {
-                # Check if the role assignment is configured for Just-In-Time (JIT) access
-                if ($role.IsElevated -eq $false) {
-                    $rolesWithNoStandingAccess++
+            # Get active (permanent) role assignments and eligible assignments for privileged roles
+            $activeAssignments = @()
+            $eligibleAssignments = @()
+            $permissionErrors = @()
+            
+            foreach ($roleDefinition in $roleDefinitions) {
+                try {
+                    # Get active role assignment schedule instances (permanent assignments)
+                    $activeRoleAssignments = Get-MgRoleManagementDirectoryRoleAssignmentScheduleInstance -Filter "roleDefinitionId eq '$($roleDefinition.Id)'" -ErrorAction Stop
+                    $activeAssignments += $activeRoleAssignments               
+                } catch {
+                    $errorMessage = $_.Exception.Message
+                    if ($errorMessage -like "*PermissionScopeNotGranted*" -or 
+                        $errorMessage -like "*Authorization failed*" -or
+                        $errorMessage -like "*missing permission scope*" -or
+                        $_.Exception.Response.StatusCode -eq 403) {
+                        $permissionErrors += "Active assignments for role '$($roleDefinition.DisplayName)'"
+                        Write-Warning "Insufficient permissions to query active assignments for role '$($roleDefinition.DisplayName)'"
+                    } else {
+                        Write-Warning "Could not retrieve active assignments for role '$($roleDefinition.DisplayName)': $($_.Exception.Message)"
+                    }
+                }
+                
+                try {
+                    # Get eligible role assignment schedule instances (PIM eligibility)
+                    $eligibleRoleAssignments = Get-MgRoleManagementDirectoryRoleEligibilityScheduleInstance -Filter "roleDefinitionId eq '$($roleDefinition.Id)'" -ErrorAction Stop
+                    $eligibleAssignments += $eligibleRoleAssignments                
+                } catch {
+                    $errorMessage = $_.Exception.Message
+                    if ($errorMessage -like "*PermissionScopeNotGranted*" -or 
+                        $errorMessage -like "*Authorization failed*" -or
+                        $errorMessage -like "*missing permission scope*" -or
+                        $_.Exception.Response.StatusCode -eq 403) {
+                        $permissionErrors += "Eligible assignments for role '$($roleDefinition.DisplayName)'"
+                        Write-Warning "Insufficient permissions to query eligible assignments for role '$($roleDefinition.DisplayName)'"
+                    } else {
+                        Write-Warning "Could not retrieve eligible assignments for role '$($roleDefinition.DisplayName)': $($_.Exception.Message)"
+                    }
+                }
+            }            # Check if we have permission errors
+            if ($permissionErrors.Count -gt 0) {
+                Write-Warning "PIM assessment requires additional Microsoft Graph permissions. Configure with Connect-MgGraph before running."
+                
+                # If we have no data at all, return unknown status
+                if ($activeAssignments.Count -eq 0 -and $eligibleAssignments.Count -eq 0) {
+                    $status = [Status]::Unknown
+                    $estimatedPercentageApplied = 0                   
+                     $rawData = @{
+                        Error = "Insufficient permissions to assess PIM configuration"
+                        RequiredPermissions = @(
+                            "RoleAssignmentSchedule.Read.Directory",
+                            "RoleEligibilitySchedule.Read.Directory", 
+                            "RoleManagement.Read.Directory"
+                        )
+                        Message = "Cannot assess PIM due to insufficient Microsoft Graph permissions."
+                    }
+                    
+                    # Calculate score and return early
+                    $score = ($weight * $estimatedPercentageApplied) / 100
+                    
+                    return @{
+                        Status = $status
+                        EstimatedPercentageApplied = $estimatedPercentageApplied
+                        Score = $score
+                        Weight = $weight
+                        RawData = $rawData
+                    }
                 }
             }
 
-            # Calculate the percentage of roles with no standing access
-            if ($rolesWithNoStandingAccess -eq $totalRoles) {
+            $totalActiveAssignments = $activeAssignments.Count
+            $totalEligibleAssignments = $eligibleAssignments.Count
+            $totalAssignments = $totalActiveAssignments + $totalEligibleAssignments
+
+            if ($totalAssignments -eq 0) {
+                # No assignments found
+                $status = [Status]::NotApplicable
+                $estimatedPercentageApplied = 100
+                $rawData = "No role assignments found for privileged roles"
+            } elseif ($totalActiveAssignments -eq 0 -and $totalEligibleAssignments -gt 0) {
+                # Perfect: Only eligible assignments (PIM), no permanent assignments
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($rolesWithNoStandingAccess -eq 0) {
+                $rawData = @{
+                    TotalAssignments = $totalAssignments
+                    ActiveAssignments = $totalActiveAssignments
+                    EligibleAssignments = $totalEligibleAssignments
+                    Message = "All privileged role assignments are properly configured with PIM (no standing access)"
+                }
+            } elseif ($totalActiveAssignments -gt 0 -and $totalEligibleAssignments -eq 0) {
+                # Bad: Only permanent assignments, no PIM
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+                $rawData = @{
+                    TotalAssignments = $totalAssignments
+                    ActiveAssignments = $totalActiveAssignments
+                    EligibleAssignments = $totalEligibleAssignments
+                    Message = "All privileged role assignments are permanent (standing access). PIM should be implemented."
+                }            } else {
+                # Mixed: Some permanent, some PIM - partially implemented
                 $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = ($rolesWithNoStandingAccess / $totalRoles) * 100
+                $estimatedPercentageApplied = ($totalEligibleAssignments / $totalAssignments) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalAssignments = $totalAssignments
+                    ActiveAssignments = $totalActiveAssignments
+                    EligibleAssignments = $totalEligibleAssignments
+                    Message = "Mix of permanent and PIM assignments. Consider migrating all to PIM."
+                }
             }
-        }
-
-        # Calculate the score
+        }        # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-        # Prepare raw data
-        $rawData = @{
-            TotalRoles                = $totalRoles
-            RolesWithNoStandingAccess = $rolesWithNoStandingAccess
-            PrivilegedRoles           = $pimRoles
-        }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
+        $rawData = @{
+            Error = $_.Exception.Message
+            ErrorDetails = "Failed to assess PIM configuration using new PIM v3 APIs"
+        }
         $rawData = $_.Exception.Message
     }
 
@@ -1089,19 +1208,49 @@ function Test-QuestionB0313 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = $null
-
+    $rawData = $null    
+    
     try {
         # Question: Implement an emergency access or break-glass account to prevent tenant-wide account lockout.
         # Reference: https://learn.microsoft.com/azure/active-directory/roles/security-emergency-access
 
-        # Get Diagnostic Settings for Microsoft Entra ID
-        $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId "/providers/microsoft.aadiam/diagnosticSettings"
+        # Try to get Diagnostic Settings for Microsoft Entra ID
+        # Note: This requires special permissions and may not be available to all users
+        try {
+            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId "/providers/microsoft.aadiam/diagnosticSettings" -ErrorAction Stop
+        } catch {
+            # Handle permission errors gracefully
+            if ($_.Exception.Message -like "*authorization*" -or $_.Exception.Message -like "*permissions*") {
+                Write-Warning "Insufficient permissions to check Microsoft Entra ID diagnostic settings. This requires Global Administrator or Security Administrator roles."
+                $status = [Status]::Unknown
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    Error = "Insufficient permissions"
+                    Message = "Cannot assess diagnostic settings due to insufficient permissions"
+                    RequiredPermissions = "Global Administrator or Security Administrator roles required"
+                }
+                
+                # Calculate score and return early
+                $weight = 5
+                $score = ($weight * $estimatedPercentageApplied) / 100
+                
+                return @{
+                    Status = $status
+                    EstimatedPercentageApplied = $estimatedPercentageApplied
+                    Score = $score
+                    Weight = $weight
+                    RawData = $rawData
+                }
+            } else {
+                # Re-throw other errors
+                throw
+            }
+        }
 
         if (-not $diagnosticSettings -or $diagnosticSettings.Count -eq 0) {
             # No diagnostic settings found
             $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 100
+            $estimatedPercentageApplied = 0
             $rawData = "No diagnostic settings are configured for Microsoft Entra ID."
         } else {
             $logsToAzureMonitor = $diagnosticSettings | Where-Object {

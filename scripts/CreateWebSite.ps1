@@ -914,8 +914,10 @@ function Replace-ErrorLogDataPlaceholder {
       # Replace the placeholder with the escaped JSON content
       return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
   } else {
-      Write-Error "Error log file not found at $ErrorLogPath"
-      return $HTMLContent
+      Write-Warning "Error log file not found at $ErrorLogPath - using empty error log"
+      # Return HTML with empty error log data
+      $emptyErrorLog = '{"errorsArray": []}'
+      return $HTMLContent -replace "__ERRORLOGDATA__", $emptyErrorLog
   }
 }
 
@@ -929,13 +931,18 @@ function Apply-ExceptionsToReport {
   if (Test-Path -Path $ReportJsonPath) {
       $reportData = Get-Content -Path $ReportJsonPath | ConvertFrom-Json
   } else {
-      Write-Error "Report file not found at $ReportJsonPath"
-      return
+      Write-Warning "Report file not found at $ReportJsonPath"
+      return @{
+          ReportData         = "{}"
+          ExceptionsApplied  = @{ exceptions = @() }
+      }
   }
 
   $exceptionsData = @{ exceptions = @() }
   if (Test-Path -Path $ExceptionsJsonPath) {
       $exceptionsData = Get-Content -Path $ExceptionsJsonPath | ConvertFrom-Json
+  } else {
+      Write-Warning "Exceptions file not found at $ExceptionsJsonPath - proceeding without exceptions"
   }
 
   $categories = @('Billing', 'IAM', 'ResourceOrganization', 'Network', 'Governance', 'Security', 'DevOps', 'Management')

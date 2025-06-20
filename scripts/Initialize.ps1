@@ -21,8 +21,7 @@ function Clear-GraphModuleConflicts {
     .DESCRIPTION
         Selectively removes only problematic Microsoft Graph modules to prevent assembly loading issues
     #>
-    
-    Write-Output "Checking for Microsoft Graph module conflicts..."
+      Write-InitLog -Message "Checking for Microsoft Graph module conflicts..."
     
     try {
         # Only look for modules that are known to cause assembly conflicts
@@ -116,12 +115,11 @@ function Test-MgGraphConnectionQuick {
 
 function Get-AzModules {
     Write-Output "Checking Azure modules (optimized)..."
-    $startTime = Get-Date
-    
-    # Required modules with their minimum versions
+    $startTime = Get-Date    # Required modules with their minimum versions
     $requiredModules = @{
         'Az.Accounts' = @{ MinVersion = '2.0.0'; Critical = $true }
         'Microsoft.Graph.Authentication' = @{ MinVersion = '2.0.0'; Critical = $true }
+        'Microsoft.Graph.Identity.Governance' = @{ MinVersion = '2.0.0'; Critical = $false }
     }
 
     foreach ($moduleName in $requiredModules.Keys) {
@@ -256,9 +254,16 @@ function Initialize-Connect {
     try {
         # Only clear modules if we're having issues
         # Don't clear modules proactively to avoid the 300-second reload
-        
-        # Attempt connection with optimized scopes
-        $scopes = @("Directory.Read.All", "Policy.Read.All", "Reports.Read.All", "UserAuthenticationMethod.Read.All")
+          # Attempt connection with comprehensive scopes including PIM
+        $scopes = @(
+            "Directory.Read.All", 
+            "Policy.Read.All", 
+            "Reports.Read.All", 
+            "UserAuthenticationMethod.Read.All",
+            "RoleAssignmentSchedule.Read.Directory",
+            "RoleEligibilitySchedule.Read.Directory",
+            "RoleManagement.Read.Directory"
+        )
         Connect-MgGraph -TenantId $TenantId -NoWelcome -Scopes $scopes -ErrorAction Stop
         
         # Verify connection
@@ -298,7 +303,7 @@ function Initialize-Connect {
             Write-Output ""
             Write-Output "Possible solutions:"
             Write-Output "1. Restart PowerShell completely and try again"
-            Write-Output "2. Run: Disconnect-MgGraph; Connect-MgGraph -Scopes 'Directory.Read.All'"
+            Write-Output "2. Run: Disconnect-MgGraph; Connect-MgGraph -Scopes 'Directory.Read.All','RoleManagement.Read.Directory','RoleAssignmentSchedule.Read.Directory','RoleEligibilitySchedule.Read.Directory'"
             Write-Output "3. Check if admin consent is required"
             Write-Output ""
             Write-Output "Some Identity and Access Management assessments will not work."
