@@ -55,7 +55,6 @@ function Invoke-IdentityandAccessManagementAssessment {
     return $script:FunctionResult
 }
 
-
 function Test-QuestionB0301 {
     [CmdletBinding()]
     param(
