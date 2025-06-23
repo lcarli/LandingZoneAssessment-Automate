@@ -48,7 +48,11 @@ function Invoke-IdentityandAccessManagementAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.16") }) | Test-QuestionB0316
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.17") }) | Test-QuestionB0317
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.18") }) | Test-QuestionB0318
-
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B04.01") }) | Test-QuestionB0401
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B04.02") }) | Test-QuestionB0402
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B04.03") }) | Test-QuestionB0403
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B04.04") }) | Test-QuestionB0404
+        
         $script:FunctionResult = $results
     } -FunctionName "Invoke-IdentityandAccessManagementAssessment"
 
@@ -168,9 +172,22 @@ function Test-QuestionB0302 {
     try {
         # Question: Use managed identities instead of service principals for authentication to Azure services.
         # Reference: https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview
-        
-        # Get all service principals
-        $servicePrincipals = Get-AzADServicePrincipal
+          # Get all service principals using Graph data (cached)
+        if ($global:GraphData.ServicePrincipals) {
+            $servicePrincipals = $global:GraphData.ServicePrincipals
+        } else {
+            # Fallback to direct Graph call if available
+            if ($global:GraphConnected) {
+                try {
+                    $servicePrincipals = Get-MgServicePrincipal -All -ErrorAction SilentlyContinue
+                } catch {
+                    Write-Warning "Could not retrieve service principals: $($_.Exception.Message)"
+                    $servicePrincipals = @()
+                }
+            } else {
+                $servicePrincipals = @()
+            }
+        }
 
         if ($servicePrincipals.Count -eq 0) {
             # No service principals found
@@ -239,12 +256,25 @@ function Test-QuestionB030201 {
     $score = 0
     $rawData = $null
 
-    try {
-        # Question: Only use the authentication type Work or school account for all account types. Avoid using the Microsoft account.
+    try {        # Question: Only use the authentication type Work or school account for all account types. Avoid using the Microsoft account.
         # Reference: https://learn.microsoft.com/learn/modules/explore-basic-services-identity-types/
 
-        # Get all Azure AD users
-        $users = Get-AzADUser
+        # Get all Azure AD users using Graph data (cached)
+        if ($global:GraphData.Users) {
+            $users = $global:GraphData.Users
+        } else {
+            # Fallback to direct Graph call if available
+            if ($global:GraphConnected) {
+                try {
+                    $users = Get-MgUser -All -ErrorAction SilentlyContinue
+                } catch {
+                    Write-Warning "Could not retrieve users: $($_.Exception.Message)"
+                    $users = @()
+                }
+            } else {
+                $users = @()
+            }
+        }
 
         if ($users.Count -eq 0) {
             # No users found
@@ -1321,26 +1351,31 @@ function Test-QuestionB0313 {
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null    
-    
-    try {
-        # Question: Implement an emergency access or break-glass account to prevent tenant-wide account lockout.
-        # Reference: https://learn.microsoft.com/azure/active-directory/roles/security-emergency-access
+      try {
+        # Question: When using Microsoft Entra Domain Services, use replica sets.
+        # Reference: https://learn.microsoft.com/azure/active-directory-domain-services/replica-sets
 
         # Try to get Diagnostic Settings for Microsoft Entra ID
         # Note: This requires special permissions and may not be available to all users
         try {
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId "/providers/microsoft.aadiam/diagnosticSettings" -ErrorAction Stop
+            # Import Az.Monitor module if not already imported
+            if (-not (Get-Module Az.Monitor -ErrorAction SilentlyContinue)) {
+                Import-Module Az.Monitor -Force -ErrorAction Stop
+            }
+            
+            # Try to get diagnostic settings for Azure AD - using the correct resource ID format
+            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId "/providers/Microsoft.AADIAM/diagnosticSettings" -ErrorAction Stop
         }
         catch {
-            # Handle permission errors gracefully
-            if ($_.Exception.Message -like "*authorization*" -or $_.Exception.Message -like "*permissions*") {
-                Write-Warning "Insufficient permissions to check Microsoft Entra ID diagnostic settings. This requires Global Administrator or Security Administrator roles."
+            # Handle permission errors or missing cmdlet gracefully
+            if ($_.Exception.Message -like "*authorization*" -or $_.Exception.Message -like "*permissions*" -or $_.Exception.Message -like "*not recognized*") {
+                Write-Warning "Cannot check Microsoft Entra ID diagnostic settings. This may require special permissions or the Az.Monitor module."
                 $status = [Status]::Unknown
                 $estimatedPercentageApplied = 0
                 $rawData = @{
-                    Error               = "Insufficient permissions"
-                    Message             = "Cannot assess diagnostic settings due to insufficient permissions"
-                    RequiredPermissions = "Global Administrator or Security Administrator roles required"
+                    Error               = "Cannot assess diagnostic settings"
+                    Message             = "Unable to retrieve diagnostic settings: $($_.Exception.Message)"
+                    RequiredPermissions = "Global Administrator, Security Administrator, or Monitor Contributor roles may be required"
                 }
                 
                 # Calculate score and return early
@@ -1416,14 +1451,23 @@ function Test-QuestionB0314 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = $null
-
+    $rawData = $null    
     try {
         # Question: When deploying Microsoft Entra Connect, use a staging server for high availability/disaster recovery.
         # Reference: https://learn.microsoft.com/azure/active-directory/hybrid/how-to-connect-sync-staging-server
 
-        # Get all Azure AD users
-        $users = Get-AzADUser
+        # Get all Azure AD users from cached Graph data or direct Graph call
+        $users = $null
+        if ($global:GraphData -and $global:GraphData.Users) {
+            $users = $global:GraphData.Users
+        } else {
+            # Try direct Graph call if global data not available
+            try {
+                $users = Get-MgUser -All -ErrorAction Stop
+            } catch {
+                Write-Warning "Failed to retrieve users via Graph API: $($_.Exception.Message)"
+            }
+        }
 
         if (-not $users -or $users.Count -eq 0) {
             $status = [Status]::NotImplemented

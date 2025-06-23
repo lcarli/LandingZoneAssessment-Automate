@@ -14,11 +14,11 @@
 
 # Removed InstallAndImportModule function - functionality integrated into Get-AzModules
 
-function Get-AzModules {
-    # Disable module auto-loading to prevent conflicts
-    $global:PSModuleAutoLoadingPreference = 'None'    
+function Get-AzModules {    # Disable module auto-loading to prevent conflicts
+    $global:PSModuleAutoLoadingPreference = 'None'
+    
     $requiredModules = @(
-        'Az.Accounts', 'Az.Resources',
+        'Az.Accounts', 'Az.Resources', 'Az.Monitor',
         'Microsoft.Graph.Authentication', 'Microsoft.Graph.Identity.DirectoryManagement',
         'Microsoft.Graph.Users', 'Microsoft.Graph.Groups', 'Microsoft.Graph.Applications',
         'Microsoft.Graph.Identity.Governance', 'Microsoft.Graph.Identity.SignIns'
@@ -145,8 +145,8 @@ function Initialize-Connect {
 }
 
 function Get-AzData {
-    # Import required modules (Az.Profile não é necessário)
-    Import-Module Az.Resources -Force -ErrorAction SilentlyContinue
+    # Import required modules (Az.Monitor added for diagnostic settings)
+    Import-Module Az.Resources, Az.Monitor -Force -ErrorAction SilentlyContinue
 
     $global:AzData = [PSCustomObject]@{
         Tenant = Get-AzTenant -TenantId $global:TenantId
@@ -280,7 +280,10 @@ function Get-GraphData {
         Write-Output "Graph: Not connected, skipping data collection"
         $global:GraphData = @{}
         return
-    }    # Import all Graph modules at once - only if not already loaded
+    }
+
+    Write-Output "  Importing Graph modules..."
+    # Import all Graph modules at once - only if not already loaded
     $graphModules = @(
         'Microsoft.Graph.Identity.DirectoryManagement', 'Microsoft.Graph.Users',
         'Microsoft.Graph.Groups', 'Microsoft.Graph.Applications',
@@ -293,6 +296,7 @@ function Get-GraphData {
                 Import-Module $_ -Force -ErrorAction Stop
             }
         }
+        Write-Output "  Graph modules imported successfully"
     }
     catch {
         Write-Warning "Failed to import Graph modules: $($_.Exception.Message)"
@@ -302,7 +306,7 @@ function Get-GraphData {
 
     $global:GraphData = @{}
 
-    # Collect data with minimal logging
+    # Collect data with detailed progress logging
     $dataTypes = @{
         'Organization' = { Get-MgOrganization -ErrorAction SilentlyContinue }
         'Users' = { Get-MgUser -All -ErrorAction SilentlyContinue }
@@ -320,19 +324,40 @@ function Get-GraphData {
         'AccessReviews' = { Get-MgIdentityGovernanceAccessReviewDefinition -All -ErrorAction SilentlyContinue }
     }
 
-    $collected = 0
+    $totalTypes = $dataTypes.Count
+    $currentType = 0
+    $totalCollected = 0
+    
+    Write-Output "  Collecting Graph data from $totalTypes sources..."
+    
     $dataTypes.GetEnumerator() | ForEach-Object {
+        $currentType++
+        $typeName = $_.Key
+        
+        Write-Output "  [$currentType/$totalTypes] Collecting $typeName..."
+        
         try {
+            $startTime = Get-Date
             $data = & $_.Value
-            $global:GraphData[$_.Key] = $data
-            if ($data -is [Array]) { $collected += $data.Count }
-            elseif ($null -ne $data) { $collected++ }
+            $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
+            
+            $global:GraphData[$typeName] = $data
+            
+            $count = 0
+            if ($data -is [Array]) { 
+                $count = $data.Count
+                $totalCollected += $count
+            }
+            elseif ($null -ne $data) { 
+                $count = 1
+                $totalCollected++
+            }            Write-Output "    > ${typeName}: $count items (${duration}s)"
         }
         catch {
-            Write-Warning "$($_.Key): $($_.Exception.Message)"
-            $global:GraphData[$_.Key] = if ($_.Key -in @('Organization', 'AuthenticationMethodPolicies', 'SecurityDefaultsPolicy')) { $null } else { @() }
+            Write-Warning "    > ${typeName}: Failed - $($_.Exception.Message)"
+            $global:GraphData[$typeName] = if ($typeName -in @('Organization', 'AuthenticationMethodPolicies', 'SecurityDefaultsPolicy')) { $null } else { @() }
         }
     }
 
-    Write-Output "Graph data: $collected items collected"
+    Write-Output "Graph data: $totalCollected items collected from $totalTypes sources"
 }
