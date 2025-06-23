@@ -62,17 +62,13 @@ function Test-QuestionB0301 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-    $status = [Status]::Unknown
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"    $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5
-    $score = 0
     $rawData = $null
 
     try {
 
-        # Enforce a RBAC model that aligns to your cloud operating model. Scope and Assign across Management Groups and Subscriptions.
+        # Enforce a RBAC model that aligns to your cloud operating model.Scope and Assign across Management Groups and Subscriptions.
         # Reference: https://learn.microsoft.com/azure/role-based-access-control/overview
 
         # Get management groups
@@ -91,7 +87,8 @@ function Test-QuestionB0301 {
 
         $mgmtGroupPercentage = if ($totalGroups -gt 0) {
             ($configuredGroups / $totalGroups) * 100
-        } else {
+        }
+        else {
             100
         }
 
@@ -111,7 +108,8 @@ function Test-QuestionB0301 {
 
         $subscriptionPercentage = if ($totalSubscriptions -gt 0) {
             ($configuredSubscriptions / $totalSubscriptions) * 100
-        } else {
+        }
+        else {
             100
         }
 
@@ -121,9 +119,11 @@ function Test-QuestionB0301 {
         # Determine status
         if ($estimatedPercentageApplied -eq 100) {
             $status = [Status]::Implemented
-        } elseif ($estimatedPercentageApplied -eq 0) {
+        }
+        elseif ($estimatedPercentageApplied -eq 0) {
             $status = [Status]::NotImplemented
-        } else {
+        }
+        else {
             $status = [Status]::PartiallyImplemented
         }
 
@@ -131,14 +131,14 @@ function Test-QuestionB0301 {
 
         $rawData = @{
             ManagementGroups = @{
-                Total       = $totalGroups
-                Configured  = $configuredGroups
-                Percentage  = $mgmtGroupPercentage
+                Total      = $totalGroups
+                Configured = $configuredGroups
+                Percentage = $mgmtGroupPercentage
             }
-            Subscriptions = @{
-                Total       = $totalSubscriptions
-                Configured  = $configuredSubscriptions
-                Percentage  = $subscriptionPercentage
+            Subscriptions    = @{
+                Total      = $totalSubscriptions
+                Configured = $configuredSubscriptions
+                Percentage = $subscriptionPercentage
             }
         }
     }
@@ -161,12 +161,8 @@ function Test-QuestionB0302 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-    $status = [Status]::Unknown
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"    $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5
-    $score = 0
     $rawData = $null
 
     try {
@@ -180,7 +176,8 @@ function Test-QuestionB0302 {
             # No service principals found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalServicePrincipals = $servicePrincipals.Count
             $managedIdentities = 0
 
@@ -194,10 +191,12 @@ function Test-QuestionB0302 {
             if ($managedIdentities -eq $totalServicePrincipals) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($managedIdentities -eq 0) {
+            }
+            elseif ($managedIdentities -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($managedIdentities / $totalServicePrincipals) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -212,7 +211,8 @@ function Test-QuestionB0302 {
             TotalServicePrincipals = $totalServicePrincipals
             ManagedIdentities      = $managedIdentities
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -250,7 +250,8 @@ function Test-QuestionB030201 {
             # No users found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalUsers = $users.Count
             $validWorkOrSchoolAccounts = 0
 
@@ -268,10 +269,12 @@ function Test-QuestionB030201 {
             if ($validWorkOrSchoolAccounts -eq $totalUsers) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($validWorkOrSchoolAccounts -eq 0) {
+            }
+            elseif ($validWorkOrSchoolAccounts -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($validWorkOrSchoolAccounts / $totalUsers) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -286,7 +289,8 @@ function Test-QuestionB030201 {
             TotalUsers                = $totalUsers
             ValidWorkOrSchoolAccounts = $validWorkOrSchoolAccounts
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -324,7 +328,8 @@ function Test-QuestionB0303 {
             # No subscriptions found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAssignments = 0
             $groupAssignments = 0
 
@@ -355,13 +360,16 @@ function Test-QuestionB0303 {
             if ($totalAssignments -eq 0) {
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } elseif ($groupAssignments -eq $totalAssignments) {
+            }
+            elseif ($groupAssignments -eq $totalAssignments) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($groupAssignments -eq 0) {
+            }
+            elseif ($groupAssignments -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($groupAssignments / $totalAssignments) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -377,7 +385,8 @@ function Test-QuestionB0303 {
             GroupAssignments = $groupAssignments
             Subscriptions    = $subscriptions | ForEach-Object { $_.Id }
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -416,13 +425,37 @@ function Test-QuestionB0304 {
             # No role assignments found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAssignments = $roleAssignments.Count
             $usersCoveredByPolicies = 0
-            $uniqueUsers = @()
-
-            # Get all Conditional Access policies
-            $conditionalAccessPolicies = Get-MgIdentityConditionalAccessPolicy
+            $uniqueUsers = @()            # Get all Conditional Access policies - check Graph connectivity first
+            if ($global:GraphConnected -eq $false) {
+                Write-Warning "Microsoft Graph is not connected. Cannot assess Conditional Access policies."
+                $status = [Status]::Unknown
+                $estimatedPercentageApplied = 0
+                $score = 0
+                $rawData = "Microsoft Graph connection not available for Conditional Access assessment"
+                return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData            }
+              # Try to get Conditional Access policies from cached data
+            try {
+                if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.ConditionalAccessPolicies) {
+                    $conditionalAccessPolicies = $global:GraphData.ConditionalAccessPolicies
+                } else {
+                    $conditionalAccessPolicies = $null
+                }
+            } catch {
+                Write-Warning "Could not retrieve Conditional Access policies: $($_.Exception.Message)"
+                $conditionalAccessPolicies = $null
+            }
+            
+            if (-not $conditionalAccessPolicies) {
+                $status = [Status]::Unknown
+                $estimatedPercentageApplied = 0
+                $score = 0
+                $rawData = "Cannot access Conditional Access policies"
+                return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+            }
 
             # Store unique user principal names from role assignments
             foreach ($assignment in $roleAssignments) {
@@ -451,10 +484,12 @@ function Test-QuestionB0304 {
             if ($usersCoveredByPolicies -eq $uniqueUsers.Count) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($usersCoveredByPolicies -eq 0) {
+            }
+            elseif ($usersCoveredByPolicies -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($usersCoveredByPolicies / $uniqueUsers.Count) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -466,12 +501,13 @@ function Test-QuestionB0304 {
 
         # Prepare raw data
         $rawData = @{
-            TotalAssignments         = $totalAssignments
-            UniqueUsers              = $uniqueUsers
-            UsersCoveredByPolicies   = $usersCoveredByPolicies
+            TotalAssignments          = $totalAssignments
+            UniqueUsers               = $uniqueUsers
+            UsersCoveredByPolicies    = $usersCoveredByPolicies
             ConditionalAccessPolicies = $conditionalAccessPolicies
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -509,7 +545,8 @@ function Test-QuestionB0305 {
             # No role assignments found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        } else {
+        }
+        else {
             $totalAssignments = $roleAssignments.Count
             $usersWithMFA = 0
             $uniqueUsers = @()
@@ -520,28 +557,46 @@ function Test-QuestionB0305 {
                 }
             }
 
-            $uniqueUsers = $uniqueUsers | Sort-Object -Unique
+            $uniqueUsers = $uniqueUsers | Sort-Object -Unique            # Check Graph connectivity before processing users
+            if ($global:GraphConnected -eq $false) {
+                Write-Warning "Microsoft Graph is not connected. Cannot assess MFA configuration."
+                $status = [Status]::Unknown
+                $estimatedPercentageApplied = 0
+                $score = 0
+                $rawData = "Microsoft Graph connection not available for MFA assessment"
+                return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+            }
 
             foreach ($userId in $uniqueUsers) {
-                $isMFAEnabled = $false
-
+                $isMFAEnabled = $false                  
                 try {
-                    $mfaMethods = Get-MgUserAuthenticationMethod -UserId $userId
+                    # Check if the required module is loaded to avoid auto-loading conflicts
+                    if (Get-Module -Name "Microsoft.Graph.Users" -ErrorAction SilentlyContinue) {
+                        $mfaMethods = Get-MgUserAuthenticationMethod -UserId $userId -ErrorAction SilentlyContinue
+                    } else {
+                        $mfaMethods = $null
+                    }
 
-                    if ($mfaMethods.Count -gt 0) {
+                    if ($mfaMethods -and $mfaMethods.Count -gt 0) {
                         $isMFAEnabled = $true
                     }
                 }
                 catch {
-                    Write-Output "Failed to get MFA methods for user: $userId" -ForegroundColor Yellow
-                }
-
-                if (-not $isMFAEnabled) {
-                    $conditionalAccessPolicies = Get-MgIdentityConditionalAccessPolicy
-                    foreach ($policy in $conditionalAccessPolicies) {
-                        if (($policy.Conditions.Users.IncludeUsers -contains $userId) -and ($policy.GrantControls.BuiltInControls -contains "mfa")) {
-                            $isMFAEnabled = $true
-                            break
+                    Write-Output "Failed to get MFA methods for user: $userId"
+                }if (-not $isMFAEnabled) {
+                    # Use cached conditional access policies
+                    if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.ConditionalAccessPolicies) {
+                        $conditionalAccessPolicies = $global:GraphData.ConditionalAccessPolicies
+                    } else {
+                        $conditionalAccessPolicies = $null
+                    }
+                    
+                    if ($conditionalAccessPolicies) {
+                        foreach ($policy in $conditionalAccessPolicies) {
+                            if (($policy.Conditions.Users.IncludeUsers -contains $userId) -and ($policy.GrantControls.BuiltInControls -contains "mfa")) {
+                                $isMFAEnabled = $true
+                                break
+                            }
                         }
                     }
                 }
@@ -554,10 +609,12 @@ function Test-QuestionB0305 {
             if ($usersWithMFA -eq $uniqueUsers.Count) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } elseif ($usersWithMFA -eq 0) {
+            }
+            elseif ($usersWithMFA -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($usersWithMFA / $uniqueUsers.Count) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -573,7 +630,8 @@ function Test-QuestionB0305 {
             UsersWithMFA     = $usersWithMFA
             UniqueUsers      = $uniqueUsers
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -625,7 +683,8 @@ function Test-QuestionB0306 {
             foreach ($roleAssignment in $mgmtGroupRoleAssignments) {
                 if ($roleAssignment.RoleDefinitionName -eq "Owner") {
                     $hasOwner = $true
-                } elseif ($roleAssignment.RoleDefinitionName -in @("Contributor", "Reader")) {
+                }
+                elseif ($roleAssignment.RoleDefinitionName -in @("Contributor", "Reader")) {
                     $hasDelegated = $true
                 }
             }
@@ -642,7 +701,8 @@ function Test-QuestionB0306 {
         if ($totalGroups -gt 0) {
             $mgmtGroupPercentage = ($configuredGroups / $totalGroups) * 100
             $delegationPercentage = ($delegatedGroups / $totalGroups) * 100
-        } else {
+        }
+        else {
             $mgmtGroupPercentage = 100
             $delegationPercentage = 100
         }
@@ -653,9 +713,11 @@ function Test-QuestionB0306 {
         # Determine status
         if ($estimatedPercentageApplied -eq 100) {
             $status = [Status]::Implemented
-        } elseif ($estimatedPercentageApplied -eq 0) {
+        }
+        elseif ($estimatedPercentageApplied -eq 0) {
             $status = [Status]::NotImplemented
-        } else {
+        }
+        else {
             $status = [Status]::PartiallyImplemented
         }
 
@@ -664,13 +726,14 @@ function Test-QuestionB0306 {
 
         # Prepare raw data
         $rawData = @{
-            TotalGroups          = $totalGroups
-            ConfiguredGroups     = $configuredGroups
-            DelegatedGroups      = $delegatedGroups
+            TotalGroups               = $totalGroups
+            ConfiguredGroups          = $configuredGroups
+            DelegatedGroups           = $delegatedGroups
             ManagementGroupPercentage = $mgmtGroupPercentage
-            DelegationPercentage = $delegationPercentage
+            DelegationPercentage      = $delegationPercentage
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -701,39 +764,55 @@ function Test-QuestionB0307 {
         # Question: Enforce Microsoft Entra ID Privileged Identity Management (PIM) to establish zero standing access and least privilege.
         # Reference: https://learn.microsoft.com/azure/active-directory/privileged-identity-management/pim-configure
         # Note: Using new PIM v3 APIs due to migration from deprecated endpoints        # Get privileged role definitions we want to check
-        $privilegedRoleNames = @("Global Administrator", "Privileged Role Administrator", "Security Administrator")
-        
-        # Get role definitions for the privileged roles
+        $privilegedRoleNames = @("Global Administrator", "Privileged Role Administrator", "Security Administrator")        # Get role definitions for the privileged roles from cached data
         try {
-            $roleDefinitions = Get-MgRoleManagementDirectoryRoleDefinition -ErrorAction Stop | Where-Object { 
-                $_.DisplayName -in $privilegedRoleNames 
+            if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.RoleDefinitions) {
+                $roleDefinitions = $global:GraphData.RoleDefinitions | Where-Object { 
+                    $_.DisplayName -in $privilegedRoleNames 
+                }
+            } else {
+                $roleDefinitions = $null
             }
-        } catch {
+            
+            # Check if we got results or if there was a permission error
+            if (-not $roleDefinitions -and $Error.Count -gt 0 -and $Error[0].Exception.Message -like "*PermissionScopeNotGranted*") {
+                
+                $Error.Clear()  # Clear the error to prevent it from showing in transcript
+                
+                $status = [Status]::Unknown
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    Error               = "Insufficient permissions to read role definitions"
+                    RequiredPermissions = @("RoleManagement.Read.Directory")
+                    Message             = "Cannot assess PIM due to insufficient Microsoft Graph permissions."
+                }
+                
+                $score = ($weight * $estimatedPercentageApplied) / 100
+                
+                return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+            }        
+        }
+        catch {
             $errorMessage = $_.Exception.Message
             if ($errorMessage -like "*PermissionScopeNotGranted*" -or 
                 $errorMessage -like "*Authorization failed*" -or
                 $errorMessage -like "*missing permission scope*" -or
                 $_.Exception.Response.StatusCode -eq 403) {
-                  Write-Warning "PIM assessment requires additional Microsoft Graph permissions. Configure with Connect-MgGraph before running."
+                
                 
                 $status = [Status]::Unknown
-                $estimatedPercentageApplied = 0                
+                $estimatedPercentageApplied = 0
                 $rawData = @{
-                    Error = "Insufficient permissions to read role definitions"
+                    Error               = "Insufficient permissions to read role definitions"
                     RequiredPermissions = @("RoleManagement.Read.Directory")
-                    Message = "Cannot assess PIM due to insufficient Microsoft Graph permissions."
+                    Message             = "Cannot assess PIM due to insufficient Microsoft Graph permissions."
                 }
                 
                 $score = ($weight * $estimatedPercentageApplied) / 100
                 
-                return @{
-                    Status = $status
-                    EstimatedPercentageApplied = $estimatedPercentageApplied
-                    Score = $score
-                    Weight = $weight
-                    RawData = $rawData
-                }
-            } else {
+                return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+            }
+            else {
                 throw $_
             }
         }
@@ -743,73 +822,81 @@ function Test-QuestionB0307 {
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
             $rawData = "No privileged role definitions found"        
-        } else {
+        }
+        else {
             # Get active (permanent) role assignments and eligible assignments for privileged roles
             $activeAssignments = @()
             $eligibleAssignments = @()
             $permissionErrors = @()
             
-            foreach ($roleDefinition in $roleDefinitions) {
-                try {
+            foreach ($roleDefinition in $roleDefinitions) {                try {
                     # Get active role assignment schedule instances (permanent assignments)
-                    $activeRoleAssignments = Get-MgRoleManagementDirectoryRoleAssignmentScheduleInstance -Filter "roleDefinitionId eq '$($roleDefinition.Id)'" -ErrorAction Stop
-                    $activeAssignments += $activeRoleAssignments               
-                } catch {
-                    $errorMessage = $_.Exception.Message
-                    if ($errorMessage -like "*PermissionScopeNotGranted*" -or 
-                        $errorMessage -like "*Authorization failed*" -or
-                        $errorMessage -like "*missing permission scope*" -or
-                        $_.Exception.Response.StatusCode -eq 403) {
+                    if (Get-Module -Name "Microsoft.Graph.Identity.Governance" -ErrorAction SilentlyContinue) {
+                        $activeRoleAssignments = Get-MgRoleManagementDirectoryRoleAssignmentScheduleInstance -Filter "roleDefinitionId eq '$($roleDefinition.Id)'" -ErrorAction SilentlyContinue
+                    } else {
+                        $activeRoleAssignments = $null
+                    }
+                    
+                    if ($activeRoleAssignments) {
+                        $activeAssignments += $activeRoleAssignments
+                    }
+                    elseif ($Error.Count -gt 0 -and $Error[0].Exception.Message -like "*PermissionScopeNotGranted*") {
                         $permissionErrors += "Active assignments for role '$($roleDefinition.DisplayName)'"
                         Write-Warning "Insufficient permissions to query active assignments for role '$($roleDefinition.DisplayName)'"
-                    } else {
-                        Write-Warning "Could not retrieve active assignments for role '$($roleDefinition.DisplayName)': $($_.Exception.Message)"
+                        $Error.Clear()  # Clear the error to prevent it from showing in transcript
                     }
                 }
-                
-                try {
+                catch {
+                    # This catch should rarely be hit with SilentlyContinue
+                    Write-Warning "Could not retrieve active assignments for role '$($roleDefinition.DisplayName)': $($_.Exception.Message)"
+                }                try {
                     # Get eligible role assignment schedule instances (PIM eligibility)
-                    $eligibleRoleAssignments = Get-MgRoleManagementDirectoryRoleEligibilityScheduleInstance -Filter "roleDefinitionId eq '$($roleDefinition.Id)'" -ErrorAction Stop
-                    $eligibleAssignments += $eligibleRoleAssignments                
-                } catch {
-                    $errorMessage = $_.Exception.Message
-                    if ($errorMessage -like "*PermissionScopeNotGranted*" -or 
-                        $errorMessage -like "*Authorization failed*" -or
-                        $errorMessage -like "*missing permission scope*" -or
-                        $_.Exception.Response.StatusCode -eq 403) {
+                    if (Get-Module -Name "Microsoft.Graph.Identity.Governance" -ErrorAction SilentlyContinue) {
+                        $eligibleRoleAssignments = Get-MgRoleManagementDirectoryRoleEligibilityScheduleInstance -Filter "roleDefinitionId eq '$($roleDefinition.Id)'" -ErrorAction SilentlyContinue
+                    } else {
+                        $eligibleRoleAssignments = $null
+                    }
+                    
+                    if ($eligibleRoleAssignments) {
+                        $eligibleAssignments += $eligibleRoleAssignments
+                    }
+                    elseif ($Error.Count -gt 0 -and $Error[0].Exception.Message -like "*PermissionScopeNotGranted*") {
                         $permissionErrors += "Eligible assignments for role '$($roleDefinition.DisplayName)'"
                         Write-Warning "Insufficient permissions to query eligible assignments for role '$($roleDefinition.DisplayName)'"
-                    } else {
-                        Write-Warning "Could not retrieve eligible assignments for role '$($roleDefinition.DisplayName)': $($_.Exception.Message)"
+                        $Error.Clear()  # Clear the error to prevent it from showing in transcript
                     }
+                }
+                catch {
+                    # This catch should rarely be hit with SilentlyContinue
+                    Write-Warning "Could not retrieve eligible assignments for role '$($roleDefinition.DisplayName)': $($_.Exception.Message)"
                 }
             }            # Check if we have permission errors
             if ($permissionErrors.Count -gt 0) {
-                Write-Warning "PIM assessment requires additional Microsoft Graph permissions. Configure with Connect-MgGraph before running."
+                
                 
                 # If we have no data at all, return unknown status
                 if ($activeAssignments.Count -eq 0 -and $eligibleAssignments.Count -eq 0) {
                     $status = [Status]::Unknown
                     $estimatedPercentageApplied = 0                   
-                     $rawData = @{
-                        Error = "Insufficient permissions to assess PIM configuration"
+                    $rawData = @{
+                        Error               = "Insufficient permissions to assess PIM configuration"
                         RequiredPermissions = @(
                             "RoleAssignmentSchedule.Read.Directory",
                             "RoleEligibilitySchedule.Read.Directory", 
                             "RoleManagement.Read.Directory"
                         )
-                        Message = "Cannot assess PIM due to insufficient Microsoft Graph permissions."
+                        Message             = "Cannot assess PIM due to insufficient Microsoft Graph permissions."
                     }
                     
                     # Calculate score and return early
                     $score = ($weight * $estimatedPercentageApplied) / 100
                     
                     return @{
-                        Status = $status
+                        Status                     = $status
                         EstimatedPercentageApplied = $estimatedPercentageApplied
-                        Score = $score
-                        Weight = $weight
-                        RawData = $rawData
+                        Score                      = $score
+                        Weight                     = $weight
+                        RawData                    = $rawData
                     }
                 }
             }
@@ -823,47 +910,52 @@ function Test-QuestionB0307 {
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
                 $rawData = "No role assignments found for privileged roles"
-            } elseif ($totalActiveAssignments -eq 0 -and $totalEligibleAssignments -gt 0) {
+            }
+            elseif ($totalActiveAssignments -eq 0 -and $totalEligibleAssignments -gt 0) {
                 # Perfect: Only eligible assignments (PIM), no permanent assignments
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
                 $rawData = @{
-                    TotalAssignments = $totalAssignments
-                    ActiveAssignments = $totalActiveAssignments
+                    TotalAssignments    = $totalAssignments
+                    ActiveAssignments   = $totalActiveAssignments
                     EligibleAssignments = $totalEligibleAssignments
-                    Message = "All privileged role assignments are properly configured with PIM (no standing access)"
+                    Message             = "All privileged role assignments are properly configured with PIM (no standing access)"
                 }
-            } elseif ($totalActiveAssignments -gt 0 -and $totalEligibleAssignments -eq 0) {
+            }
+            elseif ($totalActiveAssignments -gt 0 -and $totalEligibleAssignments -eq 0) {
                 # Bad: Only permanent assignments, no PIM
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
                 $rawData = @{
-                    TotalAssignments = $totalAssignments
-                    ActiveAssignments = $totalActiveAssignments
+                    TotalAssignments    = $totalAssignments
+                    ActiveAssignments   = $totalActiveAssignments
                     EligibleAssignments = $totalEligibleAssignments
-                    Message = "All privileged role assignments are permanent (standing access). PIM should be implemented."
-                }            } else {
+                    Message             = "All privileged role assignments are permanent (standing access). PIM should be implemented."
+                }            
+            }
+            else {
                 # Mixed: Some permanent, some PIM - partially implemented
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($totalEligibleAssignments / $totalAssignments) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
                 $rawData = @{
-                    TotalAssignments = $totalAssignments
-                    ActiveAssignments = $totalActiveAssignments
+                    TotalAssignments    = $totalAssignments
+                    ActiveAssignments   = $totalActiveAssignments
                     EligibleAssignments = $totalEligibleAssignments
-                    Message = "Mix of permanent and PIM assignments. Consider migrating all to PIM."
+                    Message             = "Mix of permanent and PIM assignments. Consider migrating all to PIM."
                 }
             }
         }        # Calculate the score
         $score = ($weight * $estimatedPercentageApplied) / 100
 
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $score = 0
         $rawData = @{
-            Error = $_.Exception.Message
+            Error        = $_.Exception.Message
             ErrorDetails = "Failed to assess PIM configuration using new PIM v3 APIs"
         }
         $rawData = $_.Exception.Message
@@ -911,18 +1003,21 @@ function Test-QuestionB0308 {
             if ($vmCount -ge 2) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } else {
+            }
+            else {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
             }
-        } else {
+        }
+        else {
             # If no Availability Zones, check for Availability Set
             $availabilitySets = Get-AzAvailabilitySet
 
             if ($availabilitySets.Count -gt 0) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            } else {
+            }
+            else {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
             }
@@ -933,12 +1028,13 @@ function Test-QuestionB0308 {
 
         # Prepare raw data
         $rawData = @{
-            Location              = $location
-            AvailabilityZones     = $availabilityZones.Count
+            Location               = $location
+            AvailabilityZones      = $availabilityZones.Count
             VirtualMachinesInZones = $vmCount
-            AvailabilitySets      = $availabilitySets.Count
+            AvailabilitySets       = $availabilitySets.Count
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -996,10 +1092,12 @@ function Test-QuestionB0309 {
         if ($rolesFound -eq $requiredRoles.Count) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
-        } elseif ($rolesFound -eq 0) {
+        }
+        elseif ($rolesFound -eq 0) {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
-        } else {
+        }
+        else {
             $status = [Status]::PartiallyImplemented
             $estimatedPercentageApplied = ($rolesFound / $requiredRoles.Count) * 100
             $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -1014,7 +1112,8 @@ function Test-QuestionB0309 {
             FoundRoles    = $foundRoles
             CustomRoles   = $customRoles
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -1062,7 +1161,8 @@ function Test-QuestionB0310 {
         foreach ($role in $requiredRoles) {
             if ($customRoles.Name -contains $role) {
                 $rolesMatched += $role
-            } else {
+            }
+            else {
                 $missingRoles += $role
             }
         }
@@ -1075,25 +1175,28 @@ function Test-QuestionB0310 {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
             $rawData = "All required custom roles are implemented."
-        } elseif ($rolesFound -eq 0) {
+        }
+        elseif ($rolesFound -eq 0) {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
             $rawData = @{
                 MissingRoles = $missingRoles
                 Message      = "None of the required custom roles are implemented."
             }
-        } else {
+        }
+        else {
             $status = [Status]::PartiallyImplemented
             $estimatedPercentageApplied = ($rolesFound / $totalRequiredRoles) * 100
             $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
             $rawData = @{
                 TotalRequiredRoles = $totalRequiredRoles
-                RolesMatched        = $rolesMatched
-                MissingRoles        = $missingRoles
-                Message             = "Some required custom roles are missing."
+                RolesMatched       = $rolesMatched
+                MissingRoles       = $missingRoles
+                Message            = "Some required custom roles are missing."
             }
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -1122,7 +1225,8 @@ function Test-QuestionB0311 {
 
         # No automated logic is implemented here
         $status = [Status]::ManualVerificationRequired
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -1147,16 +1251,21 @@ function Test-QuestionB0312 {
 
     try {
         # Question: Integrate Microsoft Entra ID logs with the platform-central Azure Monitor. Azure Monitor allows for a single source of truth around log and monitoring data in Azure, giving organizations a cloud native option to meet requirements around log collection and retention.
-        # Reference: https://learn.microsoft.com/azure/active-directory/reports-monitoring/howto-integrate-activity-logs-with-log-analytics
-
-        # Get all Entra Domain Services configurations
-        $entraDomains = Get-AzADDomainService
+        # Reference: https://learn.microsoft.com/azure/active-directory/reports-monitoring/howto-integrate-activity-logs-with-log-analytics        # Get all Entra Domain Services configurations using resource search
+        try {
+            $entraDomains = Get-AzResource -ResourceType "Microsoft.AAD/DomainServices" -ErrorAction SilentlyContinue
+        }
+        catch {
+            Write-Warning "Could not retrieve Entra Domain Services: $($_.Exception.Message)"
+            $entraDomains = $null
+        }
 
         if (-not $entraDomains -or $entraDomains.Count -eq 0) {
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
             $rawData = "No Entra Domain Services (ED DS) configurations found in the current environment."
-        } else {
+        }
+        else {
             $totalDomains = $entraDomains.Count
             $domainsWithReplicaSets = 0
 
@@ -1171,23 +1280,26 @@ function Test-QuestionB0312 {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
                 $rawData = "All Entra Domain Services domains have replica sets configured."
-            } elseif ($domainsWithReplicaSets -eq 0) {
+            }
+            elseif ($domainsWithReplicaSets -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
                 $rawData = "No Entra Domain Services domains have replica sets configured."
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($domainsWithReplicaSets / $totalDomains) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
                 $rawData = @{
-                    TotalDomains         = $totalDomains
-                    DomainsWithReplicaSets = $domainsWithReplicaSets
+                    TotalDomains              = $totalDomains
+                    DomainsWithReplicaSets    = $domainsWithReplicaSets
                     DomainsWithoutReplicaSets = $totalDomains - $domainsWithReplicaSets
-                    Message              = "Some Entra Domain Services domains are missing replica sets."
+                    Message                   = "Some Entra Domain Services domains are missing replica sets."
                 }
             }
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -1218,15 +1330,16 @@ function Test-QuestionB0313 {
         # Note: This requires special permissions and may not be available to all users
         try {
             $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId "/providers/microsoft.aadiam/diagnosticSettings" -ErrorAction Stop
-        } catch {
+        }
+        catch {
             # Handle permission errors gracefully
             if ($_.Exception.Message -like "*authorization*" -or $_.Exception.Message -like "*permissions*") {
                 Write-Warning "Insufficient permissions to check Microsoft Entra ID diagnostic settings. This requires Global Administrator or Security Administrator roles."
                 $status = [Status]::Unknown
                 $estimatedPercentageApplied = 0
                 $rawData = @{
-                    Error = "Insufficient permissions"
-                    Message = "Cannot assess diagnostic settings due to insufficient permissions"
+                    Error               = "Insufficient permissions"
+                    Message             = "Cannot assess diagnostic settings due to insufficient permissions"
                     RequiredPermissions = "Global Administrator or Security Administrator roles required"
                 }
                 
@@ -1235,13 +1348,14 @@ function Test-QuestionB0313 {
                 $score = ($weight * $estimatedPercentageApplied) / 100
                 
                 return @{
-                    Status = $status
+                    Status                     = $status
                     EstimatedPercentageApplied = $estimatedPercentageApplied
-                    Score = $score
-                    Weight = $weight
-                    RawData = $rawData
+                    Score                      = $score
+                    Weight                     = $weight
+                    RawData                    = $rawData
                 }
-            } else {
+            }
+            else {
                 # Re-throw other errors
                 throw
             }
@@ -1252,32 +1366,36 @@ function Test-QuestionB0313 {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
             $rawData = "No diagnostic settings are configured for Microsoft Entra ID."
-        } else {
+        }
+        else {
             $logsToAzureMonitor = $diagnosticSettings | Where-Object {
-                $_.WorkspaceId -ne $null -and $_.Logs | Where-Object { $_.Enabled -eq $true }
+                $null -ne $_.WorkspaceId -and $_.Logs | Where-Object { $_.Enabled -eq $true }
             }
 
             if ($logsToAzureMonitor.Count -eq $diagnosticSettings.Count) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
                 $rawData = "All diagnostic settings for Microsoft Entra ID are configured to send logs to Azure Monitor."
-            } elseif ($logsToAzureMonitor.Count -eq 0) {
+            }
+            elseif ($logsToAzureMonitor.Count -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
                 $rawData = "None of the diagnostic settings for Microsoft Entra ID are configured to send logs to Azure Monitor."
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($logsToAzureMonitor.Count / $diagnosticSettings.Count) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
                 $rawData = @{
-                    TotalSettings          = $diagnosticSettings.Count
-                    SettingsWithAzureMonitor = $logsToAzureMonitor.Count
+                    TotalSettings               = $diagnosticSettings.Count
+                    SettingsWithAzureMonitor    = $logsToAzureMonitor.Count
                     SettingsWithoutAzureMonitor = $diagnosticSettings.Count - $logsToAzureMonitor.Count
-                    Message               = "Some diagnostic settings are configured to send logs to Azure Monitor, but not all."
+                    Message                     = "Some diagnostic settings are configured to send logs to Azure Monitor, but not all."
                 }
             }
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -1311,7 +1429,8 @@ function Test-QuestionB0314 {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
             $rawData = "No users found in the tenant to verify emergency access accounts."
-        } else {
+        }
+        else {
             # Define criteria for break-glass accounts
             $breakGlassAccounts = $users | Where-Object {
                 ($_.UserPrincipalName -match "breakglass" -or $_.UserPrincipalName -match "emergency") -and
@@ -1327,7 +1446,8 @@ function Test-QuestionB0314 {
                     Accounts                = $breakGlassAccounts | Select-Object DisplayName, UserPrincipalName
                     Message                 = "Sufficient emergency access accounts (at least 2) are configured."
                 }
-            } elseif ($breakGlassAccounts.Count -eq 1) {
+            }
+            elseif ($breakGlassAccounts.Count -eq 1) {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = 50
                 $rawData = @{
@@ -1335,13 +1455,15 @@ function Test-QuestionB0314 {
                     Accounts                = $breakGlassAccounts | Select-Object DisplayName, UserPrincipalName
                     Message                 = "Only 1 emergency access account found. At least 2 are recommended."
                 }
-            } else {
+            }
+            else {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
                 $rawData = "No emergency access or break-glass accounts configured with name containing 'breakglass' or 'emergency'."
             }
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -1366,42 +1488,51 @@ function Test-QuestionB0315 {
 
     try {
         # Question: Do not use on-premises synced accounts for Microsoft Entra ID role assignments, unless you have a scenario that specifically requires it.
-        # Reference: https://learn.microsoft.com/azure/active-directory/hybrid/plan-connect-design-concepts
-
-        # Get all Entra Connect servers
-        $connectServers = Get-AzADConnectSyncServer
-
-        if (-not $connectServers -or $connectServers.Count -eq 0) {
-            # No Entra Connect servers found
-            $status = [Status]::NotApplicable
-            $estimatedPercentageApplied = 100
-            $rawData = "No Microsoft Entra Connect servers are configured in this environment."
-        } else {
-            # Check for staging servers
-            $stagingServers = $connectServers | Where-Object { $_.StagingModeEnabled -eq $true }
-            $totalServers = $connectServers.Count
-            $stagingServerCount = $stagingServers.Count
-
-            if ($stagingServerCount -ge 1) {
-                $status = [Status]::Implemented
-                $estimatedPercentageApplied = 100
-                $rawData = @{
-                    TotalServers       = $totalServers
-                    StagingServers     = $stagingServerCount
-                    StagingServerDetails = $stagingServers | Select-Object DisplayName, StagingModeEnabled, LastSyncTime
-                    Message            = "At least one staging server is configured for high availability/disaster recovery."
-                }
+        # Reference: https://learn.microsoft.com/azure/active-directory/hybrid/plan-connect-design-concepts        # Check for Entra Connect configuration through Graph API
+        if ($global:GraphConnected -eq $false) {
+            Write-Warning "Microsoft Graph is not connected. Cannot assess Entra Connect configuration."
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = "Microsoft Graph connection not available for Entra Connect assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }        # Try to get directory synchronization information from cached data
+        try {
+            if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.Organization) {
+                $organization = $global:GraphData.Organization
+                $dirSyncEnabled = $organization.OnPremisesSyncEnabled
             } else {
-                $status = [Status]::NotImplemented
-                $estimatedPercentageApplied = 0
-                $rawData = @{
-                    TotalServers   = $totalServers
-                    StagingServers = $stagingServerCount
-                    Message        = "No staging servers are configured. Consider adding one for high availability/disaster recovery."
-                }
+                $organization = $null
+                $dirSyncEnabled = $null
             }
         }
-    } catch {
+        catch {
+            Write-Warning "Could not retrieve organization sync status: $($_.Exception.Message)"
+            $dirSyncEnabled = $null
+        }
+
+        if ($null -eq $dirSyncEnabled) {
+            # Could not determine sync status
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = "Could not determine directory synchronization status."
+        }
+        elseif ($dirSyncEnabled -eq $false) {
+            # No directory sync enabled
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "Directory synchronization is not enabled in this environment."
+        }
+        else {
+            # Directory sync is enabled, but we can't check for staging servers with current APIs
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = @{
+                DirectorySyncEnabled = $dirSyncEnabled
+                Message              = "Directory synchronization is enabled, but detailed sync server configuration cannot be assessed with current API capabilities."
+            }
+        }
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -1435,7 +1566,8 @@ function Test-QuestionB0316 {
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
             $rawData = "No role assignments found in the environment."
-        } else {
+        }
+        else {
             # Filter role assignments for on-premises synced accounts
             $syncedAccounts = $roleAssignments | Where-Object {
                 $_.SignInName -match "@.*" -and $_.PrincipalType -eq "User" -and $_.SignInName -match "\.onmicrosoft\.com"
@@ -1448,15 +1580,17 @@ function Test-QuestionB0316 {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
                 $rawData = "No on-premises synced accounts are being used for Microsoft Entra ID role assignments."
-            } elseif ($syncedAssignments -eq $totalAssignments) {
+            }
+            elseif ($syncedAssignments -eq $totalAssignments) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
                 $rawData = @{
-                    TotalAssignments = $totalAssignments
+                    TotalAssignments  = $totalAssignments
                     SyncedAssignments = $syncedAssignments
-                    Message = "All role assignments are using on-premises synced accounts. Avoid this practice unless necessary."
+                    Message           = "All role assignments are using on-premises synced accounts. Avoid this practice unless necessary."
                 }
-            } else {
+            }
+            else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = (($totalAssignments - $syncedAssignments) / $totalAssignments) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
@@ -1468,7 +1602,8 @@ function Test-QuestionB0316 {
                 }
             }
         }
-    } catch {
+    }
+    catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
@@ -1497,46 +1632,39 @@ function Test-QuestionB0317 {
         # Question: Configure Identity network segmentation through the use of a virtual network and peer back to the hub. Providing authentication inside application landing zone (legacy).
         # Reference: https://learn.microsoft.com/azure/active-directory/fundamentals/identity-secure-score
 
-        # Check for Microsoft Entra ID Application Proxy connectors
-        $appProxyConnectors = Get-AzADApplicationProxyConnectorGroup
-
-        if (-not $appProxyConnectors -or $appProxyConnectors.Count -eq 0) {
-            $status = [Status]::NotImplemented
+        # Check for Microsoft Entra ID Application Proxy through Graph API
+        if ($global:GraphConnected -eq $false) {
+            Write-Warning "Microsoft Graph is not connected. Cannot assess Application Proxy configuration."
+            $status = [Status]::Unknown
             $estimatedPercentageApplied = 0
-            $rawData = "No Microsoft Entra ID Application Proxy connectors are configured in this tenant."
-        } else {
-            # Ensure the Application Proxy is managed as a platform resource
-            $managedAsPlatform = $appProxyConnectors | Where-Object {
-                $_.DisplayName -match "Platform" -or $_.Tags -contains "PlatformResource"
-            }
-
-            if ($managedAsPlatform.Count -eq $appProxyConnectors.Count) {
-                $status = [Status]::Implemented
-                $estimatedPercentageApplied = 100
-                $rawData = @{
-                    TotalConnectors       = $appProxyConnectors.Count
-                    ManagedAsPlatform     = $managedAsPlatform.Count
-                    ConnectorDetails      = $appProxyConnectors | Select-Object DisplayName, ConnectorGroupType, Tags
-                    Message               = "All Microsoft Entra ID Application Proxy connectors are managed as platform resources."
-                }
-            } elseif ($managedAsPlatform.Count -eq 0) {
-                $status = [Status]::NotImplemented
-                $estimatedPercentageApplied = 0
-                $rawData = @{
-                    TotalConnectors   = $appProxyConnectors.Count
-                    ManagedAsPlatform = $managedAsPlatform.Count
-                    Message           = "No Microsoft Entra ID Application Proxy connectors are managed as platform resources. Consider tagging them appropriately. We recommend using 'PlatformResource' tag."
-                }
+            $rawData = "Microsoft Graph connection not available for Application Proxy assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }        # Try to get application proxy applications from cached data
+        try {
+            if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.Applications) {
+                $applications = $global:GraphData.Applications | Where-Object { $_.onPremisesPublishing.externalUrl -ne $null }
             } else {
-                $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = ($managedAsPlatform.Count / $appProxyConnectors.Count) * 100
-                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-                $rawData = @{
-                    TotalConnectors       = $appProxyConnectors.Count
-                    ManagedAsPlatform     = $managedAsPlatform.Count
-                    NotManagedAsPlatform  = $appProxyConnectors.Count - $managedAsPlatform.Count
-                    Message               = "Some Microsoft Entra ID Application Proxy connectors are managed as platform resources, but not all."
-                }
+                $applications = $null
+            }
+        }
+        catch {
+            Write-Warning "Could not retrieve Application Proxy applications: $($_.Exception.Message)"
+            $applications = $null
+        }
+
+        if (-not $applications -or $applications.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No Microsoft Entra ID Application Proxy applications are configured in this tenant."
+        }
+        else {
+            # Application Proxy is in use - recommend managing as platform resource
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = @{
+                TotalApplications = $applications.Count
+                Message           = "Application Proxy applications found. Verify these are managed as platform resources rather than individual app resources."
+                Applications      = $applications | Select-Object DisplayName, AppId | ForEach-Object { $_.DisplayName }
             }
         }
     } catch {
@@ -1546,7 +1674,7 @@ function Test-QuestionB0317 {
         $rawData = $_.Exception.Message
     }
 
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionB0401 {
@@ -1599,21 +1727,21 @@ function Test-QuestionB0401 {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
                 $rawData = @{
-                    TotalVNets        = $totalVNets
-                    IdentityVNets     = $identityVNets.Count
-                    PeeredVNets       = $peeredVNets
-                    Message           = "All identity VNets are peered to the hub network."
+                    TotalVNets    = $totalVNets
+                    IdentityVNets = $identityVNets.Count
+                    PeeredVNets   = $peeredVNets
+                    Message       = "All identity VNets are peered to the hub network."
                 }
             } else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($peeredVNets / $identityVNets.Count) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
                 $rawData = @{
-                    TotalVNets        = $totalVNets
-                    IdentityVNets     = $identityVNets.Count
-                    PeeredVNets       = $peeredVNets
-                    NotPeeredVNets    = $identityVNets.Count - $peeredVNets
-                    Message           = "Some identity VNets are not peered to the hub network."
+                    TotalVNets     = $totalVNets
+                    IdentityVNets  = $identityVNets.Count
+                    PeeredVNets    = $peeredVNets
+                    NotPeeredVNets = $identityVNets.Count - $peeredVNets
+                    Message        = "Some identity VNets are not peered to the hub network."
                 }
             }
         }
@@ -1692,27 +1820,27 @@ function Test-QuestionB0402 {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
                 $rawData = @{
-                    TotalResources      = $totalResources
-                    ResourcesUsingRBAC  = $resourcesUsingRBAC
-                    Message             = "All resources of specified types are configured to use Azure RBAC for data plane access."
+                    TotalResources     = $totalResources
+                    ResourcesUsingRBAC = $resourcesUsingRBAC
+                    Message            = "All resources of specified types are configured to use Azure RBAC for data plane access."
                 }
             } elseif ($resourcesUsingRBAC -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
                 $rawData = @{
-                    TotalResources      = $totalResources
-                    ResourcesUsingRBAC  = $resourcesUsingRBAC
-                    Message             = "None of the specified resources are configured to use Azure RBAC for data plane access."
+                    TotalResources     = $totalResources
+                    ResourcesUsingRBAC = $resourcesUsingRBAC
+                    Message            = "None of the specified resources are configured to use Azure RBAC for data plane access."
                 }
             } else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($resourcesUsingRBAC / $totalResources) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
                 $rawData = @{
-                    TotalResources      = $totalResources
-                    ResourcesUsingRBAC  = $resourcesUsingRBAC
+                    TotalResources       = $totalResources
+                    ResourcesUsingRBAC   = $resourcesUsingRBAC
                     ResourcesWithoutRBAC = $totalResources - $resourcesUsingRBAC
-                    Message             = "Some resources are configured to use Azure RBAC for data plane access, but not all."
+                    Message              = "Some resources are configured to use Azure RBAC for data plane access, but not all."
                 }
             }
         }
@@ -1739,15 +1867,28 @@ function Test-QuestionB0403 {
     $estimatedPercentageApplied = 0
     $rawData = $null
 
-    try {
-        # Question: Use Microsoft Entra ID PIM access reviews to periodically validate resource entitlements.
+    try {        # Question: Use Microsoft Entra ID PIM access reviews to periodically validate resource entitlements.
         # Reference: https://learn.microsoft.com/azure/active-directory/privileged-identity-management/pim-how-to-start-security-review
 
-        # Connect to Microsoft Graph with appropriate permissions
-        Connect-MgGraph -Scopes "AccessReview.Read.All"
-
-        # Get all active Access Reviews in PIM
-        $accessReviews = Get-MgAccessReviewScheduleDefinition -Filter "status eq 'active'" -All
+        # Check if Microsoft Graph is connected
+        if ($global:GraphConnected -eq $false) {
+            Write-Warning "Microsoft Graph is not connected. Cannot assess PIM access reviews."
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = "Microsoft Graph connection not available for PIM access reviews assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }        # Try to get active Access Reviews in PIM from cached data
+        try {
+            if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.AccessReviews) {
+                $accessReviews = $global:GraphData.AccessReviews
+            } else {
+                $accessReviews = $null
+            }
+        }
+        catch {
+            Write-Warning "Could not retrieve PIM access reviews: $($_.Exception.Message)"
+            $accessReviews = $null
+        }
 
         if (-not $accessReviews -or $accessReviews.Count -eq 0) {
             $status = [Status]::NotImplemented
@@ -1765,27 +1906,27 @@ function Test-QuestionB0403 {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
                 $rawData = @{
-                    TotalAccessReviews  = $totalAccessReviews
-                    ResourceReviews     = $resourceReviews.Count
-                    Message             = "All active access reviews are configured for resource entitlements."
+                    TotalAccessReviews = $totalAccessReviews
+                    ResourceReviews    = $resourceReviews.Count
+                    Message            = "All active access reviews are configured for resource entitlements."
                 }
             } elseif ($resourceReviews.Count -eq 0) {
                 $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
                 $rawData = @{
-                    TotalAccessReviews  = $totalAccessReviews
-                    ResourceReviews     = $resourceReviews.Count
-                    Message             = "None of the active access reviews are related to resource entitlements."
+                    TotalAccessReviews = $totalAccessReviews
+                    ResourceReviews    = $resourceReviews.Count
+                    Message            = "None of the active access reviews are related to resource entitlements."
                 }
             } else {
                 $status = [Status]::PartiallyImplemented
                 $estimatedPercentageApplied = ($resourceReviews.Count / $totalAccessReviews) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
                 $rawData = @{
-                    TotalAccessReviews      = $totalAccessReviews
-                    ResourceReviews         = $resourceReviews.Count
-                    NonResourceReviews      = $totalAccessReviews - $resourceReviews.Count
-                    Message                 = "Some active access reviews are configured for resource entitlements, but not all."
+                    TotalAccessReviews = $totalAccessReviews
+                    ResourceReviews    = $resourceReviews.Count
+                    NonResourceReviews = $totalAccessReviews - $resourceReviews.Count
+                    Message            = "Some active access reviews are configured for resource entitlements, but not all."
                 }
             }
         }
@@ -1816,46 +1957,38 @@ function Test-QuestionB0318 {
         # Question: When using Microsoft Entra ID Application Proxy to give remote users access to applications, manage it as a Platform resource.
         # Reference: https://learn.microsoft.com/azure/active-directory/app-proxy/what-is-application-proxy
 
-        # Check for Microsoft Entra ID Application Proxy connectors
-        $appProxyConnectors = Get-AzADApplicationProxyConnectorGroup
-
-        if (-not $appProxyConnectors -or $appProxyConnectors.Count -eq 0) {
-            $status = [Status]::NotImplemented
+        # Check for Microsoft Entra ID Application Proxy through Graph API
+        if ($global:GraphConnected -eq $false) {
+            Write-Warning "Microsoft Graph is not connected. Cannot assess Application Proxy configuration."
+            $status = [Status]::Unknown
             $estimatedPercentageApplied = 0
-            $rawData = "No Microsoft Entra ID Application Proxy connectors are configured in this tenant."
-        } else {
-            # Ensure the Application Proxy is managed as a platform resource
-            $managedAsPlatform = $appProxyConnectors | Where-Object {
-                $_.DisplayName -match "Platform" -or $_.Tags -contains "PlatformResource"
-            }
-
-            if ($managedAsPlatform.Count -eq $appProxyConnectors.Count) {
-                $status = [Status]::Implemented
-                $estimatedPercentageApplied = 100
-                $rawData = @{
-                    TotalConnectors       = $appProxyConnectors.Count
-                    ManagedAsPlatform     = $managedAsPlatform.Count
-                    ConnectorDetails      = $appProxyConnectors | Select-Object DisplayName, ConnectorGroupType, Tags
-                    Message               = "All Microsoft Entra ID Application Proxy connectors are managed as platform resources."
-                }
-            } elseif ($managedAsPlatform.Count -eq 0) {
-                $status = [Status]::NotImplemented
-                $estimatedPercentageApplied = 0
-                $rawData = @{
-                    TotalConnectors   = $appProxyConnectors.Count
-                    ManagedAsPlatform = $managedAsPlatform.Count
-                    Message           = "No Microsoft Entra ID Application Proxy connectors are managed as platform resources. Consider tagging them appropriately. We recommend using 'PlatformResource' tag."
-                }
+            $rawData = "Microsoft Graph connection not available for Application Proxy assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }        # Try to get application proxy applications from cached data
+        try {
+            if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.Applications) {
+                $applications = $global:GraphData.Applications | Where-Object { $_.onPremisesPublishing.externalUrl -ne $null }
             } else {
-                $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = ($managedAsPlatform.Count / $appProxyConnectors.Count) * 100
-                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-                $rawData = @{
-                    TotalConnectors       = $appProxyConnectors.Count
-                    ManagedAsPlatform     = $managedAsPlatform.Count
-                    NotManagedAsPlatform  = $appProxyConnectors.Count - $managedAsPlatform.Count
-                    Message               = "Some Microsoft Entra ID Application Proxy connectors are managed as platform resources, but not all."
-                }
+                $applications = $null
+            }
+        }
+        catch {
+            Write-Warning "Could not retrieve Application Proxy applications: $($_.Exception.Message)"
+            $applications = $null
+        }
+
+        if (-not $applications -or $applications.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No Microsoft Entra ID Application Proxy applications are configured in this tenant."
+        } else {
+            # Application Proxy is in use - recommend managing as platform resource
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = @{
+                TotalApplications = $applications.Count
+                Message = "Application Proxy applications found. Verify these are managed as platform resources rather than individual app resources."
+                Applications = $applications | Select-Object DisplayName, AppId | ForEach-Object { $_.DisplayName }
             }
         }
     } catch {

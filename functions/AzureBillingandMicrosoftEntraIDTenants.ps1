@@ -261,16 +261,27 @@ function Test-QuestionA0201 {
         # Verify if a partner has access to administer the tenant and ensure Azure Lighthouse is used
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-microsoft-customer-agreement#design-recommendations
 
-        # Import the Microsoft Graph module
-        if (-not (Get-Module -ListAvailable -Name 'Microsoft.Graph.Identity.DirectoryManagement')) {
-            Install-Module -Name 'Microsoft.Graph' -Scope CurrentUser -Force
+        # Import the Microsoft Graph module        # Check if Microsoft Graph is connected
+        if ($global:GraphConnected -eq $false) {
+            Write-Warning "Microsoft Graph is not connected. Cannot assess partner directory roles."
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = "Microsoft Graph connection not available for partner assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }        # Try to get the list of service principals (partners) with directory roles from cached data
+        try {
+            if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.ServicePrincipals) {
+                $servicePrincipals = $global:GraphData.ServicePrincipals | Where-Object { $_.servicePrincipalType -eq 'Partner' }
+            } else {
+                $servicePrincipals = $null
+            }
         }
-        Import-Module Microsoft.Graph.Identity.DirectoryManagement
+        catch {
+            Write-Warning "Could not retrieve partner service principals: $($_.Exception.Message)"
+            $servicePrincipals = $null
+        }
 
-        # Get the list of service principals (partners) with directory roles
-        $servicePrincipals = Get-MgServicePrincipal -Filter "servicePrincipalType eq 'Partner'"
-
-        if ($servicePrincipals.Count -eq 0) {
+        if (-not $servicePrincipals -or $servicePrincipals.Count -eq 0) {
             # No partners found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100

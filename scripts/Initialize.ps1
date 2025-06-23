@@ -14,467 +14,325 @@
 
 # Removed InstallAndImportModule function - functionality integrated into Get-AzModules
 
-function Clear-GraphModuleConflicts {
-    <#
-    .SYNOPSIS
-        Clears Microsoft Graph module conflicts only when necessary
-    .DESCRIPTION
-        Selectively removes only problematic Microsoft Graph modules to prevent assembly loading issues
-    #>
-      Write-InitLog -Message "Checking for Microsoft Graph module conflicts..."
-    
-    try {
-        # Only look for modules that are known to cause assembly conflicts
-        $problematicModules = @(
-            'Microsoft.Graph.Authentication'
-        )
-        
-        $modulesToRemove = @()
-        foreach ($moduleName in $problematicModules) {
-            $loadedModule = Get-Module -Name $moduleName -ErrorAction SilentlyContinue
-            if ($loadedModule) {
-                # Check if this module is causing issues by testing a simple Graph call
-                try {
-                    $null = Get-MgContext -ErrorAction Stop
-                    # If this works, the module is fine, don't remove it
-                    Write-Output "Module '$moduleName' is loaded and working correctly."
-                }
-                catch {
-                    # This module might be causing issues
-                    $modulesToRemove += $loadedModule
-                    Write-Output "Module '$moduleName' appears to be causing conflicts."
-                }
-            }
-        }
-        
-        if ($modulesToRemove.Count -gt 0) {
-            Write-Output "Removing $($modulesToRemove.Count) problematic modules..."
-            $modulesToRemove | Remove-Module -Force -ErrorAction SilentlyContinue
-            Write-Output "Problematic modules removed."
-            
-            # Brief pause to allow cleanup
-            Start-Sleep -Milliseconds 500
-        } else {
-            Write-Output "No conflicting modules found."
-        }
-    }
-    catch {
-        Write-Output "Warning during conflict check: $($_.Exception.Message)"
-    }
-}
-
-function Test-MgGraphConnection {
-    <#
-    .SYNOPSIS
-        Tests if Microsoft Graph connection is working and can execute commands
-    .DESCRIPTION
-        Validates that Microsoft Graph is connected and can execute basic commands
-    .RETURNS
-        Boolean indicating if the connection is working
-    #>
-    
-    try {
-        # Test basic Graph connection
-        $context = Get-MgContext -ErrorAction Stop
-        if (-not $context -or -not $context.TenantId) {
-            return $false
-        }
-        
-        # Test if we can actually execute a simple Graph command
-        $testResult = Get-MgOrganization -Top 1 -ErrorAction Stop
-        if ($testResult) {
-            return $true
-        }
-        
-        return $false
-    }
-    catch {
-        Write-Output "Microsoft Graph connection test failed: $($_.Exception.Message)"
-        return $false
-    }
-}
-
-function Test-MgGraphConnectionQuick {
-    <#
-    .SYNOPSIS
-        Quick test if Microsoft Graph connection exists (without API calls)
-    .DESCRIPTION
-        Fast check that only verifies if Get-MgContext returns a valid context
-    .RETURNS
-        Boolean indicating if there's an active Graph context
-    #>
-    
-    try {
-        $context = Get-MgContext -ErrorAction SilentlyContinue
-        return ($context -and $context.TenantId)
-    }
-    catch {
-        return $false
-    }
-}
-
 function Get-AzModules {
-    Write-Output "Checking Azure modules (optimized)..."
-    $startTime = Get-Date    # Required modules with their minimum versions
-    $requiredModules = @{
-        'Az.Accounts' = @{ MinVersion = '2.0.0'; Critical = $true }
-        'Microsoft.Graph.Authentication' = @{ MinVersion = '2.0.0'; Critical = $true }
-        'Microsoft.Graph.Identity.Governance' = @{ MinVersion = '2.0.0'; Critical = $false }
-    }
-
-    foreach ($moduleName in $requiredModules.Keys) {
-        $moduleInfo = $requiredModules[$moduleName]
-        $minVersion = $moduleInfo.MinVersion
-        $isCritical = $moduleInfo.Critical
-        
-        Write-Output "Checking module '$moduleName'..."
-        
-        # Check if module is already loaded with adequate version
-        $loadedModule = Get-Module -Name $moduleName -ErrorAction SilentlyContinue
-        if ($loadedModule -and $loadedModule.Version -ge [version]$minVersion) {
-            Write-Output "✓ Module '$moduleName' v$($loadedModule.Version) already loaded and compatible."
-            continue
-        }
-        
-        # Check if module is available (installed)
-        $availableModule = Get-Module -ListAvailable -Name $moduleName | Sort-Object Version -Descending | Select-Object -First 1
-        if (-not $availableModule) {
-            Write-Output "Installing module '$moduleName'..."
-            try {
-                Install-Module -Name $moduleName -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
-                Write-Output "✓ Module '$moduleName' installed successfully."
-                $availableModule = Get-Module -ListAvailable -Name $moduleName | Sort-Object Version -Descending | Select-Object -First 1
-            }
-            catch {
-                Write-Output "✗ Error installing module '$moduleName': $($_.Exception.Message)"
-                if ($isCritical) {
-                    throw "Critical module installation failed: $moduleName"
-                }
-                continue
-            }
-        }
-        
-        # Import only if not loaded or version is inadequate
-        if (-not $loadedModule -or $loadedModule.Version -lt $availableModule.Version) {
-            try {
-                # For critical modules, import carefully
-                if ($moduleName -eq 'Microsoft.Graph.Authentication') {
-                    # Only import if we don't have a working Microsoft Graph connection
-                    if (-not (Test-MgGraphConnectionQuick)) {
-                        Import-Module $moduleName -Force -ErrorAction Stop
-                        Write-Output "✓ Module '$moduleName' v$($availableModule.Version) imported."
-                    } else {
-                        Write-Output "✓ Microsoft Graph already connected, skipping authentication module import."
-                    }
-                } else {
-                    Import-Module $moduleName -Force -ErrorAction Stop
-                    Write-Output "✓ Module '$moduleName' v$($availableModule.Version) imported."
-                }
-            }
-            catch {
-                Write-Output "⚠ Warning: Could not import '$moduleName': $($_.Exception.Message)"
-                if ($isCritical) {
-                    Write-Output "Module will be auto-loaded when needed."
-                }
-            }
-        }
+    # Disable module auto-loading to prevent conflicts
+    $global:PSModuleAutoLoadingPreference = 'None'    
+    $requiredModules = @(
+        'Az.Accounts', 'Az.Resources',
+        'Microsoft.Graph.Authentication', 'Microsoft.Graph.Identity.DirectoryManagement',
+        'Microsoft.Graph.Users', 'Microsoft.Graph.Groups', 'Microsoft.Graph.Applications',
+        'Microsoft.Graph.Identity.Governance', 'Microsoft.Graph.Identity.SignIns'
+    )
+    
+    # Check missing modules
+    $missingModules = $requiredModules | Where-Object { 
+        -not (Get-Module -ListAvailable -Name $_ -ErrorAction SilentlyContinue) 
     }
     
-    $elapsed = (Get-Date) - $startTime
-    Write-Output "Module check completed in $([math]::Round($elapsed.TotalSeconds, 1)) seconds."
-    Write-Output "Note: Other Az and Microsoft.Graph modules will be auto-loaded as needed."
+    if ($missingModules.Count -gt 0) {
+        Write-Warning "Missing modules: $($missingModules -join ', ')"
+        
+        # Try to install if possible
+        if (Get-Command Install-Module -ErrorAction SilentlyContinue) {
+            try {
+                $missingModules | ForEach-Object {
+                    Install-Module -Name $_ -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
+                }
+                Write-Output "Modules installed successfully"
+            } catch {
+                Write-Error "Failed to install modules: $($_.Exception.Message)"
+                Write-Warning "Install manually: Install-Module -Name <ModuleName> -Scope CurrentUser -Force"
+            }
+        } else {
+            Write-Warning "Install-Module not available. Install modules manually in regular PowerShell"
+        }    }
+    
+    # More aggressive Graph module cleanup to prevent assembly conflicts
+    try {
+        # Remove all Microsoft.Graph modules to start fresh
+        Get-Module Microsoft.Graph* | Remove-Module -Force -ErrorAction SilentlyContinue
+        
+        # Also trigger garbage collection to clean up assemblies (best effort)
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+    } catch {
+        # Ignore cleanup errors
+    }
 }
 
 function Initialize-Connect {
-    Write-Output "Connecting to Azure..."
     $configPath = "$PSScriptRoot/../shared/config.json"
     
     try {
         $config = Get-Content -Path $configPath | ConvertFrom-Json
-        $TenantId = $config.TenantId
-        Set-Variable -Name "TenantId" -Value $TenantId -Scope Global
+        $global:TenantId = $config.TenantId
     }
     catch {
-        Write-Output "Error reading configuration file: $_.Exception.Message"
+        Write-Error "Failed to read config file: $($_.Exception.Message)"
         return
     }
 
+    # Azure connection
     try {
-        $azContext = Get-AzContext
-        if ($null -eq $azContext) {
-            Write-Output "No existing Azure connection found. Connecting..."
-            Connect-AzAccount -Tenant $TenantId   
+        Import-Module Az.Accounts -Force -ErrorAction Stop
+        
+        $azContext = Get-AzContext -ErrorAction SilentlyContinue
+        if ($null -eq $azContext -or $azContext.Tenant.Id -ne $global:TenantId) {
+            Connect-AzAccount -Tenant $global:TenantId | Out-Null
         }
-        else {
-            if ($azContext.Tenant.Id -eq $TenantId) {
-                Write-Output "Already connected to Azure."
-                Get-AzContext
-            }
-            else {
-                Write-Output "No existing Azure connection found. Connecting..."
-                Connect-AzAccount -Tenant $TenantId
-            }  
-        }
+        Write-Output "Azure: Connected"
     }
     catch {
-        Write-Output "Error checking Azure connection: $_.Exception.Message"
-        Write-Output "Connecting to Azure..."
-        try {
-            Connect-AzAccount -Tenant $TenantId
-        }
-        catch {
-            Write-Output "Error connecting to Azure: $_.Exception.Message"
-        }
-    }    # Check if the user is already connected to Microsoft Graph
-    Write-Output "Checking Microsoft Graph connection..."
-    $startTime = Get-Date
-    
-    # Quick check - if already connected and working, skip everything
-    if (Test-MgGraphConnectionQuick) {
-        try {
-            $context = Get-MgContext
-            Write-Output "✓ Already connected to Microsoft Graph."
-            Write-Output "  Tenant: $($context.TenantId)"
-            Write-Output "  Account: $($context.Account)"
-            
-            # Quick validation - try one simple call
-            $null = Get-MgContext -ErrorAction Stop
-            $elapsed = (Get-Date) - $startTime
-            Write-Output "Microsoft Graph connection verified in $([math]::Round($elapsed.TotalSeconds, 1)) seconds."
-            return
-        }
-        catch {
-            Write-Output "Existing connection seems invalid, will reconnect..."
-        }
-    }
-    
-    # If we get here, we need to establish a new connection
-    Write-Output "Establishing Microsoft Graph connection..."
+        Write-Error "Azure connection failed: $($_.Exception.Message)"
+        return
+    }    # Microsoft Graph connection with intelligent conflict handling
+    $global:GraphConnected = $false
     
     try {
-        # Only clear modules if we're having issues
-        # Don't clear modules proactively to avoid the 300-second reload
-          # Attempt connection with comprehensive scopes including PIM
+        # First check if we can already use Graph commands (module might be loaded)
+        try {
+            $context = Get-MgContext -ErrorAction SilentlyContinue
+            if ($context -and $context.TenantId -eq $global:TenantId) {
+                $global:GraphConnected = $true
+                Write-Output "Graph: Already connected"
+                return
+            }
+        } catch {
+            # Get-MgContext failed, need to load module
+        }
+        
+        # Try to use existing loaded module first
+        $authModule = Get-Module Microsoft.Graph.Authentication -ErrorAction SilentlyContinue
+        if (-not $authModule) {
+            # Module not loaded, try to import
+            try {
+                Import-Module Microsoft.Graph.Authentication -ErrorAction Stop
+            } catch {                # Assembly conflict - try alternative approach
+                Write-Output "Assembly conflict detected - attempting workaround..."
+                
+                # Try to connect anyway - sometimes the cmdlets work even with assembly warnings
+                try {
+                    $scopes = @(
+                        "Directory.Read.All", "Policy.Read.All", "Reports.Read.All", 
+                        "UserAuthenticationMethod.Read.All", "RoleAssignmentSchedule.Read.Directory",
+                        "RoleEligibilitySchedule.Read.Directory", "RoleManagement.Read.Directory"
+                    )
+                    
+                    Connect-MgGraph -TenantId $global:TenantId -Scopes $scopes -NoWelcome -ErrorAction Stop | Out-Null
+                    $global:GraphConnected = $true
+                    Write-Output "Graph: Connected (workaround successful)"
+                    return
+                } catch {
+                    Write-Output "Graph: Connection failed (assembly conflict)"
+                    return
+                }
+            }
+        }
+        
+        # Module is loaded, try to connect
         $scopes = @(
-            "Directory.Read.All", 
-            "Policy.Read.All", 
-            "Reports.Read.All", 
-            "UserAuthenticationMethod.Read.All",
-            "RoleAssignmentSchedule.Read.Directory",
-            "RoleEligibilitySchedule.Read.Directory",
-            "RoleManagement.Read.Directory"
+            "Directory.Read.All", "Policy.Read.All", "Reports.Read.All", 
+            "UserAuthenticationMethod.Read.All", "RoleAssignmentSchedule.Read.Directory",
+            "RoleEligibilitySchedule.Read.Directory", "RoleManagement.Read.Directory"
         )
-        Connect-MgGraph -TenantId $TenantId -NoWelcome -Scopes $scopes -ErrorAction Stop
         
-        # Verify connection
-        $context = Get-MgContext
-        if ($context -and $context.TenantId) {
-            Write-Output "✓ Microsoft Graph connection established successfully."
-            Write-Output "  Tenant: $($context.TenantId)"
-            Write-Output "  Scopes: $($context.Scopes -join ', ')"
-        } else {
-            throw "Connection verification failed - no valid context found"
-        }
-        
-        $elapsed = (Get-Date) - $startTime
-        Write-Output "Microsoft Graph connection completed in $([math]::Round($elapsed.TotalSeconds, 1)) seconds."
-    }
+        Connect-MgGraph -TenantId $global:TenantId -Scopes $scopes -NoWelcome | Out-Null
+        $global:GraphConnected = $true
+        Write-Output "Graph: Connected"    }
     catch {
-        Write-Output "Microsoft Graph connection failed: $($_.Exception.Message)"
-        
-        # Only now try the more drastic measures
-        Write-Output "Attempting recovery with module refresh..."
-        try {
-            Clear-GraphModuleConflicts
-            
-            # Try once more with clean modules
-            Connect-MgGraph -TenantId $TenantId -NoWelcome -Scopes $scopes -ErrorAction Stop
-            
-            $context = Get-MgContext
-            if ($context -and $context.TenantId) {
-                Write-Output "✓ Microsoft Graph connection recovered successfully."
-            } else {
-                throw "Recovery failed"
-            }
-        }
-        catch {
-            Write-Output "CRITICAL: Microsoft Graph connection could not be established."
-            Write-Output "Error: $($_.Exception.Message)"
-            Write-Output ""
-            Write-Output "Possible solutions:"
-            Write-Output "1. Restart PowerShell completely and try again"
-            Write-Output "2. Run: Disconnect-MgGraph; Connect-MgGraph -Scopes 'Directory.Read.All','RoleManagement.Read.Directory','RoleAssignmentSchedule.Read.Directory','RoleEligibilitySchedule.Read.Directory'"
-            Write-Output "3. Check if admin consent is required"
-            Write-Output ""
-            Write-Output "Some Identity and Access Management assessments will not work."
-        }
+        Write-Output "Graph: Connection failed - $($_.Exception.Message)"
     }
 }
 
 function Get-AzData {
-    Write-Output "Getting data from Azure..."
+    # Import required modules (Az.Profile não é necessário)
+    Import-Module Az.Resources -Force -ErrorAction SilentlyContinue
 
-    # Initialize global object
     $global:AzData = [PSCustomObject]@{
-        Tenant           = Get-AzTenant -TenantId $TenantId
+        Tenant = Get-AzTenant -TenantId $global:TenantId
         ManagementGroups = @()
-        Subscriptions    = Get-AzSubscription -TenantId $TenantId
-        Resources        = @()
-        Policies         = @()
-        Users            = @()
+        Subscriptions = Get-AzSubscription -TenantId $global:TenantId
+        Resources = @()
+        Policies = @()
     }
 
-    # Get Management Groups with error handling to prevent blocking
+    # Get Management Groups
     try {
-        Write-Output "Retrieving Management Groups..."
-        $managementGroups = Get-AzManagementGroup -ErrorAction SilentlyContinue
-        if ($managementGroups) {
-            foreach ($mg in $managementGroups) {
-                try {
-                    $detailedMG = Get-AzManagementGroup -GroupName $mg.Name -ErrorAction SilentlyContinue
-                    if ($detailedMG) {
-                        $global:AzData.ManagementGroups += $detailedMG
-                    }
-                }
-                catch {
-                    Write-Warning "Unable to retrieve details for Management Group: $($mg.Name). Skipping..."
-                }
-            }
-        }
-        else {
-            Write-Output "No Management Groups found or insufficient permissions."
+        $mgs = Get-AzManagementGroup -ErrorAction SilentlyContinue
+        foreach ($mg in $mgs) {
+            $detailed = Get-AzManagementGroup -GroupName $mg.Name -ErrorAction SilentlyContinue
+            if ($detailed) { $global:AzData.ManagementGroups += $detailed }
         }
     }
     catch {
-        Write-Warning "Error retrieving Management Groups: $($_.Exception.Message). Continuing without MG data..."
+        Write-Warning "Management Groups: $($_.Exception.Message)"
     }
 
-    # Get Policy Assignments with timeout protection
+    # Get Policy Assignments
     try {
-        Write-Output "Retrieving Policy Assignments..."
-        
-        # Get policies from Management Groups
-        foreach ($mg in $global:AzData.ManagementGroups) {
-            try {
-                $policyAssignments = Get-AzPolicyAssignment -Scope $mg.Id -ErrorAction SilentlyContinue
-                if ($policyAssignments) {
-                    $global:AzData.Policies += $policyAssignments
-                }
-            }
-            catch {
-                Write-Warning "Could not retrieve policies for MG: $($mg.Name)"
-            }
-        }
-
-        # Get general policy assignments
-        $policyAssignments = Get-AzPolicyAssignment -ErrorAction SilentlyContinue
-        if ($policyAssignments) {
-            $global:AzData.Policies += $policyAssignments
-        }
+        $global:AzData.Policies = Get-AzPolicyAssignment -ErrorAction SilentlyContinue
     }
     catch {
-        Write-Warning "Error retrieving Policy Assignments: $($_.Exception.Message)"
+        Write-Warning "Policies: $($_.Exception.Message)"
     }
 
-    # Get Resources from subscriptions with better error handling
-    $subscriptionCount = $global:AzData.Subscriptions.Count
-    $currentSub = 0
-    
-    foreach ($subscription in $global:AzData.Subscriptions) {
-        $currentSub++
-        Write-Output "Getting data for subscription [$currentSub/$subscriptionCount]: $($subscription.Name)"
+    # Get Resources from all subscriptions
+    $subCount = $global:AzData.Subscriptions.Count
+    for ($i = 0; $i -lt $subCount; $i++) {
+        $sub = $global:AzData.Subscriptions[$i]
+        Write-Output "  Subscription [$($i+1)/$subCount]: $($sub.Name)"
         
         try {
-            Set-AzContext -Subscription $subscription.Id -Tenant $TenantId -ErrorAction Stop
-            
-            # Get resources with timeout protection
+            Set-AzContext -Subscription $sub.Id -Tenant $global:TenantId -ErrorAction Stop | Out-Null
             $resources = Get-AzResource -ErrorAction SilentlyContinue
-            if ($resources) {
-                $global:AzData.Resources += $resources
-                Write-Output "  - Retrieved $($resources.Count) resources"
-            }
-            else {
-                Write-Output "  - No resources found in this subscription"
-            }
+            if ($resources) { $global:AzData.Resources += $resources }
         }
         catch {
-            Write-Warning "  - Error accessing subscription $($subscription.Name): $($_.Exception.Message)"
-            continue
+            Write-Warning "  Failed: $($_.Exception.Message)"
         }
     }
     
-    Write-Output "Data collection completed. Found $($global:AzData.Resources.Count) total resources across $($global:AzData.Subscriptions.Count) subscriptions."
+    Write-Output "Azure data: $($global:AzData.Resources.Count) resources, $($global:AzData.Subscriptions.Count) subscriptions"
 }
 
 function Set-GlobalChecklist {
-    Write-Output "Setting global checklist..."
     $configPath = "$PSScriptRoot/../shared/config.json"
     $config = Get-Content -Path $configPath | ConvertFrom-Json
     $checklistPath = "$PSScriptRoot/../shared/$($config.AlzChecklist)"
-    $checklists = Get-Content -Path $checklistPath | ConvertFrom-Json
-    $global:Checklist = $checklists
+    $global:Checklist = Get-Content -Path $checklistPath | ConvertFrom-Json
     $global:ChecklistPath = $checklistPath
 }
 
 function New-ReportFolder {
-    Write-Output "Ensuring 'reports' folder exists and clearing previous log files..."
-
-    # Define the reports directory path
     $reportsDirectory = "$PSScriptRoot/../reports"
-    $errorLogPath = Join-Path -Path $reportsDirectory -ChildPath "ErrorLog.json"
-    $reportPath = Join-Path -Path $reportsDirectory -ChildPath "report.json"
-
-    # Check if the reports directory exists; if not, create it
+    
     if (!(Test-Path -Path $reportsDirectory)) {
-        New-Item -ItemType Directory -Path $reportsDirectory -Force
-        Write-Output "Created 'reports' folder."
+        New-Item -ItemType Directory -Path $reportsDirectory -Force | Out-Null
     }
 
-    # Remove ErrorLog.json if it exists
-    if (Test-Path -Path $errorLogPath) {
-        Remove-Item -Path $errorLogPath -Force
-        Write-Output "Deleted 'ErrorLog.json'."
-    }
-
-    # Remove report.json if it exists
-    if (Test-Path -Path $reportPath) {
-        Remove-Item -Path $reportPath -Force
-        Write-Output "Deleted 'report.json'."
+    @("ErrorLog.json", "report.json") | ForEach-Object {
+        $filePath = Join-Path -Path $reportsDirectory -ChildPath $_
+        if (Test-Path -Path $filePath) {
+            Remove-Item -Path $filePath -Force
+        }
     }
 }
 
 
 
 function Initialize-Environment {
-    Write-Output "=== Starting Azure Landing Zone Assessment Initialization ==="
-    $initStartTime = Get-Date
+    Write-Output "=== Azure Landing Zone Assessment Initialization ==="
+    $startTime = Get-Date
     
-    Write-Output "Step 1/5: Installing and checking Azure modules..."
-    $moduleStartTime = Get-Date
+    # Check for potential conflicts early with clear guidance
+    $hasConflicts = Test-ModuleConflicts
+    
+    Write-Output "Step 1/6: Checking modules..."
     Get-AzModules
-    $moduleEndTime = Get-Date
-    Write-Output "Modules completed in $([math]::Round(($moduleEndTime - $moduleStartTime).TotalSeconds, 2)) seconds"
     
-    Write-Output "Step 2/5: Setting up global checklist..."
+    Write-Output "Step 2/6: Loading checklist..."
     Set-GlobalChecklist
     
-    Write-Output "Step 3/5: Connecting to Azure and Microsoft Graph..."
-    $connectStartTime = Get-Date
+    Write-Output "Step 3/6: Connecting to Azure and Graph..."
     Initialize-Connect
-    $connectEndTime = Get-Date
-    Write-Output "Connection completed in $([math]::Round(($connectEndTime - $connectStartTime).TotalSeconds, 2)) seconds"
     
-    Write-Output "Step 4/5: Collecting Azure data..."
-    $dataStartTime = Get-Date
+    Write-Output "Step 4/6: Collecting Azure data..."
     Get-AzData
-    $dataEndTime = Get-Date
-    Write-Output "Data collection completed in $([math]::Round(($dataEndTime - $dataStartTime).TotalSeconds, 2)) seconds"
     
-    Write-Output "Step 5/5: Preparing report folder..."
+    Write-Output "Step 5/6: Collecting Graph data..."
+    Get-GraphData
+    
+    Write-Output "Step 6/6: Preparing reports..."
     New-ReportFolder
     
-    $initEndTime = Get-Date
-    $totalTime = [math]::Round(($initEndTime - $initStartTime).TotalSeconds, 2)
-    Write-Output "=== Initialization completed successfully in $totalTime seconds ==="
+    $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
+    Write-Output "=== Initialization completed in $duration seconds ==="
+    
+    # Final status summary
+    if ($global:GraphConnected) {
+        Write-Output "  Status: Full assessment with Azure + Graph data"
+    } else {
+        Write-Output "  Status: Limited assessment (Azure data only)"
+        if ($hasConflicts) {
+            Write-Output "   → For complete assessment: restart PowerShell and try again"
+        }
+    }
 }
 
+# Function to check for potential assembly conflicts
+function Test-ModuleConflicts {
+    $loadedGraphModules = Get-Module Microsoft.Graph* -ErrorAction SilentlyContinue
+    if ($loadedGraphModules) {
+        Write-Output "⚠️  Microsoft Graph modules already loaded: $($loadedGraphModules.Name -join ', ')"
+        Write-Output "⚠️  This may cause assembly conflicts. For full Graph support:"
+        Write-Output "   1. Close this PowerShell session completely"
+        Write-Output "   2. Open fresh PowerShell session" 
+        Write-Output "   3. Run the assessment again"
+        Write-Output ""
+        return $true
+    }
+    return $false
+}
+
+# Function to collect and cache all Microsoft Graph data
+function Get-GraphData {
+    if (-not $global:GraphConnected) {
+        Write-Output "Graph: Not connected, skipping data collection"
+        $global:GraphData = @{}
+        return
+    }    # Import all Graph modules at once - only if not already loaded
+    $graphModules = @(
+        'Microsoft.Graph.Identity.DirectoryManagement', 'Microsoft.Graph.Users',
+        'Microsoft.Graph.Groups', 'Microsoft.Graph.Applications',
+        'Microsoft.Graph.Identity.Governance', 'Microsoft.Graph.Identity.SignIns'
+    )
+
+    try {
+        $graphModules | ForEach-Object {
+            if (-not (Get-Module $_ -ErrorAction SilentlyContinue)) {
+                Import-Module $_ -Force -ErrorAction Stop
+            }
+        }
+    }
+    catch {
+        Write-Warning "Failed to import Graph modules: $($_.Exception.Message)"
+        $global:GraphData = @{}
+        return
+    }
+
+    $global:GraphData = @{}
+
+    # Collect data with minimal logging
+    $dataTypes = @{
+        'Organization' = { Get-MgOrganization -ErrorAction SilentlyContinue }
+        'Users' = { Get-MgUser -All -ErrorAction SilentlyContinue }
+        'Groups' = { Get-MgGroup -All -ErrorAction SilentlyContinue }
+        'Applications' = { Get-MgApplication -All -ErrorAction SilentlyContinue }
+        'ServicePrincipals' = { Get-MgServicePrincipal -All -ErrorAction SilentlyContinue }
+        'DirectoryRoles' = { Get-MgDirectoryRole -All -ErrorAction SilentlyContinue }
+        'Domains' = { Get-MgDomain -All -ErrorAction SilentlyContinue }
+        'RoleDefinitions' = { Get-MgRoleManagementDirectoryRoleDefinition -All -ErrorAction SilentlyContinue }
+        'RoleAssignments' = { Get-MgRoleManagementDirectoryRoleAssignment -All -ErrorAction SilentlyContinue }
+        'ConditionalAccessPolicies' = { Get-MgIdentityConditionalAccessPolicy -All -ErrorAction SilentlyContinue }
+        'NamedLocations' = { Get-MgIdentityConditionalAccessNamedLocation -All -ErrorAction SilentlyContinue }
+        'AuthenticationMethodPolicies' = { Get-MgPolicyAuthenticationMethodPolicy -ErrorAction SilentlyContinue }
+        'SecurityDefaultsPolicy' = { Get-MgPolicyIdentitySecurityDefaultEnforcementPolicy -ErrorAction SilentlyContinue }
+        'AccessReviews' = { Get-MgIdentityGovernanceAccessReviewDefinition -All -ErrorAction SilentlyContinue }
+    }
+
+    $collected = 0
+    $dataTypes.GetEnumerator() | ForEach-Object {
+        try {
+            $data = & $_.Value
+            $global:GraphData[$_.Key] = $data
+            if ($data -is [Array]) { $collected += $data.Count }
+            elseif ($null -ne $data) { $collected++ }
+        }
+        catch {
+            Write-Warning "$($_.Key): $($_.Exception.Message)"
+            $global:GraphData[$_.Key] = if ($_.Key -in @('Organization', 'AuthenticationMethodPolicies', 'SecurityDefaultsPolicy')) { $null } else { @() }
+        }
+    }
+
+    Write-Output "Graph data: $collected items collected"
+}

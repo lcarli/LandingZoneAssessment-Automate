@@ -914,8 +914,7 @@ function Replace-ErrorLogDataPlaceholder {
       # Replace the placeholder with the escaped JSON content
       return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
   } else {
-      Write-Warning "Error log file not found at $ErrorLogPath - using empty error log"
-      # Return HTML with empty error log data
+      # No error log file is normal - use empty error log silently
       $emptyErrorLog = '{"errorsArray": []}'
       return $HTMLContent -replace "__ERRORLOGDATA__", $emptyErrorLog
   }
