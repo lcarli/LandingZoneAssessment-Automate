@@ -124,3 +124,55 @@ function Measure-ExecutionTime {
     $executionTime = $endTime - $startTime
     Write-Output "Function '$FunctionName' Execution Time: $($executionTime.TotalSeconds) seconds"
 }
+
+# Helper function to test if a cmdlet is available
+function Test-CmdletAvailable {
+    param(
+        [string]$CmdletName,
+        [string]$ModuleName = $null
+    )
+    
+    try {
+        $cmd = Get-Command $CmdletName -ErrorAction SilentlyContinue
+        if ($cmd) {
+            return $true
+        }
+        
+        # If module name is provided, try to import it
+        if ($ModuleName) {
+            Import-Module $ModuleName -Force -ErrorAction SilentlyContinue
+            $cmd = Get-Command $CmdletName -ErrorAction SilentlyContinue
+            return $null -ne $cmd
+        }
+        
+        return $false
+    }
+    catch {
+        return $false
+    }
+}
+
+# Helper function to safely execute Azure cmdlets with fallback
+function Invoke-AzCmdletSafely {
+    param(
+        [scriptblock]$ScriptBlock,
+        [string]$CmdletName,
+        [string]$ModuleName = $null,
+        [object]$FallbackValue = $null,
+        [string]$WarningMessage = "Cmdlet not available"
+    )
+    
+    if (Test-CmdletAvailable -CmdletName $CmdletName -ModuleName $ModuleName) {
+        try {
+            return & $ScriptBlock
+        }
+        catch {
+            Write-Output "  Warning: $WarningMessage - $($_.Exception.Message)"
+            return $FallbackValue
+        }
+    }
+    else {
+        Write-Output "  Warning: $CmdletName not available. Install module: $ModuleName"
+        return $FallbackValue
+    }
+}

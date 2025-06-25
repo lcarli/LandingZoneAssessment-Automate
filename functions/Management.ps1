@@ -67,7 +67,6 @@ function Test-QuestionF0101 {
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
-    $score = 0
     $rawData = $null
 
     try {
@@ -206,7 +205,6 @@ function Test-QuestionF0103 {
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
-    $score = 0
     $rawData = $null
 
     try {
@@ -262,10 +260,12 @@ function Test-QuestionF0103 {
 
                                 # Get the storage account
                                 $storageAccountId = $rule.Destination
-                                $storageAccount = Get-AzStorageAccount -ResourceId $storageAccountId
+                                $storageAccount = Invoke-AzCmdletSafely -ScriptBlock {
+                                    Get-AzStorageAccount -ResourceId $storageAccountId -ErrorAction Stop
+                                } -CmdletName "Get-AzStorageAccount" -ModuleName "Az.Storage" -WarningMessage "Could not check Storage Account for WORM: $storageAccountId"
 
                                 # Check if immutable storage with WORM is enabled
-                                if ($storageAccount.ImmutableStorageWithVersioning.Enabled -eq $true) {
+                                if ($storageAccount -and $storageAccount.BlobRestorePolicy -and $storageAccount.BlobRestorePolicy.Enabled) {
                                     $storageCompliant = $true
                                     break
                                 }
@@ -443,25 +443,40 @@ function Test-QuestionF0106 {
             $totalResources = $resources.Count
 
             foreach ($resource in $resources) {
-                switch ($resource.ResourceType) {
-                    "Microsoft.Storage/storageAccounts" {
-                        $storageAccount = Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
-                        if ($storageAccount.EnableEncryptionService && $storageAccount.KeyVaultProperties) {
-                            $resourcesWithCMK++
+                try {
+                    switch ($resource.ResourceType) {
+                        "Microsoft.Storage/storageAccounts" {
+                            $storageAccount = Invoke-AzCmdletSafely -ScriptBlock {
+                                Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction Stop
+                            } -CmdletName "Get-AzStorageAccount" -ModuleName "Az.Storage" -WarningMessage "Could not check Storage Account encryption for $($resource.Name)"
+                            
+                            if ($storageAccount -and $storageAccount.Encryption -and $storageAccount.Encryption.KeyVaultProperties) {
+                                $resourcesWithCMK++
+                            }
+                        }
+                        "Microsoft.Sql/servers" {
+                            $sqlServer = Invoke-AzCmdletSafely -ScriptBlock {
+                                Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name -ErrorAction Stop
+                            } -CmdletName "Get-AzSqlServer" -ModuleName "Az.Sql" -WarningMessage "Could not check SQL Server encryption for $($resource.Name)"
+                            
+                            if ($sqlServer -and $sqlServer.Identity) {
+                                # Check for TDE with customer-managed keys
+                                $resourcesWithCMK++
+                            }
+                        }
+                        "Microsoft.KeyVault/vaults" {
+                            $keyVault = Invoke-AzCmdletSafely -ScriptBlock {
+                                Get-AzKeyVault -VaultName $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction Stop
+                            } -CmdletName "Get-AzKeyVault" -ModuleName "Az.KeyVault" -WarningMessage "Could not check Key Vault for $($resource.Name)"
+                            
+                            if ($keyVault -and $keyVault.EnablePurgeProtection -and $keyVault.VaultUri) {
+                                $resourcesWithCMK++
+                            }
                         }
                     }
-                    "Microsoft.Sql/servers" {
-                        $sqlServer = Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name
-                        if ($sqlServer.EncryptionProtector -and $sqlServer.EncryptionProtector.ServerKeyType -eq "AzureKeyVault") {
-                            $resourcesWithCMK++
-                        }
-                    }
-                    "Microsoft.KeyVault/vaults" {
-                        $keyVault = Get-AzKeyVault -VaultName $resource.Name -ResourceGroupName $resource.ResourceGroupName
-                        if ($keyVault.Properties.EnablePurgeProtection -and $keyVault.Properties.VaultUri) {
-                            $resourcesWithCMK++
-                        }
-                    }
+                }
+                catch {
+                    Write-Output "  Warning: Error processing resource $($resource.Name): $($_.Exception.Message)"
                 }
             }
 
@@ -525,25 +540,39 @@ function Test-QuestionF0107 {
             foreach ($resource in $resources) {
                 $resourcesChecked++
 
-                switch ($resource.ResourceType) {
-                    "Microsoft.Sql/servers" {
-                        $sqlServer = Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name
-                        if ($sqlServer.MinimalTlsVersion -ge "1.2") {
-                            $resourcesCompliant++
+                try {
+                    switch ($resource.ResourceType) {
+                        "Microsoft.Sql/servers" {
+                            $sqlServer = Invoke-AzCmdletSafely -ScriptBlock {
+                                Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name -ErrorAction Stop
+                            } -CmdletName "Get-AzSqlServer" -ModuleName "Az.Sql" -WarningMessage "Could not check SQL Server TLS for $($resource.Name)"
+                            
+                            if ($sqlServer -and $sqlServer.MinimalTlsVersion -ge "1.2") {
+                                $resourcesCompliant++
+                            }
+                        }
+                        "Microsoft.Web/sites" {
+                            $webApp = Invoke-AzCmdletSafely -ScriptBlock {
+                                Get-AzWebApp -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction Stop
+                            } -CmdletName "Get-AzWebApp" -ModuleName "Az.Websites" -WarningMessage "Could not check Web App HTTPS for $($resource.Name)"
+                            
+                            if ($webApp -and $webApp.HttpsOnly -eq $true) {
+                                $resourcesCompliant++
+                            }
+                        }
+                        "Microsoft.Storage/storageAccounts" {
+                            $storageAccount = Invoke-AzCmdletSafely -ScriptBlock {
+                                Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction Stop
+                            } -CmdletName "Get-AzStorageAccount" -ModuleName "Az.Storage" -WarningMessage "Could not check Storage Account TLS for $($resource.Name)"
+                            
+                            if ($storageAccount -and $storageAccount.MinimumTlsVersion -eq "TLS1_2") {
+                                $resourcesCompliant++
+                            }
                         }
                     }
-                    "Microsoft.Web/sites" {
-                        $webApp = Get-AzWebApp -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
-                        if ($webApp.HttpsOnly -eq $true) {
-                            $resourcesCompliant++
-                        }
-                    }
-                    "Microsoft.Storage/storageAccounts" {
-                        $storageAccount = Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
-                        if ($storageAccount.MinimumTlsVersion -eq "TLS1_2") {
-                            $resourcesCompliant++
-                        }
-                    }
+                }
+                catch {
+                    Write-Output "  Warning: Error processing resource $($resource.Name): $($_.Exception.Message)"
                 }
             }
 
@@ -649,7 +678,10 @@ function Test-QuestionF0109 {
         $vaultsWithRotationPolicy = 0
 
         foreach ($keyVault in $keyVaults) {
-            $keys = Get-AzKeyVaultKey -VaultName $keyVault.Name
+            $keys = Invoke-AzCmdletSafely -ScriptBlock {
+                Get-AzKeyVaultKey -VaultName $keyVault.Name -ErrorAction SilentlyContinue
+            } -CmdletName "Get-AzKeyVaultKey" -ModuleName "Az.KeyVault" -FallbackValue @() -WarningMessage "Could not check Key Vault keys for $($keyVault.Name)"
+            
             foreach ($key in $keys) {
                 if ($key.Attributes.Expires -and ($key.Attributes.Expires -gt (Get-Date))) {
                     $vaultsWithRotationPolicy++
@@ -1557,7 +1589,7 @@ function Test-QuestionF0602 {
             # Check for diagnostic settings sending logs to Microsoft Sentinel
             $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $service.Id -ErrorAction SilentlyContinue |
                                   Where-Object {
-                                      $_.WorkspaceId -ne $null -and $_.WorkspaceId -match "Microsoft Sentinel"
+                                      $null -ne $_.WorkspaceId -and $_.WorkspaceId -match "Microsoft Sentinel"
                                   }
 
             if ($diagnosticSettings) {

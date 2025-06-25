@@ -139,3 +139,89 @@ The final output is an interactive web page (`web/index.html`) that includes:
 ## License
 
 This project is licensed under the terms specified in the `LICENSE` file. Feel free to contribute and extend the project!
+
+## Prerequisites and Module Management
+
+### PowerShell Requirements
+- PowerShell 5.1 or PowerShell Core 7.x
+- Appropriate permissions to read Azure resources and Microsoft Entra ID
+
+### Module Installation Strategy
+This project uses an **optimized module management strategy** for better performance and reliability:
+
+#### What Gets Installed
+- **`Az` meta-module**: This single module includes ALL Azure PowerShell sub-modules
+- **Microsoft Graph modules**: Installed individually as they're separate from Az
+  - `Microsoft.Graph.Authentication`
+  - `Microsoft.Graph.Identity.DirectoryManagement`
+  - `Microsoft.Graph.Users`
+  - `Microsoft.Graph.Groups`
+  - `Microsoft.Graph.Applications`
+  - `Microsoft.Graph.Identity.Governance`
+  - `Microsoft.Graph.Identity.SignIns`
+
+#### What Gets Imported
+Only the specific Azure sub-modules actually used by the assessment:
+- `Az.Accounts`, `Az.Resources`, `Az.Monitor`, `Az.Billing`
+- `Az.Network`, `Az.Storage`, `Az.Sql`, `Az.KeyVault`, `Az.Websites`
+
+#### Benefits
+- **Faster installation**: Only install `Az` meta-module instead of individual sub-modules
+- **Better performance**: Only load modules actually used
+- **Easier maintenance**: No need to track individual sub-modules for installation
+- **Backwards compatible**: All Az cmdlets available if needed
+
+### Manual Installation (if needed)
+If automatic installation fails, run these commands:
+
+```powershell
+# Install core modules
+Install-Module -Name Az -Scope CurrentUser -Force -AllowClobber
+
+# Install Microsoft Graph modules
+Install-Module -Name Microsoft.Graph.Authentication -Scope CurrentUser -Force
+Install-Module -Name Microsoft.Graph.Identity.DirectoryManagement -Scope CurrentUser -Force
+Install-Module -Name Microsoft.Graph.Users -Scope CurrentUser -Force
+Install-Module -Name Microsoft.Graph.Groups -Scope CurrentUser -Force
+Install-Module -Name Microsoft.Graph.Applications -Scope CurrentUser -Force
+Install-Module -Name Microsoft.Graph.Identity.Governance -Scope CurrentUser -Force
+Install-Module -Name Microsoft.Graph.Identity.SignIns -Scope CurrentUser -Force
+```
+
+---
+
+## Troubleshooting
+
+### Common Module Issues
+
+#### "Cmdlet not recognized" errors
+If you see errors like `Get-AzStorageAccount: The term 'Get-AzStorageAccount' is not recognized`:
+
+1. **Check if Az module is installed**:
+   ```powershell
+   Get-Module Az -ListAvailable
+   ```
+
+2. **Install if missing**:
+   ```powershell
+   Install-Module -Name Az -Scope CurrentUser -Force -AllowClobber
+   ```
+
+3. **Restart PowerShell** and run the assessment again
+
+#### Assembly conflicts with Microsoft Graph modules
+If you see assembly loading warnings:
+
+1. **Close all PowerShell sessions**
+2. **Start a fresh PowerShell session**
+3. **Run the assessment script directly** without manually importing modules
+
+#### Performance issues
+- The script automatically imports only required sub-modules for better performance
+- If you need additional Az cmdlets, they're available through the installed Az meta-module
+- For best performance, avoid manually importing additional modules
+
+#### Permission issues
+- Ensure your account has appropriate read permissions for Azure resources
+- Some assessments require special permissions (e.g., diagnostic settings for Entra ID)
+- The script gracefully handles missing permissions and marks items as "Unknown" where access is not available

@@ -12,19 +12,26 @@
     lramoscostah@microsoft.com
 #>
 
-# Removed InstallAndImportModule function - functionality integrated into Get-AzModules
-
-function Get-AzModules {    # Disable module auto-loading to prevent conflicts
+function Get-AzModules {
+    # Disable module auto-loading to prevent conflicts
     $global:PSModuleAutoLoadingPreference = 'None'    
+    
+    # Required modules: Only Az meta-module and specific Graph modules
     $requiredModules = @(
-        'Az.Accounts', 'Az.Resources', 'Az.Monitor', 'Az.Billing',
+        'Az'  # Meta-module that includes all Az.* modules - only this needs to be installed
+    )
+    
+    # Microsoft Graph modules (install individually as they're not part of Az)
+    $graphModules = @(
         'Microsoft.Graph.Authentication', 'Microsoft.Graph.Identity.DirectoryManagement',
         'Microsoft.Graph.Users', 'Microsoft.Graph.Groups', 'Microsoft.Graph.Applications',
         'Microsoft.Graph.Identity.Governance', 'Microsoft.Graph.Identity.SignIns'
     )
     
+    $allRequiredModules = $requiredModules + $graphModules
+    
     # Check missing modules
-    $missingModules = $requiredModules | Where-Object { 
+    $missingModules = $allRequiredModules | Where-Object { 
         -not (Get-Module -ListAvailable -Name $_ -ErrorAction SilentlyContinue) 
     }
     
@@ -35,6 +42,7 @@ function Get-AzModules {    # Disable module auto-loading to prevent conflicts
         if (Get-Command Install-Module -ErrorAction SilentlyContinue) {
             try {
                 $missingModules | ForEach-Object {
+                    Write-Output "Installing module: $_"
                     Install-Module -Name $_ -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
                 }
                 Write-Output "Modules installed successfully"
@@ -67,6 +75,10 @@ function Initialize-Connect {
     try {
         $config = Get-Content -Path $configPath | ConvertFrom-Json
         $global:TenantId = $config.TenantId
+        $global:DefaultRegion = $config.DefaultRegion
+        if (-not $global:DefaultRegion) {
+            $global:DefaultRegion = "eastus2"  # Fallback default
+        }
     }
     catch {
         Write-Error "Failed to read config file: $($_.Exception.Message)"
@@ -149,12 +161,30 @@ function Initialize-Connect {
 }
 
 function Get-AzData {
-    # Import required modules (Az.Monitor and Az.Billing for diagnostics and billing)
-    # Note: Az.Consumption module has been discontinued in newer Az PowerShell versions
-    Import-Module Az.Resources, Az.Monitor, Az.Billing -Force -ErrorAction SilentlyContinue
+    # Import specific Az modules that we need - the Az meta-module includes all of these
+    # Only import specific modules to avoid loading unnecessary ones and improve performance
+    # Import only the specific Az sub-modules we need (for performance)
+    # Note: Az meta-module is installed but we import only what we use
+    $azSubModules = @('Az.Accounts', 'Az.Resources', 'Az.Monitor', 'Az.Billing', 'Az.Network', 'Az.Storage', 'Az.Sql', 'Az.KeyVault', 'Az.Websites')
     
-    # Az.Consumption functionality has been moved to Az.Billing in newer versions
-    Write-Verbose "Using Az.Billing for consumption/budget operations (Az.Consumption deprecated)"
+    try {
+        Write-Output "Importing required Az sub-modules..."
+        Import-Module $azSubModules -Force -ErrorAction Stop
+        Write-Output "Az modules imported successfully"
+    }
+    catch {
+        Write-Warning "Failed to import some Az modules: $($_.Exception.Message)"
+        # Try importing one by one to identify which ones fail
+        foreach ($module in $azSubModules) {
+            try {
+                Import-Module $module -Force -ErrorAction Stop
+                Write-Output "  ✓ $module imported"
+            }
+            catch {
+                Write-Warning "  ✗ Failed to import $module : $($_.Exception.Message)"
+            }
+        }
+    }
 
     $global:AzData = [PSCustomObject]@{
         Tenant = Get-AzTenant -TenantId $global:TenantId

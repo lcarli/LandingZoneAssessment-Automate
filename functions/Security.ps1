@@ -343,12 +343,22 @@ function Test-QuestionG0204 {
         } else {
             # Check Key Vault configuration for certificates, secrets, keys, and tags
             $vaultStatus = $keyVaults | ForEach-Object {
+                $vault = $_
                 [PSCustomObject]@{
-                    VaultName       = $_.Name
-                    HasCertificates = $null -ne ($_ | Get-AzKeyVaultCertificate -ErrorAction SilentlyContinue)
-                    HasSecrets      = $null -ne ($_ | Get-AzKeyVaultSecret -ErrorAction SilentlyContinue)
-                    HasKeys         = $null -ne ($_ | Get-AzKeyVaultKey -ErrorAction SilentlyContinue)
-                    HasTags         = ($null -ne $_.Tags -and $_.Tags.Count -gt 0)
+                    VaultName       = $vault.Name
+                    HasCertificates = Invoke-AzCmdletSafely -ScriptBlock {
+                        $certs = Get-AzKeyVaultCertificate -VaultName $vault.Name -ErrorAction SilentlyContinue
+                        return $null -ne $certs -and $certs.Count -gt 0
+                    } -CmdletName "Get-AzKeyVaultCertificate" -ModuleName "Az.KeyVault" -FallbackValue $false
+                    HasSecrets      = Invoke-AzCmdletSafely -ScriptBlock {
+                        $secrets = Get-AzKeyVaultSecret -VaultName $vault.Name -ErrorAction SilentlyContinue
+                        return $null -ne $secrets -and $secrets.Count -gt 0
+                    } -CmdletName "Get-AzKeyVaultSecret" -ModuleName "Az.KeyVault" -FallbackValue $false
+                    HasKeys         = Invoke-AzCmdletSafely -ScriptBlock {
+                        $keys = Get-AzKeyVaultKey -VaultName $vault.Name -ErrorAction SilentlyContinue
+                        return $null -ne $keys -and $keys.Count -gt 0
+                    } -CmdletName "Get-AzKeyVaultKey" -ModuleName "Az.KeyVault" -FallbackValue $false
+                    HasTags         = ($null -ne $vault.Tags -and $vault.Tags.Count -gt 0)
                 }
             }
 
@@ -416,7 +426,9 @@ function Test-QuestionG0205 {
                 
                 try {
                     # Get all certificates in the Key Vault
-                    $certificates = Get-AzKeyVaultCertificate -VaultName $keyVault.Name -ErrorAction SilentlyContinue
+                    $certificates = Invoke-AzCmdletSafely -ScriptBlock {
+                        Get-AzKeyVaultCertificate -VaultName $keyVault.Name -ErrorAction SilentlyContinue
+                    } -CmdletName "Get-AzKeyVaultCertificate" -ModuleName "Az.KeyVault" -FallbackValue @()
                     
                     if ($certificates.Count -gt 0) {
                         foreach ($cert in $certificates) {
@@ -426,12 +438,23 @@ function Test-QuestionG0205 {
                             
                             # Get the certificate issuer - this indicates if it's using a public CA
                             try {
-                                $issuer = Get-AzKeyVaultCertificateIssuer -VaultName $keyVault.Name -Name $cert.Certificate.Issuer.Split("=")[1].Split(",")[0] -ErrorAction SilentlyContinue
+                                $issuerName = if ($cert.Certificate.Issuer -and $cert.Certificate.Issuer.Contains("=")) {
+                                    $cert.Certificate.Issuer.Split("=")[1].Split(",")[0]
+                                } else {
+                                    "Unknown"
+                                }
+                                
+                                $issuer = Invoke-AzCmdletSafely -ScriptBlock {
+                                    Get-AzKeyVaultCertificateIssuer -VaultName $keyVault.Name -Name $issuerName -ErrorAction SilentlyContinue
+                                } -CmdletName "Get-AzKeyVaultCertificateIssuer" -ModuleName "Az.KeyVault"
+                                
                                 $issuerInfo = $issuer
                                 
                                 # Check if certificate uses automated renewal
                                 # Automated certificates typically have an IssuerProvider set and policy with auto-renewal settings
-                                $policy = Get-AzKeyVaultCertificatePolicy -VaultName $keyVault.Name -Name $cert.Name -ErrorAction SilentlyContinue
+                                $policy = Invoke-AzCmdletSafely -ScriptBlock {
+                                    Get-AzKeyVaultCertificatePolicy -VaultName $keyVault.Name -Name $cert.Name -ErrorAction SilentlyContinue
+                                } -CmdletName "Get-AzKeyVaultCertificatePolicy" -ModuleName "Az.KeyVault"
                                 
                                 if ($issuer -and $issuer.IssuerProvider -and 
                                     $policy -and $policy.LifetimeActions -and 

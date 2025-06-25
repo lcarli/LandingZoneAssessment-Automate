@@ -62,13 +62,11 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
         [Parameter(Mandatory = $true)]
         [object]$Checklist
     )    Write-Output "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..."
-      # Import required Azure modules for billing assessment
-    try {
-        Import-Module Az.Billing -Force -ErrorAction Stop
-    }
-    catch {
-        Write-Warning "Failed to import Az.Billing module: $($_.Exception.Message)"
-        Write-Warning "Billing assessment may not work correctly without this module"
+    
+    # Note: Az.Billing module is imported in Initialize.ps1 for better performance
+    # Verify billing module is available before proceeding
+    if (-not (Test-CmdletAvailable -CmdletName 'Get-AzBillingAccount')) {
+        Write-Warning "Az.Billing module not properly loaded. Some billing assessments may not work correctly."
     }
 
     Measure-ExecutionTime -ScriptBlock {
