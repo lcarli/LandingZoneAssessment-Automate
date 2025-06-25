@@ -38,6 +38,7 @@ function Invoke-IdentityandAccessManagementAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.05") }) | Test-QuestionB0305
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.06") }) | Test-QuestionB0306
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.07") }) | Test-QuestionB0307
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.08") }) | Test-QuestionB0308
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.09") }) | Test-QuestionB0309
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.10") }) | Test-QuestionB0310
         $results += ($Checklist.items | Where-Object { ($_.id -eq "B03.11") }) | Test-QuestionB0311
@@ -159,7 +160,6 @@ function Test-QuestionB0301 {
     # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-
 function Test-QuestionB0302 {
     [CmdletBinding()]
     param(
@@ -247,7 +247,6 @@ function Test-QuestionB0302 {
     # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-
 function Test-QuestionB030201 {
     [CmdletBinding()]
     param(
@@ -342,7 +341,6 @@ function Test-QuestionB030201 {
     # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-
 function Test-QuestionB0303 {
     [CmdletBinding()]
     param(
@@ -438,7 +436,6 @@ function Test-QuestionB0303 {
     # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-
 function Test-QuestionB0304 {
     [CmdletBinding()]
     param(
@@ -562,7 +559,6 @@ function Test-QuestionB0304 {
     # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-
 function Test-QuestionB0305 {
     [CmdletBinding()]
     param(
@@ -688,7 +684,6 @@ function Test-QuestionB0305 {
     # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-
 function Test-QuestionB0306 {
     [CmdletBinding()]
     param(
@@ -790,7 +785,6 @@ function Test-QuestionB0306 {
     # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-
 function Test-QuestionB0307 {
     [CmdletBinding()]
     param(
@@ -1014,7 +1008,6 @@ function Test-QuestionB0307 {
     # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-
 function Test-QuestionB0308 {
     [CmdletBinding()]
     param(
@@ -1023,120 +1016,88 @@ function Test-QuestionB0308 {
     )
 
     Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
+    
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5
-    $score = 0
     $rawData = $null
 
     try {
-        # Question: When deploying Active Directory Domain Controllers, use a location with Availability Zones and deploy at least two VMs across these zones. If not available, deploy in an Availability Set.
-        # Reference: https://learn.microsoft.com/azure/virtual-machines/availability
+        # Question: Microsoft recommends that you use roles with the fewest permissions. Global Administrator is a highly privileged role that should be limited to emergency scenarios when you can't use an existing role.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/identity-access-landing-zones#microsoft-entra-id-recommendations
 
-        # Get region from global config or use default
-        $location = $global:DefaultRegion
-        if (-not $location) {
-            $location = "eastus2"  # Fallback default
-        }
-
-        # Get Domain Controller VMs from global resource data
-        # Look for VMs that might be Domain Controllers (by naming convention or resource group naming)
-        $dcVMs = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -eq "Microsoft.Compute/virtualMachines" -and
-            ($_.Name -like "*dc*" -or $_.Name -like "*domain*" -or 
-            $_.ResourceGroupName -like "*dc*" -or $_.ResourceGroupName -like "*domain*" -or
-            $_.ResourceGroupName -like "*identity*" -or $_.ResourceGroupName -like "*ad*")
-        }
-
-        if ($dcVMs.Count -eq 0) {
-            # No Domain Controller VMs found
-            $status = [Status]::NotApplicable
+        # Get all role assignments from Graph
+        $roleAssignments = $global:GraphData.RoleAssignments
+        $roleDefinitions = $global:GraphData.RoleDefinitions
+        
+        if (-not $roleAssignments -or $roleAssignments.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No role assignments found in Microsoft Entra ID."
             $estimatedPercentageApplied = 0
-            $rawData = @{
-                Message             = "No Domain Controller VMs detected. Assessment not applicable."
-                Location            = $location
-                DomainControllerVMs = 0
+        } else {
+            # Find Global Administrator role definition
+            $globalAdminRole = $roleDefinitions | Where-Object { 
+                $_.DisplayName -eq "Global Administrator" -or $_.RoleTemplateId -eq "62e90394-69f5-4237-9190-012177145e10" 
             }
-        }
-        else {
-            # Check availability zones in the region
-            # Note: We'll use a simplified approach since Get-AzAvailabilityZone requires specific module imports
-            # Known regions with Availability Zones (as of 2024)
-            $regionsWithAZ = @(
-                "eastus", "eastus2", "westus", "westus2", "westus3", "centralus", "northcentralus", "southcentralus",
-                "westcentralus", "canadacentral", "canadaeast", "brazilsouth", "northeurope", "westeurope",
-                "uksouth", "ukwest", "francecentral", "francesouth", "germanywestcentral", "norwayeast",
-                "switzerlandnorth", "swedencentral", "australiaeast", "australiasoutheast", "southeastasia",
-                "eastasia", "japaneast", "japanwest", "koreacentral", "koreasouth", "southafricanorth",
-                "centralindia", "southindia", "westindia", "uaenorth"
-            )
-
-            $locationHasAZ = $regionsWithAZ -contains $location.ToLower()
-
-            # For detailed VM information including Availability Zones and Sets, we need to make additional calls
-            # Since this is challenging with cached data, we'll use a more practical approach
             
-            $vmsInAZ = 0
-            $vmsInAvailabilitySet = 0
-            $totalDCVMs = $dcVMs.Count
-
-            # Get Availability Sets from global data
-            $availabilitySets = $global:AzData.Resources | Where-Object {
-                $_.ResourceType -eq "Microsoft.Compute/availabilitySets"
-            }
-
-            # For a simplified assessment, if the region supports AZ and we have multiple DCs, assume good practice
-            if ($locationHasAZ -and $totalDCVMs -ge 2) {
-                # If region has AZ and multiple DCs exist, assume best practice is followed
-                $status = [Status]::Implemented
-                $estimatedPercentageApplied = 85  # High confidence if multiple DCs in AZ-enabled region
-                $message = "Multiple Domain Controllers deployed in Availability Zone-enabled region. Assuming best practices."
-            }
-            elseif ($availabilitySets.Count -gt 0 -and $totalDCVMs -ge 2) {
-                # Multiple DCs and Availability Sets exist
-                $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = 70  # Good but not optimal (AZ preferred over AS)
-                $message = "Multiple Domain Controllers and Availability Sets found. Consider upgrading to Availability Zones if region supports them."
-            }
-            elseif ($totalDCVMs -ge 2) {
-                # Multiple DCs but unclear about high availability
-                $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = 50
-                $message = "Multiple Domain Controllers found but high availability configuration unclear."
-            }
-            else {
-                # Single DC - not following best practices
-                $status = [Status]::NotImplemented
+            if (-not $globalAdminRole) {
+                $status = [Status]::Error
+                $rawData = "Could not find Global Administrator role definition."
                 $estimatedPercentageApplied = 0
-                $message = "Only single Domain Controller found. Deploy at least two DCs with high availability."
-            }
-
-            $rawData = @{
-                Location                     = $location
-                LocationHasAvailabilityZones = $locationHasAZ
-                DomainControllerVMs          = $totalDCVMs
-                AvailabilitySets             = $availabilitySets.Count
-                Message                      = $message
-                DCVMNames                    = $dcVMs.Name -join ", "
+            } else {
+                # Count Global Administrator assignments
+                $globalAdminAssignments = $roleAssignments | Where-Object { 
+                    $_.RoleDefinitionId -eq $globalAdminRole.Id 
+                }
+                
+                $totalRoleAssignments = $roleAssignments.Count
+                $globalAdminCount = $globalAdminAssignments.Count
+                
+                # Microsoft recommends limiting Global Admin to 2-4 accounts maximum
+                $recommendedMaxGlobalAdmins = 4
+                
+                if ($globalAdminCount -eq 0) {
+                    $status = [Status]::Error
+                    $rawData = "No Global Administrator assignments found. At least one emergency access account should have Global Administrator role."
+                    $estimatedPercentageApplied = 0
+                } elseif ($globalAdminCount -le $recommendedMaxGlobalAdmins) {
+                    # Check if percentage of Global Admin assignments is reasonable (should be low)
+                    $globalAdminPercentage = ($globalAdminCount / $totalRoleAssignments) * 100
+                    
+                    if ($globalAdminPercentage -le 5) {  # Less than 5% of all role assignments should be Global Admin
+                        $status = [Status]::Implemented
+                        $estimatedPercentageApplied = 100
+                        $rawData = "Global Administrator role is appropriately limited with $globalAdminCount assignments out of $totalRoleAssignments total role assignments ($([Math]::Round($globalAdminPercentage, 2))%)."
+                    } else {
+                        $status = [Status]::PartiallyImplemented
+                        $estimatedPercentageApplied = 75
+                        $rawData = @{
+                            GlobalAdminCount = $globalAdminCount
+                            TotalRoleAssignments = $totalRoleAssignments
+                            GlobalAdminPercentage = [Math]::Round($globalAdminPercentage, 2)
+                            Message = "Global Administrator count is within recommended limits but represents a high percentage of total role assignments."
+                            GlobalAdminAssignments = $globalAdminAssignments
+                        }
+                    }
+                } else {
+                    $status = [Status]::NotImplemented
+                    $estimatedPercentageApplied = 25
+                    $rawData = @{
+                        GlobalAdminCount = $globalAdminCount
+                        RecommendedMax = $recommendedMaxGlobalAdmins
+                        TotalRoleAssignments = $totalRoleAssignments
+                        Message = "Too many Global Administrator assignments. Microsoft recommends limiting to $recommendedMaxGlobalAdmins or fewer accounts."
+                        GlobalAdminAssignments = $globalAdminAssignments
+                    }
+                }
             }
         }
-
-        # Calculate the score
-        $score = ($weight * $estimatedPercentageApplied) / 100
-    }
-    catch {
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
-        $score = 0
-        $rawData = @{
-            Error        = $_.Exception.Message
-            ErrorDetails = "Failed to assess Domain Controller availability configuration"
-        }
+        $rawData = $_.Exception.Message
     }
 
-    # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
@@ -1148,74 +1109,89 @@ function Test-QuestionB0309 {
     )
 
     Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
+    
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5
-    $score = 0
     $rawData = $null
 
     try {
-        # Question: Use Azure custom RBAC roles for the following key roles to provide fine-grain access across your ALZ: Azure platform owner, network management, security operations, subscription owner, application owner. Align these roles to teams and responsibilities within your business.
-        # Reference: https://learn.microsoft.com/azure/role-based-access-control/custom-roles
+        # Question: When deploying Active Directory Domain Controllers, use a location with Availability Zones and deploy at least two VMs across these zones. If not available, deploy in an Availability Set.
+        # Reference: https://learn.microsoft.com/azure/architecture/reference-architectures/identity/adds-extend-domain#vm-recommendations
 
-        # Get all custom roles in the tenant
-        $customRoles = Get-AzRoleDefinition | Where-Object { $_.IsCustom -eq $true }
-
-        # Define key roles that should be customized
-        $requiredRoles = @(
-            "Azure platform owner",
-            "Network management",
-            "Security operations",
-            "Subscription owner",
-            "Application owner"
-        )
-
-        # Check if each required role is represented in custom roles
-        $rolesFound = 0
-        $foundRoles = @()
-
-        foreach ($role in $requiredRoles) {
-            if ($customRoles.Name -contains $role) {
-                $rolesFound++
-                $foundRoles += $role
-            }
+        # Get all VMs that could be domain controllers
+        $domainControllerVMs = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.Compute/virtualMachines" -and (
+                $_.Name -like "*dc*" -or $_.Name -like "*domain*" -or 
+                $_.ResourceGroupName -like "*identity*" -or $_.ResourceGroupName -like "*ad*"
+            )
         }
 
-        # Calculate the percentage of required roles found
-        if ($rolesFound -eq $requiredRoles.Count) {
-            $status = [Status]::Implemented
+        if ($domainControllerVMs.Count -eq 0) {
+            $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        }
-        elseif ($rolesFound -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
+            $rawData = "No domain controller VMs found in this environment."
         }
         else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($rolesFound / $requiredRoles.Count) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
+            $totalDCs = $domainControllerVMs.Count
+            $dcsProperlyConfigured = 0
 
-        # Calculate the score
-        $score = ($weight * $estimatedPercentageApplied) / 100
+            foreach ($vm in $domainControllerVMs) {
+                try {
+                    $vmDetails = Get-AzVM -ResourceGroupName $vm.ResourceGroupName -Name $vm.Name -ErrorAction SilentlyContinue
+                    
+                    if ($vmDetails) {
+                        # Check for Availability Zones
+                        if ($vmDetails.Zones -and $vmDetails.Zones.Count -gt 0) {
+                            $dcsProperlyConfigured++
+                        }
+                        # Check for Availability Set
+                        elseif ($vmDetails.AvailabilitySetReference) {
+                            $dcsProperlyConfigured++
+                        }
+                    }
+                }
+                catch {
+                    Write-Verbose "Could not retrieve details for VM: $($vm.Name)"
+                }
+            }
 
-        # Prepare raw data
-        $rawData = @{
-            RequiredRoles = $requiredRoles
-            FoundRoles    = $foundRoles
-            CustomRoles   = $customRoles
+            if ($dcsProperlyConfigured -eq $totalDCs -and $totalDCs -ge 2) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalDomainControllers = $totalDCs
+                    ProperlyConfiguredDCs = $dcsProperlyConfigured
+                    Message = "All domain controllers are properly configured for high availability with Availability Zones or Sets."
+                }
+            }
+            elseif ($dcsProperlyConfigured -gt 0) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($dcsProperlyConfigured / $totalDCs) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+                $rawData = @{
+                    TotalDomainControllers = $totalDCs
+                    ProperlyConfiguredDCs = $dcsProperlyConfigured
+                    Message = "Some domain controllers are configured for high availability, but not all."
+                }
+            }
+            else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalDomainControllers = $totalDCs
+                    ProperlyConfiguredDCs = $dcsProperlyConfigured
+                    Message = "Domain controllers are not configured for high availability with Availability Zones or Sets."
+                }
+            }
         }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
-        $score = 0
         $rawData = $_.Exception.Message
     }
 
-    # Return result object using Set-EvaluationResultObject
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
@@ -1233,60 +1209,53 @@ function Test-QuestionB0310 {
     $rawData = $null
 
     try {
-        # Question: If planning to switch from Active Directory Domain Services to Entra domain services, evaluate the compatibility of all workloads.
-        # Reference: https://learn.microsoft.com/azure/active-directory-domain-services/overview
+        # Question: Deploy your Azure landing zone identity resources in multiple regions. If using domain controllers, associate each region with an Active Directory site so that resources can resolve to their local domain controllers.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/regions#identity
 
-        # Get all Custom RBAC Roles
-        $customRoles = Get-AzRoleDefinition | Where-Object { $_.IsCustom -eq $true }
-
-        # Define the required roles
-        $requiredRoles = @(
-            "Azure platform owner",
-            "Network management",
-            "Security operations",
-            "Subscription owner",
-            "Application owner"
-        )
-
-        # Check if each required role exists
-        $rolesMatched = @()
-        $missingRoles = @()
-
-        foreach ($role in $requiredRoles) {
-            if ($customRoles.Name -contains $role) {
-                $rolesMatched += $role
-            }
-            else {
-                $missingRoles += $role
-            }
+        # Get all identity-related resources (domain controllers, identity VMs)
+        $identityResources = $global:AzData.Resources | Where-Object {
+            ($_.ResourceType -eq "Microsoft.Compute/virtualMachines" -and (
+                $_.Name -like "*dc*" -or $_.Name -like "*domain*" -or $_.Name -like "*identity*"
+            )) -or 
+            ($_.ResourceGroupName -like "*identity*" -or $_.ResourceGroupName -like "*ad*")
         }
 
-        # Determine status and estimated percentage
-        $rolesFound = $rolesMatched.Count
-        $totalRequiredRoles = $requiredRoles.Count
-
-        if ($rolesFound -eq $totalRequiredRoles) {
-            $status = [Status]::Implemented
+        if ($identityResources.Count -eq 0) {
+            $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-            $rawData = "All required custom roles are implemented."
-        }
-        elseif ($rolesFound -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-            $rawData = @{
-                MissingRoles = $missingRoles
-                Message      = "None of the required custom roles are implemented."
-            }
+            $rawData = "No identity resources found in this environment."
         }
         else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($rolesFound / $totalRequiredRoles) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-            $rawData = @{
-                TotalRequiredRoles = $totalRequiredRoles
-                RolesMatched       = $rolesMatched
-                MissingRoles       = $missingRoles
-                Message            = "Some required custom roles are missing."
+            # Get unique regions where identity resources are deployed
+            $regionsWithIdentity = $identityResources | Select-Object -ExpandProperty Location -Unique
+            $totalRegions = $regionsWithIdentity.Count
+
+            if ($totalRegions -eq 1) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 25
+                $rawData = @{
+                    TotalIdentityResources = $identityResources.Count
+                    RegionsWithIdentity = $regionsWithIdentity
+                    Message = "Identity resources are deployed in only one region. Consider deploying in multiple regions for better resilience."
+                }
+            }
+            elseif ($totalRegions -eq 2) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = 75
+                $rawData = @{
+                    TotalIdentityResources = $identityResources.Count
+                    RegionsWithIdentity = $regionsWithIdentity
+                    Message = "Identity resources are deployed in two regions, which provides good resilience."
+                }
+            }
+            else {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalIdentityResources = $identityResources.Count
+                    RegionsWithIdentity = $regionsWithIdentity
+                    Message = "Identity resources are deployed across multiple regions, providing excellent resilience."
+                }
             }
         }
     }
@@ -1311,14 +1280,85 @@ function Test-QuestionB0311 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to evaluate the compatibility of all workloads when planning to switch from Active Directory Domain Services (AD DS) to Entra Domain Services (ED DS)."
+    $rawData = $null
 
     try {
-        # Question: When using Microsoft Entra Domain Services use replica sets. Replica sets will improve the resiliency of your managed domain and allow you to deploy to additional regions.
-        # Reference: https://learn.microsoft.com/azure/active-directory-domain-services/replica-sets
+        # Question: Use Azure custom RBAC roles for the following key roles to provide fine-grain access across your ALZ: Azure platform owner, network management, security operations, subscription owner, application owner. Align these roles to teams and responsibilities within your business.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/identity-access#prerequisites-for-a-landing-zone---design-recommendations
 
-        # No automated logic is implemented here
-        $status = [Status]::ManualVerificationRequired
+        # Get all custom role definitions
+        $customRoles = Get-AzRoleDefinition | Where-Object { $_.IsCustom -eq $true }
+
+        if ($customRoles.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+            $rawData = "No custom RBAC roles are defined in this environment."
+        }
+        else {
+            # Define key roles that should be present for ALZ
+            $recommendedRoleTypes = @(
+                "platform", "network", "security", "subscription", "application", "owner", "admin"
+            )
+
+            $alignedRoles = 0
+            $roleAnalysis = @()
+
+            foreach ($role in $customRoles) {
+                $isAligned = $false
+                foreach ($roleType in $recommendedRoleTypes) {
+                    if ($role.Name -like "*$roleType*" -or $role.Description -like "*$roleType*") {
+                        $isAligned = $true
+                        break
+                    }
+                }
+                
+                if ($isAligned) {
+                    $alignedRoles++
+                }
+
+                $roleAnalysis += @{
+                    RoleName = $role.Name
+                    IsAligned = $isAligned
+                    Description = $role.Description
+                }
+            }
+
+            $alignmentPercentage = ($alignedRoles / $customRoles.Count) * 100
+
+            if ($alignmentPercentage -eq 100 -and $customRoles.Count -ge 3) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    TotalCustomRoles = $customRoles.Count
+                    AlignedRoles = $alignedRoles
+                    AlignmentPercentage = [Math]::Round($alignmentPercentage, 2)
+                    Message = "Custom RBAC roles are well-aligned with Azure Landing Zone recommendations."
+                    RoleAnalysis = $roleAnalysis
+                }
+            }
+            elseif ($alignedRoles -gt 0) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = [Math]::Round($alignmentPercentage, 2)
+                $rawData = @{
+                    TotalCustomRoles = $customRoles.Count
+                    AlignedRoles = $alignedRoles
+                    AlignmentPercentage = [Math]::Round($alignmentPercentage, 2)
+                    Message = "Some custom RBAC roles are aligned with ALZ recommendations, but more could be defined."
+                    RoleAnalysis = $roleAnalysis
+                }
+            }
+            else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 25
+                $rawData = @{
+                    TotalCustomRoles = $customRoles.Count
+                    AlignedRoles = $alignedRoles
+                    AlignmentPercentage = [Math]::Round($alignmentPercentage, 2)
+                    Message = "Custom RBAC roles exist but are not aligned with Azure Landing Zone key role recommendations."
+                    RoleAnalysis = $roleAnalysis
+                }
+            }
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -1344,52 +1384,53 @@ function Test-QuestionB0312 {
     $rawData = $null
 
     try {
-        # Question: Integrate Microsoft Entra ID logs with the platform-central Azure Monitor. Azure Monitor allows for a single source of truth around log and monitoring data in Azure, giving organizations a cloud native option to meet requirements around log collection and retention.
-        # Reference: https://learn.microsoft.com/azure/active-directory/reports-monitoring/howto-integrate-activity-logs-with-log-analytics        # Get all Entra Domain Services configurations using resource search
-        try {
-            $entraDomains = Get-AzResource -ResourceType "Microsoft.AAD/DomainServices" -ErrorAction SilentlyContinue
-        }
-        catch {
-            Write-Warning "Could not retrieve Entra Domain Services: $($_.Exception.Message)"
-            $entraDomains = $null
+        # Question: If planning to switch from Active Directory Domain Services to Entra domain services, evaluate the compatibility of all workloads.
+        # Reference: https://learn.microsoft.com/entra/identity/domain-services/overview
+
+        # Check for Entra Domain Services and on-premises domain controllers
+        $entraDomainServices = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.AAD/DomainServices"
         }
 
-        if (-not $entraDomains -or $entraDomains.Count -eq 0) {
+        $onPremisesDCs = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.Compute/virtualMachines" -and (
+                $_.Name -like "*dc*" -or $_.Name -like "*domain*"
+            )
+        }
+
+        if ($entraDomainServices.Count -eq 0 -and $onPremisesDCs.Count -eq 0) {
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-            $rawData = "No Entra Domain Services (ED DS) configurations found in the current environment."
+            $rawData = "No Entra Domain Services or on-premises domain controllers found."
+        }
+        elseif ($entraDomainServices.Count -gt 0 -and $onPremisesDCs.Count -eq 0) {
+            # Only Entra Domain Services - assume migration completed
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+            $rawData = @{
+                EntraDomainServices = $entraDomainServices.Count
+                OnPremisesDCs = $onPremisesDCs.Count
+                Message = "Entra Domain Services is deployed. If this was a migration from AD DS, workload compatibility should have been evaluated."
+            }
+        }
+        elseif ($entraDomainServices.Count -eq 0 -and $onPremisesDCs.Count -gt 0) {
+            # Only on-premises DCs - no migration planned or in progress
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = @{
+                EntraDomainServices = $entraDomainServices.Count
+                OnPremisesDCs = $onPremisesDCs.Count
+                Message = "Only on-premises domain controllers found. No Entra Domain Services migration detected."
+            }
         }
         else {
-            $totalDomains = $entraDomains.Count
-            $domainsWithReplicaSets = 0
-
-            foreach ($domain in $entraDomains) {
-                # Check if replica sets are configured
-                if ($domain.ReplicaSets.Count -gt 1) {
-                    $domainsWithReplicaSets++
-                }
-            }
-
-            if ($domainsWithReplicaSets -eq $totalDomains) {
-                $status = [Status]::Implemented
-                $estimatedPercentageApplied = 100
-                $rawData = "All Entra Domain Services domains have replica sets configured."
-            }
-            elseif ($domainsWithReplicaSets -eq 0) {
-                $status = [Status]::NotImplemented
-                $estimatedPercentageApplied = 0
-                $rawData = "No Entra Domain Services domains have replica sets configured."
-            }
-            else {
-                $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = ($domainsWithReplicaSets / $totalDomains) * 100
-                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-                $rawData = @{
-                    TotalDomains              = $totalDomains
-                    DomainsWithReplicaSets    = $domainsWithReplicaSets
-                    DomainsWithoutReplicaSets = $totalDomains - $domainsWithReplicaSets
-                    Message                   = "Some Entra Domain Services domains are missing replica sets."
-                }
+            # Both exist - migration in progress or hybrid setup
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 50
+            $rawData = @{
+                EntraDomainServices = $entraDomainServices.Count
+                OnPremisesDCs = $onPremisesDCs.Count
+                Message = "Both Entra Domain Services and on-premises domain controllers detected. Ensure workload compatibility has been evaluated for any migration."
             }
         }
     }
@@ -1414,83 +1455,65 @@ function Test-QuestionB0313 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = $null    
+    $rawData = $null
+
     try {
-        # Question: When using Microsoft Entra Domain Services, use replica sets.
-        # Reference: https://learn.microsoft.com/azure/active-directory-domain-services/replica-sets
+        # Question: When using Microsoft Entra Domain Services, use replica sets. Replica sets will improve the resiliency of your managed domain and allow you to deploy to additional regions.
+        # Reference: https://learn.microsoft.com/entra/identity/domain-services/overview
 
-        # Try to get Diagnostic Settings for Microsoft Entra ID
-        # Note: This requires special permissions and may not be available to all users
-        try {
-            # Note: Az.Monitor module is imported in Initialize.ps1 for better performance
-            # Verify monitor module is available before proceeding
-            if (-not (Test-CmdletAvailable -CmdletName 'Get-AzDiagnosticSetting')) {
-                throw "Get-AzDiagnosticSetting cmdlet not available"
-            }
-            
-            # Try to get diagnostic settings for Azure AD - using the correct resource ID format
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId "/providers/Microsoft.AADIAM/diagnosticSettings" -ErrorAction Stop
-        }
-        catch {
-            # Handle permission errors or missing cmdlet gracefully
-            if ($_.Exception.Message -like "*authorization*" -or $_.Exception.Message -like "*permissions*" -or $_.Exception.Message -like "*not recognized*") {
-                Write-Warning "Cannot check Microsoft Entra ID diagnostic settings. This may require special permissions or the Az.Monitor module."
-                $status = [Status]::Unknown
-                $estimatedPercentageApplied = 0
-                $rawData = @{
-                    Error               = "Cannot assess diagnostic settings"
-                    Message             = "Unable to retrieve diagnostic settings: $($_.Exception.Message)"
-                    RequiredPermissions = "Global Administrator, Security Administrator, or Monitor Contributor roles may be required"
-                }
-                
-                # Calculate score and return early
-                $weight = 5
-                $score = ($weight * $estimatedPercentageApplied) / 100
-                
-                return @{
-                    Status                     = $status
-                    EstimatedPercentageApplied = $estimatedPercentageApplied
-                    Score                      = $score
-                    Weight                     = $weight
-                    RawData                    = $rawData
-                }
-            }
-            else {
-                # Re-throw other errors
-                throw
-            }
+        # Check for Entra Domain Services
+        $entraDomainServices = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.AAD/DomainServices"
         }
 
-        if (-not $diagnosticSettings -or $diagnosticSettings.Count -eq 0) {
-            # No diagnostic settings found
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-            $rawData = "No diagnostic settings are configured for Microsoft Entra ID."
+        if ($entraDomainServices.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No Microsoft Entra Domain Services found in this environment."
         }
         else {
-            $logsToAzureMonitor = $diagnosticSettings | Where-Object {
-                $null -ne $_.WorkspaceId -and $_.Logs | Where-Object { $_.Enabled -eq $true }
+            $totalDomainServices = $entraDomainServices.Count
+            $servicesWithReplicaSets = 0
+
+            foreach ($domainService in $entraDomainServices) {
+                try {
+                    # For detailed replica set information, we would need to call the specific API
+                    # Since we're using cached data, we'll assess based on the presence of centralized logging infrastructure
+                    if ($domainService.Peerings -and $domainService.Peerings.Count -gt 0) {
+                        $servicesWithReplicaSets++
+                    }
+                }
+                catch {
+                    Write-Verbose "Could not analyze replica sets for domain service: $($domainService.Name)"
+                }
             }
 
-            if ($logsToAzureMonitor.Count -eq $diagnosticSettings.Count) {
+            if ($servicesWithReplicaSets -eq $totalDomainServices) {
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-                $rawData = "All diagnostic settings for Microsoft Entra ID are configured to send logs to Azure Monitor."
+                $rawData = @{
+                    TotalDomainServices = $totalDomainServices
+                    ServicesWithReplicaSets = $servicesWithReplicaSets
+                    Message = "All Entra Domain Services appear to have replica sets configured for improved resiliency."
+                }
             }
-            elseif ($logsToAzureMonitor.Count -eq 0) {
-                $status = [Status]::NotImplemented
-                $estimatedPercentageApplied = 0
-                $rawData = "None of the diagnostic settings for Microsoft Entra ID are configured to send logs to Azure Monitor."
-            }
-            else {
+            elseif ($servicesWithReplicaSets -gt 0) {
                 $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = ($logsToAzureMonitor.Count / $diagnosticSettings.Count) * 100
+                $estimatedPercentageApplied = ($servicesWithReplicaSets / $totalDomainServices) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
                 $rawData = @{
-                    TotalSettings               = $diagnosticSettings.Count
-                    SettingsWithAzureMonitor    = $logsToAzureMonitor.Count
-                    SettingsWithoutAzureMonitor = $diagnosticSettings.Count - $logsToAzureMonitor.Count
-                    Message                     = "Some diagnostic settings are configured to send logs to Azure Monitor, but not all."
+                    TotalDomainServices = $totalDomainServices
+                    ServicesWithReplicaSets = $servicesWithReplicaSets
+                    Message = "Some Entra Domain Services have replica sets, but not all."
+                }
+            }
+            else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalDomainServices = $totalDomainServices
+                    ServicesWithReplicaSets = $servicesWithReplicaSets
+                    Message = "Entra Domain Services found but no replica sets detected. Consider configuring replica sets for improved resiliency."
                 }
             }
         }
@@ -1516,61 +1539,64 @@ function Test-QuestionB0314 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = $null    
+    $rawData = $null
+
     try {
-        # Question: When deploying Microsoft Entra Connect, use a staging server for high availability/disaster recovery.
-        # Reference: https://learn.microsoft.com/azure/active-directory/hybrid/how-to-connect-sync-staging-server
+        # Question: Integrate Microsoft Entra ID logs with the platform-central Azure Monitor. Azure Monitor allows for a single source of truth around log and monitoring data in Azure, giving organizations a cloud native options to meet requirements around log collection and retention.
+        # Reference: https://learn.microsoft.com/azure/active-directory/reports-monitoring/concept-activity-logs-azure-monitor
 
-        # Get all Azure AD users from cached Graph data or direct Graph call
-        $users = $null
-        if ($global:GraphData -and $global:GraphData.Users) {
-            $users = $global:GraphData.Users
-        }
-        else {
-            # Try direct Graph call if global data not available
-            try {
-                $users = Get-MgUser -All -ErrorAction Stop
-            }
-            catch {
-                Write-Warning "Failed to retrieve users via Graph API: $($_.Exception.Message)"
-            }
+        # Check if Graph connection is available for Microsoft Entra ID logs
+        if ($global:GraphConnected -eq $false) {
+            Write-Warning "Microsoft Graph is not connected. Cannot assess Entra ID log integration."
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = "Microsoft Graph connection not available for Entra ID log assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
         }
 
-        if (-not $users -or $users.Count -eq 0) {
+        # Check for Log Analytics workspaces
+        $logAnalyticsWorkspaces = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.OperationalInsights/workspaces"
+        }
+
+        # Check for diagnostic settings on Azure resources
+        $resourcesWithDiagnostics = $global:AzData.Resources | Where-Object {
+            # Look for resources that typically have diagnostic settings configured
+            $_.ResourceType -in @(
+                "Microsoft.Storage/storageAccounts",
+                "Microsoft.KeyVault/vaults",
+                "Microsoft.Network/virtualNetworks",
+                "Microsoft.Compute/virtualMachines"
+            )
+        }
+
+        if ($logAnalyticsWorkspaces.Count -eq 0) {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
-            $rawData = "No users found in the tenant to verify emergency access accounts."
+            $rawData = "No Log Analytics workspaces found for centralized logging."
         }
         else {
-            # Define criteria for break-glass accounts
-            $breakGlassAccounts = $users | Where-Object {
-                ($_.UserPrincipalName -match "breakglass" -or $_.UserPrincipalName -match "emergency") -and
-                $_.AccountEnabled -eq $true -and
-                $_.UserType -eq "Member"
-            }
-
-            if ($breakGlassAccounts.Count -ge 2) {
-                $status = [Status]::Implemented
-                $estimatedPercentageApplied = 100
-                $rawData = @{
-                    BreakGlassAccountsFound = $breakGlassAccounts.Count
-                    Accounts                = $breakGlassAccounts | Select-Object DisplayName, UserPrincipalName
-                    Message                 = "Sufficient emergency access accounts (at least 2) are configured."
-                }
-            }
-            elseif ($breakGlassAccounts.Count -eq 1) {
+            $totalWorkspaces = $logAnalyticsWorkspaces.Count
+            
+            # Since we can't directly check Entra ID diagnostic settings from cached resource data,
+            # we'll assess based on the presence of centralized logging infrastructure
+            if ($totalWorkspaces -ge 1) {
                 $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = 50
+                $estimatedPercentageApplied = 75
                 $rawData = @{
-                    BreakGlassAccountsFound = $breakGlassAccounts.Count
-                    Accounts                = $breakGlassAccounts | Select-Object DisplayName, UserPrincipalName
-                    Message                 = "Only 1 emergency access account found. At least 2 are recommended."
+                    LogAnalyticsWorkspaces = $totalWorkspaces
+                    ResourcesMonitored = $resourcesWithDiagnostics.Count
+                    Message = "Log Analytics workspaces are available for centralized logging. Verify that Entra ID logs are integrated with Azure Monitor."
                 }
             }
             else {
                 $status = [Status]::NotImplemented
-                $estimatedPercentageApplied = 0
-                $rawData = "No emergency access or break-glass accounts configured with name containing 'breakglass' or 'emergency'."
+                $estimatedPercentageApplied = 25
+                $rawData = @{
+                    LogAnalyticsWorkspaces = $totalWorkspaces
+                    ResourcesMonitored = $resourcesWithDiagnostics.Count
+                    Message = "Limited centralized logging infrastructure. Consider integrating Entra ID logs with Azure Monitor."
+                }
             }
         }
     }
@@ -1598,49 +1624,78 @@ function Test-QuestionB0315 {
     $rawData = $null
 
     try {
-        # Question: Do not use on-premises synced accounts for Microsoft Entra ID role assignments, unless you have a scenario that specifically requires it.
-        # Reference: https://learn.microsoft.com/azure/active-directory/hybrid/plan-connect-design-concepts        # Check for Entra Connect configuration through Graph API
+        # Question: Implement an emergency access or break-glass accounts to prevent tenant-wide account lockout. MFA will be turned on by default for all users in Oct 2024. We recommend updating these accounts to use passkey (FIDO2) or configure certificate-based authentication for MFA.
+        # Reference: https://learn.microsoft.com/azure/active-directory/roles/security-emergency-access
+
+        # Check if Graph connection is available
         if ($global:GraphConnected -eq $false) {
-            Write-Warning "Microsoft Graph is not connected. Cannot assess Entra Connect configuration."
+            Write-Warning "Microsoft Graph is not connected. Cannot assess emergency access accounts."
             $status = [Status]::Unknown
             $estimatedPercentageApplied = 0
-            $rawData = "Microsoft Graph connection not available for Entra Connect assessment"
+            $rawData = "Microsoft Graph connection not available for emergency access account assessment"
             return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-        }        # Try to get directory synchronization information from cached data
-        try {
-            if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.Organization) {
-                $organization = $global:GraphData.Organization
-                $dirSyncEnabled = $organization.OnPremisesSyncEnabled
-            }
-            else {
-                $organization = $null
-                $dirSyncEnabled = $null
-            }
-        }
-        catch {
-            Write-Warning "Could not retrieve organization sync status: $($_.Exception.Message)"
-            $dirSyncEnabled = $null
         }
 
-        if ($null -eq $dirSyncEnabled) {
-            # Could not determine sync status
-            $status = [Status]::Unknown
-            $estimatedPercentageApplied = 0
-            $rawData = "Could not determine directory synchronization status."
-        }
-        elseif ($dirSyncEnabled -eq $false) {
-            # No directory sync enabled
-            $status = [Status]::NotApplicable
-            $estimatedPercentageApplied = 100
-            $rawData = "Directory synchronization is not enabled in this environment."
+        # Get users from cached data
+        if ($global:GraphData -and $global:GraphData.Users) {
+            $users = $global:GraphData.Users
         }
         else {
-            # Directory sync is enabled, but we can't check for staging servers with current APIs
             $status = [Status]::Unknown
             $estimatedPercentageApplied = 0
+            $rawData = "User data not available for emergency access account assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
+        # Look for potential emergency access accounts
+        $emergencyAccounts = $users | Where-Object {
+            $_.DisplayName -like "*emergency*" -or 
+            $_.DisplayName -like "*break*glass*" -or 
+            $_.DisplayName -like "*breakglass*" -or
+            $_.UserPrincipalName -like "*emergency*" -or
+            $_.UserPrincipalName -like "*break*glass*" -or
+            $_.UserPrincipalName -like "*breakglass*"
+        }
+
+        # Get Global Admin role assignments
+        $globalAdminRole = $global:GraphData.RoleDefinitions | Where-Object { 
+            $_.DisplayName -eq "Global Administrator" 
+        }
+
+        $globalAdminAssignments = @()
+        if ($globalAdminRole -and $global:GraphData.RoleAssignments) {
+            $globalAdminAssignments = $global:GraphData.RoleAssignments | Where-Object { 
+                $_.RoleDefinitionId -eq $globalAdminRole.Id 
+            }
+        }
+
+        if ($emergencyAccounts.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
             $rawData = @{
-                DirectorySyncEnabled = $dirSyncEnabled
-                Message              = "Directory synchronization is enabled, but detailed sync server configuration cannot be assessed with current API capabilities."
+                EmergencyAccounts = 0
+                GlobalAdminAccounts = $globalAdminAssignments.Count
+                Message = "No emergency access (break-glass) accounts found. Consider implementing emergency access accounts to prevent tenant lockout."
+            }
+        }
+        elseif ($emergencyAccounts.Count -eq 1) {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = 50
+            $rawData = @{
+                EmergencyAccounts = $emergencyAccounts.Count
+                GlobalAdminAccounts = $globalAdminAssignments.Count
+                Message = "One emergency access account found. Microsoft recommends having at least two emergency access accounts."
+                EmergencyAccountNames = $emergencyAccounts.DisplayName
+            }
+        }
+        else {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+            $rawData = @{
+                EmergencyAccounts = $emergencyAccounts.Count
+                GlobalAdminAccounts = $globalAdminAssignments.Count
+                Message = "Multiple emergency access accounts found. Ensure they use strong authentication methods like FIDO2 or certificate-based authentication."
+                EmergencyAccountNames = $emergencyAccounts.DisplayName
             }
         }
     }
@@ -1668,50 +1723,41 @@ function Test-QuestionB0316 {
     $rawData = $null
 
     try {
-        # Question: When using Microsoft Entra ID Application Proxy to give remote users access to applications, manage it as a Platform resource as you can only have one instance per tenant.
-        # Reference: https://learn.microsoft.com/azure/active-directory/app-proxy/what-is-application-proxy
+        # Question: When deploying Microsoft Entra Connect, use a staging server for high availability/disaster recovery.
+        # Reference: https://learn.microsoft.com/azure/active-directory/hybrid/how-to-connect-sync-staging-server
 
-        # Get all role assignments in Microsoft Entra ID
-        $roleAssignments = Get-AzRoleAssignment
+        # Look for VMs that might be running Entra Connect (formerly Azure AD Connect)
+        $entraConnectServers = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.Compute/virtualMachines" -and (
+                $_.Name -like "*connect*" -or 
+                $_.Name -like "*sync*" -or 
+                $_.Name -like "*aad*" -or
+                $_.Name -like "*entra*"
+            )
+        }
 
-        if (-not $roleAssignments -or $roleAssignments.Count -eq 0) {
+        if ($entraConnectServers.Count -eq 0) {
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-            $rawData = "No role assignments found in the environment."
+            $rawData = "No Entra Connect servers found in this environment."
+        }
+        elseif ($entraConnectServers.Count -eq 1) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 25
+            $rawData = @{
+                EntraConnectServers = $entraConnectServers.Count
+                ServerNames = $entraConnectServers.Name
+                Message = "Only one Entra Connect server found. Consider deploying a staging server for high availability."
+            }
         }
         else {
-            # Filter role assignments for on-premises synced accounts
-            $syncedAccounts = $roleAssignments | Where-Object {
-                $_.SignInName -match "@.*" -and $_.PrincipalType -eq "User" -and $_.SignInName -match "\.onmicrosoft\.com"
-            }
-
-            $totalAssignments = $roleAssignments.Count
-            $syncedAssignments = $syncedAccounts.Count
-
-            if ($syncedAssignments -eq 0) {
-                $status = [Status]::Implemented
-                $estimatedPercentageApplied = 100
-                $rawData = "No on-premises synced accounts are being used for Microsoft Entra ID role assignments."
-            }
-            elseif ($syncedAssignments -eq $totalAssignments) {
-                $status = [Status]::NotImplemented
-                $estimatedPercentageApplied = 0
-                $rawData = @{
-                    TotalAssignments  = $totalAssignments
-                    SyncedAssignments = $syncedAssignments
-                    Message           = "All role assignments are using on-premises synced accounts. Avoid this practice unless necessary."
-                }
-            }
-            else {
-                $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = (($totalAssignments - $syncedAssignments) / $totalAssignments) * 100
-                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-                $rawData = @{
-                    TotalAssignments     = $totalAssignments
-                    SyncedAssignments    = $syncedAssignments
-                    NonSyncedAssignments = $totalAssignments - $syncedAssignments
-                    Message              = "Some role assignments are using on-premises synced accounts. Review these cases to ensure they are necessary."
-                }
+            # Multiple servers found - assume staging server is configured
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+            $rawData = @{
+                EntraConnectServers = $entraConnectServers.Count
+                ServerNames = $entraConnectServers.Name
+                Message = "Multiple Entra Connect servers found, suggesting staging server configuration for high availability."
             }
         }
     }
@@ -1736,13 +1782,120 @@ function Test-QuestionB0317 {
 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $weight = 5
-    $score = 0
     $rawData = $null
 
     try {
-        # Question: Configure Identity network segmentation through the use of a virtual network and peer back to the hub. Providing authentication inside application landing zone (legacy).
-        # Reference: https://learn.microsoft.com/azure/active-directory/fundamentals/identity-secure-score
+        # Question: Do not use on-premises synced accounts for Microsoft Entra ID role assignments, unless you have a scenario that specifically requires it.
+        # Reference: https://learn.microsoft.com/azure/active-directory/roles/best-practices
+
+        # Check if Graph connection is available
+        if ($global:GraphConnected -eq $false) {
+            Write-Warning "Microsoft Graph is not connected. Cannot assess synced account role assignments."
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = "Microsoft Graph connection not available for synced account assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
+        # Get role assignments and users from cached data
+        if (-not $global:GraphData.RoleAssignments -or -not $global:GraphData.Users) {
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = "Role assignment or user data not available for assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
+        $roleAssignments = $global:GraphData.RoleAssignments
+        $users = $global:GraphData.Users
+
+        $totalRoleAssignments = $roleAssignments.Count
+        $syncedAccountAssignments = 0
+        $cloudOnlyAccountAssignments = 0
+
+        foreach ($assignment in $roleAssignments) {
+            # Find the user for this assignment
+            $user = $users | Where-Object { $_.Id -eq $assignment.PrincipalId }
+            
+            if ($user) {
+                # Check if the user is synced from on-premises
+                # OnPremisesSyncEnabled indicates if the account is synced
+                if ($user.OnPremisesSyncEnabled -eq $true) {
+                    $syncedAccountAssignments++
+                }
+                else {
+                    $cloudOnlyAccountAssignments++
+                }
+            }
+        }
+
+        if ($totalRoleAssignments -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+            $rawData = "No role assignments found."
+        }
+        elseif ($syncedAccountAssignments -eq 0) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+            $rawData = @{
+                TotalRoleAssignments = $totalRoleAssignments
+                SyncedAccountAssignments = $syncedAccountAssignments
+                CloudOnlyAccountAssignments = $cloudOnlyAccountAssignments
+                Message = "All role assignments are to cloud-only accounts. No on-premises synced accounts have role assignments."
+            }
+        }
+        else {
+            $syncedPercentage = ($syncedAccountAssignments / $totalRoleAssignments) * 100
+            
+            if ($syncedPercentage -le 10) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = 75
+                $rawData = @{
+                    TotalRoleAssignments = $totalRoleAssignments
+                    SyncedAccountAssignments = $syncedAccountAssignments
+                    CloudOnlyAccountAssignments = $cloudOnlyAccountAssignments
+                    SyncedAccountPercentage = [Math]::Round($syncedPercentage, 2)
+                    Message = "Low percentage of synced accounts have role assignments. Review if these assignments are necessary."
+                }
+            }
+            else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 25
+                $rawData = @{
+                    TotalRoleAssignments = $totalRoleAssignments
+                    SyncedAccountAssignments = $syncedAccountAssignments
+                    CloudOnlyAccountAssignments = $cloudOnlyAccountAssignments
+                    SyncedAccountPercentage = [Math]::Round($syncedPercentage, 2)
+                    Message = "Significant number of on-premises synced accounts have role assignments. Consider using cloud-only accounts unless specifically required."
+                }
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionB0318 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: When using Microsoft Entra ID Application Proxy to give remote users access to applications, manage it as a Platform resource.
+        # Reference: https://learn.microsoft.com/azure/active-directory/app-proxy/what-is-application-proxy
 
         # Check for Microsoft Entra ID Application Proxy through Graph API
         if ($global:GraphConnected -eq $false) {
@@ -1754,7 +1907,7 @@ function Test-QuestionB0317 {
         }        # Try to get application proxy applications from cached data
         try {
             if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.Applications) {
-                $applications = $global:GraphData.Applications | Where-Object { $_.onPremisesPublishing.externalUrl -ne $null }
+                $applications = $global:GraphData.Applications | Where-Object { $null -ne $_.onPremisesPublishing.externalUrl }
             }
             else {
                 $applications = $null
@@ -2110,70 +2263,6 @@ function Test-QuestionB0403 {
                     NonResourceReviews = $totalAccessReviews - $resourceReviews.Count
                     Message            = "Some active access reviews are configured for resource entitlements, but not all."
                 }
-            }
-        }
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-function Test-QuestionB0318 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: When using Microsoft Entra ID Application Proxy to give remote users access to applications, manage it as a Platform resource.
-        # Reference: https://learn.microsoft.com/azure/active-directory/app-proxy/what-is-application-proxy
-
-        # Check for Microsoft Entra ID Application Proxy through Graph API
-        if ($global:GraphConnected -eq $false) {
-            Write-Warning "Microsoft Graph is not connected. Cannot assess Application Proxy configuration."
-            $status = [Status]::Unknown
-            $estimatedPercentageApplied = 0
-            $rawData = "Microsoft Graph connection not available for Application Proxy assessment"
-            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-        }        # Try to get application proxy applications from cached data
-        try {
-            if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.Applications) {
-                $applications = $global:GraphData.Applications | Where-Object { $_.onPremisesPublishing.externalUrl -ne $null }
-            }
-            else {
-                $applications = $null
-            }
-        }
-        catch {
-            Write-Warning "Could not retrieve Application Proxy applications: $($_.Exception.Message)"
-            $applications = $null
-        }
-
-        if (-not $applications -or $applications.Count -eq 0) {
-            $status = [Status]::NotApplicable
-            $estimatedPercentageApplied = 100
-            $rawData = "No Microsoft Entra ID Application Proxy applications are configured in this tenant."
-        }
-        else {
-            # Application Proxy is in use - recommend managing as platform resource
-            $status = [Status]::Unknown
-            $estimatedPercentageApplied = 0
-            $rawData = @{
-                TotalApplications = $applications.Count
-                Message           = "Application Proxy applications found. Verify these are managed as platform resources rather than individual app resources."
-                Applications      = $applications | Select-Object DisplayName, AppId | ForEach-Object { $_.DisplayName }
             }
         }
     }
