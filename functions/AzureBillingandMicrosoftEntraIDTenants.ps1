@@ -58,6 +58,8 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
         [string]$ContractType,
         [Parameter(Mandatory = $true)]
         [object]$Checklist
+    )
+    
     Write-AssessmentHeader "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..."
     
     # Note: Az.Billing module is imported in Initialize.ps1 for better performance
