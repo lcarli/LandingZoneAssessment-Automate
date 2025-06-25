@@ -14,9 +14,10 @@
     lramoscostah@microsoft.com
 #>
 
-# Import shared modules
-Import-Module "$PSScriptRoot/../shared/Enums.ps1"
-Import-Module "$PSScriptRoot/../shared/ErrorHandling.ps1"
+# Dot-source shared modules
+. "$PSScriptRoot/../shared/Enums.ps1"
+. "$PSScriptRoot/../shared/ErrorHandling.ps1"
+. "$PSScriptRoot/../shared/SharedFunctions.ps1"
 
 function Invoke-ResourceOrganizationAssessment {
     [CmdletBinding()]
@@ -25,9 +26,11 @@ function Invoke-ResourceOrganizationAssessment {
         [object]$Checklist
     )
 
-    Write-Output "Evaluating the Resource Organization design area..."
+    Write-AssessmentHeader "Evaluating the Resource Organization design area..."
+    
     Measure-ExecutionTime -ScriptBlock {
         $results = @()
+        
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C01.01") }) | Test-QuestionC0101
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.01") }) | Test-QuestionC0201
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.02") }) | Test-QuestionC0202
@@ -43,6 +46,7 @@ function Invoke-ResourceOrganizationAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.12") }) | Test-QuestionC0212
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.13") }) | Test-QuestionC0213        
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.14") }) | Test-QuestionC0214
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "C02.15") }) | Test-QuestionC0215
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C03.01") }) | Test-QuestionC0301
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C03.02") }) | Test-QuestionC0302
         $results += ($Checklist.items | Where-Object { ($_.id -eq "C03.03") }) | Test-QuestionC0303
@@ -53,7 +57,6 @@ function Invoke-ResourceOrganizationAssessment {
     return $script:FunctionResult
 }
 
-# Function for Management item C01.01
 function Test-QuestionC0101 {
     [CmdletBinding()]
     param(
@@ -61,13 +64,14 @@ function Test-QuestionC0101 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to ensure that processes and policies are aligned."
+    $rawData = "This question requires manual verification to ensure that processes and policies are aligned with Microsoft Best Practice Naming Standards."
 
     try {
         # Question: Use a well defined naming scheme for resources, such as Microsoft Best Practice Naming Standards.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/naming-and-tagging
         $status = [Status]::ManualVerificationRequired
     }
     catch {
@@ -80,7 +84,6 @@ function Test-QuestionC0101 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.01
 function Test-QuestionC0201 {
     [CmdletBinding()]
     param(
@@ -88,13 +91,13 @@ function Test-QuestionC0201 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
 
     try {
-        # Question: Enforce reasonably flat management group hierarchy with no more than four levels.
+        # Question: Enforce reasonably flat management group hierarchy with no more than six levels.
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/resource-org-management-groups
 
         $rootMG = $global:AzData.ManagementGroups | Where-Object { $_.Name -eq "Tenant Root Group" }
@@ -116,7 +119,7 @@ function Test-QuestionC0201 {
         }
         $maxDepth = Get-MGDepth -mg $rootMG -currentDepth 1
 
-        if ($maxDepth -le 5) {
+        if ($maxDepth -le 6) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
         }
@@ -127,7 +130,7 @@ function Test-QuestionC0201 {
 
         $rawData = @{
             MaxDepth = $maxDepth
-            Limit    = 4
+            Limit    = 6
         }
     }
     catch {
@@ -140,7 +143,6 @@ function Test-QuestionC0201 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.02
 function Test-QuestionC0202 {
     [CmdletBinding()]
     param(
@@ -148,7 +150,7 @@ function Test-QuestionC0202 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -187,7 +189,6 @@ function Test-QuestionC0202 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.03
 function Test-QuestionC0203 {
     [CmdletBinding()]
     param(
@@ -195,7 +196,7 @@ function Test-QuestionC0203 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -234,7 +235,6 @@ function Test-QuestionC0203 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.04
 function Test-QuestionC0204 {
     [CmdletBinding()]
     param(
@@ -242,7 +242,7 @@ function Test-QuestionC0204 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -283,7 +283,6 @@ function Test-QuestionC0204 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.05
 function Test-QuestionC0205 {
     [CmdletBinding()]
     param(
@@ -291,7 +290,7 @@ function Test-QuestionC0205 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -327,7 +326,6 @@ function Test-QuestionC0205 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.06
 function Test-QuestionC0206 {
     [CmdletBinding()]
     param(
@@ -335,7 +333,7 @@ function Test-QuestionC0206 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -374,7 +372,6 @@ function Test-QuestionC0206 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.07
 function Test-QuestionC0207 {
     [CmdletBinding()]
     param(
@@ -382,7 +379,7 @@ function Test-QuestionC0207 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that management groups under the root are categorized based on workload needs (security, compliance, connectivity, and features)."
@@ -402,7 +399,6 @@ function Test-QuestionC0207 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.08
 function Test-QuestionC0208 {
     [CmdletBinding()]
     param(
@@ -410,7 +406,7 @@ function Test-QuestionC0208 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that resource owners are informed of their roles and responsibilities, access reviews are conducted, budgets are reviewed, and policy compliance is remediated as necessary."
@@ -430,7 +426,6 @@ function Test-QuestionC0208 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.09
 function Test-QuestionC0209 {
     [CmdletBinding()]
     param(
@@ -438,7 +433,7 @@ function Test-QuestionC0209 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure all subscription owners and IT core team members are informed about subscription quotas and their impact on resource provisioning."
@@ -458,7 +453,6 @@ function Test-QuestionC0209 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.10
 function Test-QuestionC0210 {
     [CmdletBinding()]
     param(
@@ -466,7 +460,7 @@ function Test-QuestionC0210 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -480,11 +474,16 @@ function Test-QuestionC0210 {
         $totalSubscriptions = $subscriptions.Count
 
         foreach ($subscription in $subscriptions) {
-            Set-AzContext -SubscriptionId $subscription.Id | Out-Null
-
-            $reservations = Get-AzReservationOrder -ErrorAction SilentlyContinue
-            if ($reservations) {
-                $reservedInstancesUsed++
+            try {
+                # Use cached data or get reservations without changing context
+                $reservations = Get-AzReservationOrder -SubscriptionId $subscription.Id -ErrorAction SilentlyContinue
+                if ($reservations -and $reservations.Count -gt 0) {
+                    $reservedInstancesUsed++
+                }
+            }
+            catch {
+                # Skip this subscription if we can't check reservations
+                continue
             }
         }
 
@@ -519,7 +518,6 @@ function Test-QuestionC0210 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.11
 function Test-QuestionC0211 {
     [CmdletBinding()]
     param(
@@ -527,7 +525,7 @@ function Test-QuestionC0211 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -537,35 +535,29 @@ function Test-QuestionC0211 {
         # Reference: https://learn.microsoft.com/azure/azure-portal/azure-portal-dashboards
 
         $dashboards = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.Portal/dashboards" }
-        $dashboardMetrics = @("CPU", "Memory", "Disk Space")
-        $validDashboards = @()
-
-        foreach ($dashboard in $dashboards) {
-            if ($dashboard.Properties -join " " -match ($dashboardMetrics -join "|")) {
-                $validDashboards += $dashboard.Name
-            }
+        $monitoringResources = $global:AzData.Resources | Where-Object { 
+            $_.ResourceType -in @(
+                "Microsoft.OperationalInsights/workspaces",
+                "Microsoft.Insights/metricAlerts",
+                "Microsoft.Insights/components"
+            )
         }
 
-        if ($validDashboards.Count -eq $dashboards.Count) {
+        $totalMonitoringResources = $dashboards.Count + $monitoringResources.Count
+
+        if ($totalMonitoringResources -gt 0) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
             $rawData = @{
-                TotalDashboards    = $dashboards.Count
-                ValidDashboards    = $validDashboards
-                Status             = "All dashboards monitor compute and storage capacity metrics."
+                Dashboards         = $dashboards.Count
+                MonitoringResources = $monitoringResources.Count
+                TotalResources     = $totalMonitoringResources
+                Status             = "Monitoring infrastructure found for capacity metrics."
             }
-        } elseif ($validDashboards.Count -eq 0) {
+        } else {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
-            $rawData = "No dashboards were found monitoring compute and storage capacity metrics."
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($validDashboards.Count / $dashboards.Count) * 100
-            $rawData = @{
-                TotalDashboards    = $dashboards.Count
-                ValidDashboards    = $validDashboards
-                Status             = "Some dashboards monitor compute and storage capacity metrics."
-            }
+            $rawData = "No dashboards or monitoring infrastructure found for capacity metrics."
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -577,7 +569,6 @@ function Test-QuestionC0211 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.12
 function Test-QuestionC0212 {
     [CmdletBinding()]
     param(
@@ -585,7 +576,7 @@ function Test-QuestionC0212 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to confirm if a detailed cost management plan has been implemented using the 'Managed cloud costs' process."
@@ -605,7 +596,6 @@ function Test-QuestionC0212 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Resource Organization item C02.13
 function Test-QuestionC0213 {
     [cmdletbinding()]
     param(
@@ -613,7 +603,7 @@ function Test-QuestionC0213 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to confirm if a detailed cost management plan has been implemented using the 'Managed cloud costs' process."
@@ -633,7 +623,6 @@ function Test-QuestionC0213 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C02.14
 function Test-QuestionC0214 {
     [CmdletBinding()]
     param(
@@ -641,7 +630,7 @@ function Test-QuestionC0214 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to confirm that tags are consistently used across resources for cost management and reporting."
@@ -661,43 +650,78 @@ function Test-QuestionC0214 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C03.01
-function Test-QuestionC0301 {
+function Test-QuestionC0215 {
     [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
 
     try {
-        # Question: Define and apply security baselines to ensure consistent security standards across all environments.
-        # Reference: https://learn.microsoft.com/azure/security/fundamentals/security-baseline
+        # Question: For Sovereign Landing Zone, have a 'confidential corp' and 'confidential online' management group directly under the 'landing zones' MG.
+        # Reference: https://github.com/Azure/sovereign-landing-zone/blob/main/docs/02-Architecture.md
 
-        # Check for Microsoft Security Baseline policy assignments
-        $securityBaselineInitiatives = @(
-            "SecurityBaseline", # Common Microsoft Security Baseline Initiative name
-            "MSCB"              # Alternate abbreviation for Microsoft Security Compliance Baseline
-        )
-        $assignedPolicies = $global:AzData.Policies | Where-Object {
-            $_.Properties.DisplayName -match ($securityBaselineInitiatives -join "|")
+        # Look for landing zones management group first
+        $landingZonesMG = $global:AzData.ManagementGroups | Where-Object {
+            $_.DisplayName.ToLower() -like "*landing zones*" -or
+            $_.DisplayName.ToLower() -like "*landingzones*" -or
+            $_.Name.ToLower() -like "*landingzones*"
         }
 
-        if ($assignedPolicies) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-            $rawData = @{
-                AssignedPolicies = $assignedPolicies | Select-Object -ExpandProperty DisplayName
-                Status           = "Microsoft Security Baseline is implemented."
-            }
-        } else {
+        if (-not $landingZonesMG) {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
-            $rawData = "Microsoft Security Baseline is not implemented."
+            $rawData = "No 'landing zones' management group found."
+        } else {
+            # Look for confidential corp and confidential online management groups under landing zones
+            $confidentialCorpMG = $global:AzData.ManagementGroups | Where-Object {
+                ($_.DisplayName.ToLower() -like "*confidential corp*" -or
+                 $_.DisplayName.ToLower() -like "*confidentialcorp*" -or
+                 $_.Name.ToLower() -like "*confidentialcorp*") -and
+                $_.Properties.Details.Parent.Id -eq $landingZonesMG.Id
+            }
+
+            $confidentialOnlineMG = $global:AzData.ManagementGroups | Where-Object {
+                ($_.DisplayName.ToLower() -like "*confidential online*" -or
+                 $_.DisplayName.ToLower() -like "*confidentialonline*" -or
+                 $_.Name.ToLower() -like "*confidentialonline*") -and
+                $_.Properties.Details.Parent.Id -eq $landingZonesMG.Id
+            }
+
+            $foundGroups = @()
+            if ($confidentialCorpMG) { $foundGroups += "Confidential Corp" }
+            if ($confidentialOnlineMG) { $foundGroups += "Confidential Online" }
+
+            if ($confidentialCorpMG -and $confidentialOnlineMG) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    LandingZonesMG = $landingZonesMG.DisplayName
+                    FoundGroups = $foundGroups
+                    Status = "Both 'confidential corp' and 'confidential online' management groups found under landing zones."
+                }
+            } elseif ($confidentialCorpMG -or $confidentialOnlineMG) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = 50
+                $rawData = @{
+                    LandingZonesMG = $landingZonesMG.DisplayName
+                    FoundGroups = $foundGroups
+                    Status = "Only some of the required confidential management groups found."
+                }
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    LandingZonesMG = $landingZonesMG.DisplayName
+                    FoundGroups = @()
+                    Status = "No confidential management groups found under landing zones."
+                }
+            }
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -709,7 +733,60 @@ function Test-QuestionC0301 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C03.02
+function Test-QuestionC0301 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Define and apply security baselines to ensure consistent security standards across all environments.
+        # Reference: https://learn.microsoft.com/azure/security/fundamentals/security-baseline
+
+        # Check for Microsoft Security Baseline policy assignments
+        $securityBaselineInitiatives = @(
+            "Security Baseline",
+            "Azure Security Benchmark",
+            "Microsoft Security Compliance",
+            "MSCB",
+            "ASB"
+        )
+        $assignedPolicies = $global:AzData.Policies | Where-Object {
+            $policyName = $_.Properties.DisplayName
+            $securityBaselineInitiatives | ForEach-Object { 
+                if ($policyName -match $_) { return $true }
+            }
+            return $false
+        }
+
+        if ($assignedPolicies -and $assignedPolicies.Count -gt 0) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+            $rawData = @{
+                AssignedPolicies = $assignedPolicies | Select-Object -ExpandProperty @{Name="DisplayName"; Expression={$_.Properties.DisplayName}}
+                Status           = "Security baselines are implemented."
+            }
+        } else {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+            $rawData = "No security baseline policies found."
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
 function Test-QuestionC0302 {
     [CmdletBinding()]
     param(
@@ -717,7 +794,7 @@ function Test-QuestionC0302 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -758,7 +835,6 @@ function Test-QuestionC0302 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item C03.03
 function Test-QuestionC0303 {
     [CmdletBinding()]
     param(
@@ -766,7 +842,7 @@ function Test-QuestionC0303 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires manual verification to ensure that a threat detection strategy is defined and applied across all environments."
@@ -785,3 +861,4 @@ function Test-QuestionC0303 {
 
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
+

@@ -185,6 +185,97 @@ function Test-QuestionF0101 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
+function Test-QuestionF0102 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Decide whether to use a single Azure Monitor Logs workspace for all regions or to create multiple workspaces to cover various geographical regions.
+        # Reference: https://learn.microsoft.com/azure/azure-monitor/logs/design-logs-deployment
+
+        $subscriptions = $global:AzData.Subscriptions
+
+        if ($subscriptions.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+        } else {
+            $allWorkspaces = @()
+            $totalWorkspaces = 0
+
+            foreach ($subscription in $subscriptions) {
+                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzOperationalInsightsWorkspace -SubscriptionId $subscription.Id -ErrorAction Stop
+                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
+                
+                $allWorkspaces += $workspaces
+            }
+
+            $totalWorkspaces = $allWorkspaces.Count
+
+            if ($totalWorkspaces -eq 0) {
+                $status = [Status]::NotApplicable
+                $estimatedPercentageApplied = 100
+            } else {
+                # Group workspaces by region
+                $regions = $allWorkspaces | Group-Object Location
+                $regionCount = $regions.Count
+
+                # Check for cross-region networking charges considerations
+                $hasMultiRegionWorkspaces = $regionCount -gt 1
+                $hasRegionalDistribution = $false
+
+                if ($hasMultiRegionWorkspaces) {
+                    # Check if workspaces are properly distributed across regions
+                    $maxWorkspacesPerRegion = ($regions | Measure-Object -Property Count -Maximum).Maximum
+                    $minWorkspacesPerRegion = ($regions | Measure-Object -Property Count -Minimum).Minimum
+                    
+                    # Consider well-distributed if difference is not too large
+                    $hasRegionalDistribution = ($maxWorkspacesPerRegion - $minWorkspacesPerRegion) -le 2
+                }
+
+                if ($totalWorkspaces -eq 1) {
+                    # Single workspace strategy - check if it covers multiple regions appropriately
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                } elseif ($hasMultiRegionWorkspaces -and $hasRegionalDistribution) {
+                    # Multiple workspaces with good regional distribution
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                } elseif ($hasMultiRegionWorkspaces) {
+                    # Multiple workspaces but poor distribution
+                    $status = [Status]::PartiallyImplemented
+                    $estimatedPercentageApplied = 60
+                } else {
+                    # Multiple workspaces in same region - may not be optimal
+                    $status = [Status]::PartiallyImplemented
+                    $estimatedPercentageApplied = 40
+                }
+
+                $rawData = @{
+                    TotalWorkspaces = $totalWorkspaces
+                    UniqueRegions = $regionCount
+                    WorkspacesByRegion = $regions | ForEach-Object { @{ Region = $_.Name; Count = $_.Count } }
+                }
+            }
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
 function Test-QuestionF0103 {
     [cmdletbinding()]
     param(
@@ -308,6 +399,84 @@ function Test-QuestionF0103 {
     }
 
     # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0104 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Monitor OS level virtual machine (VM) configuration drift using Azure Policy. Enabling Azure Automanage Machine Configuration audit capabilities.
+        # Reference: https://learn.microsoft.com/azure/governance/machine-configuration/overview
+
+        $totalVMs = 0
+        $vmsWithGuestConfiguration = 0
+
+        $virtualMachines = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.Compute/virtualMachines"
+        }
+
+        $totalVMs = $virtualMachines.Count
+
+        if ($totalVMs -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+        } else {
+            foreach ($vm in $virtualMachines) {
+                # Check for Azure Policy guest configuration compliance
+                $guestConfigPolicies = $global:AzData.Policies | Where-Object {
+                    $_.ResourceId -eq $vm.Id -and
+                    $_.PolicyDefinitionCategory -eq "Guest Configuration" -and
+                    $_.ComplianceState -eq "Compliant"
+                }
+
+                # Check for VM extensions related to guest configuration
+                $extensions = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzVMExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -ErrorAction Stop
+                } -CmdletName "Get-AzVMExtension" -ModuleName "Az.Compute" -FallbackValue @() -WarningMessage "Could not check VM extensions for $($vm.Name)"
+
+                $hasGuestConfigExtension = $extensions | Where-Object {
+                    $_.ExtensionType -in @("ConfigurationForLinux", "ConfigurationForWindows", "GuestConfiguration")
+                }
+
+                if ($guestConfigPolicies.Count -gt 0 -or $hasGuestConfigExtension) {
+                    $vmsWithGuestConfiguration++
+                }
+            }
+
+            $estimatedPercentageApplied = ($vmsWithGuestConfiguration / $totalVMs) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+
+            if ($estimatedPercentageApplied -eq 100) {
+                $status = [Status]::Implemented
+            } elseif ($estimatedPercentageApplied -eq 0) {
+                $status = [Status]::NotImplemented
+            } else {
+                $status = [Status]::PartiallyImplemented
+            }
+
+            $rawData = @{
+                TotalVMs = $totalVMs
+                VMsWithGuestConfiguration = $vmsWithGuestConfiguration
+                VMsWithoutGuestConfiguration = $totalVMs - $vmsWithGuestConfiguration
+            }
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
@@ -780,7 +949,6 @@ function Test-QuestionF0110 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.11
 function Test-QuestionF0111 {
     [CmdletBinding()]
     param(
@@ -845,7 +1013,6 @@ function Test-QuestionF0111 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.12
 function Test-QuestionF0112 {
     [CmdletBinding()]
     param(
@@ -913,7 +1080,6 @@ function Test-QuestionF0112 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.13
 function Test-QuestionF0113 {
     [CmdletBinding()]
     param(
@@ -940,868 +1106,6 @@ function Test-QuestionF0113 {
     return $result
 }
 
-# Function for Management item F01.15
-function Test-QuestionF0115 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Use Azure Monitor Logs for insights and reporting.
-        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-setup-guide/monitoring-reporting?tabs=AzureMonitor
-
-        $resourcesWithMonitorLogs = 0
-        $totalResources = 0
-
-        $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
-        }
-
-        foreach ($resource in $resources) {
-            $totalResources++
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction SilentlyContinue
-
-            if ($diagnosticSettings) {
-                $logsConfigured = $diagnosticSettings.Logs | Where-Object {
-                    $_.Enabled -eq $true
-                }
-
-                if ($logsConfigured) {
-                    $resourcesWithMonitorLogs++
-                }
-            }
-        }
-
-        if ($resourcesWithMonitorLogs -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithMonitorLogs -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithMonitorLogs / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalResources              = $totalResources
-            ResourcesWithMonitorLogs    = $resourcesWithMonitorLogs
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F01.16
-function Test-QuestionF0116 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-    # Since this question involves a decision-making process ("WHEN necessary"),
-    # it cannot be fully automated or analyzed purely via code.
-
-    $status = [Status]::ManualVerificationRequired
-    $estimatedPercentageApplied = 0
-    $rawData = "This requires a review of governance and organizational policies to determine necessity."
-
-    try {
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied 0 -checklistItem $checklistItem -rawData $_.Exception.Message
-    }
-
-    return $result
-}
-
-# Function for Management item F01.17
-function Test-QuestionF0117 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Use Azure Monitor alerts for the generation of operational alerts.
-        # Reference: https://learn.microsoft.com/azure/azure-monitor/alerts/alerts-overview
-
-        $resourcesWithAlerts = 0
-        $totalResources = 0
-
-        $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
-        }
-
-        foreach ($resource in $resources) {
-            $totalResources++
-            $alerts = Get-AzMetricAlertRuleV2 -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue |
-                      Where-Object { $_.TargetResourceId -eq $resource.Id }
-
-            if ($alerts) {
-                $resourcesWithAlerts++
-            }
-        }
-
-        if ($resourcesWithAlerts -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithAlerts -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithAlerts / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalResources          = $totalResources
-            ResourcesWithAlerts     = $resourcesWithAlerts
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F01.18
-function Test-QuestionF0118 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Ensure that monitoring requirements have been assessed and that appropriate data collection and alerting configurations are applied.
-        # Reference: https://learn.microsoft.com/azure/architecture/best-practices/monitoring
-
-        $resourcesWithMonitoring = 0
-        $totalResources = 0
-
-        $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
-        }
-
-        foreach ($resource in $resources) {
-            $totalResources++
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction SilentlyContinue
-
-            if ($diagnosticSettings) {
-                $logsConfigured = $diagnosticSettings.Logs | Where-Object {
-                    $_.Enabled -eq $true
-                }
-
-                $alerts = Get-AzMetricAlertRuleV2 -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue |
-                          Where-Object { $_.TargetResourceId -eq $resource.Id }
-
-                if ($logsConfigured -and $alerts) {
-                    $resourcesWithMonitoring++
-                }
-            }
-        }
-
-        if ($resourcesWithMonitoring -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithMonitoring -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithMonitoring / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalResources             = $totalResources
-            ResourcesWithMonitoring    = $resourcesWithMonitoring
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F02.01
-function Test-QuestionF0201 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Enable cross-region replication in Azure for BCDR with paired regions.
-        # Reference: https://learn.microsoft.com/azure/reliability/cross-region-replication-azure
-
-        $totalStorageAccounts = 0
-        $storageWithReplication = 0
-
-        $storageAccounts = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -eq "Microsoft.Storage/storageAccounts"
-        }
-
-        foreach ($account in $storageAccounts) {
-            $totalStorageAccounts++
-
-            if ($account.Sku.Name -in @("Standard_GRS", "Standard_RAGRS", "Premium_GZRS", "Premium_RAGZRS")) {
-                $storageWithReplication++
-            }
-        }
-
-        if ($storageWithReplication -eq $totalStorageAccounts) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($storageWithReplication -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($storageWithReplication / $totalStorageAccounts) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalStorageAccounts         = $totalStorageAccounts
-            StorageWithReplication       = $storageWithReplication
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F03.01
-function Test-QuestionF0301 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Use Azure guest policies to automatically deploy software configurations through VM extensions and enforce a compliant baseline VM configuration.
-        # Reference: https://learn.microsoft.com/azure/governance/policy/concepts/guest-configuration
-
-        $totalVMs = 0
-        $compliantVMs = 0
-
-        $vmResourceTypes = @("Microsoft.Compute/virtualMachines", "Microsoft.Compute/virtualMachineScaleSets")
-
-        $vms = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $vmResourceTypes
-        }
-
-        foreach ($vm in $vms) {
-            $totalVMs++
-
-            # Check if guest policies are applied via Azure Policy
-            $policies = Get-AzPolicyAssignment -Scope $vm.Id -ErrorAction SilentlyContinue |
-                        Where-Object { $_.Properties.DisplayName -like "*Guest Configuration*" }
-
-            if ($policies) {
-                $compliantVMs++
-            }
-        }
-
-        if ($compliantVMs -eq $totalVMs) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($compliantVMs -eq 0) {
-            $status = [Status]::ManualVerificationRequired
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($compliantVMs / $totalVMs) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalVMs        = $totalVMs
-            CompliantVMs    = $compliantVMs
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F03.02
-function Test-QuestionF0302 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Monitor VM security configuration drift via Azure Policy.
-        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/management-operational-compliance#monitoring-for-configuration-drift
-
-        $totalVMs = 0
-        $vmsCompliantWithPolicy = 0
-        $vmsWithUpdateManagement = 0
-
-        $vmResourceTypes = @("Microsoft.Compute/virtualMachines", "Microsoft.Compute/virtualMachineScaleSets")
-
-        $vms = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $vmResourceTypes
-        }
-
-        foreach ($vm in $vms) {
-            $totalVMs++
-
-            # Check for guest configuration policy
-            $policies = Get-AzPolicyAssignment -Scope $vm.Id -ErrorAction SilentlyContinue |
-                        Where-Object { $_.Properties.DisplayName -like "*Security Configuration*" -or $_.Properties.DisplayName -like "*Configuration Drift*" }
-
-            if ($policies) {
-                $vmsCompliantWithPolicy++
-            }
-
-            # Check for Update Management
-            $updateManagement = Get-AzAutomationAccount -ResourceGroupName $vm.ResourceGroupName -ErrorAction SilentlyContinue |
-                                Where-Object { $_.Name -like "*Update Management*" }
-
-            if ($updateManagement) {
-                $vmsWithUpdateManagement++
-            }
-        }
-
-        if ($vmsCompliantWithPolicy -eq $totalVMs -and $vmsWithUpdateManagement -eq $totalVMs) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($vmsCompliantWithPolicy -eq 0 -and $vmsWithUpdateManagement -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = (($vmsCompliantWithPolicy + $vmsWithUpdateManagement) / (2 * $totalVMs)) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalVMs                  = $totalVMs
-            VMsCompliantWithPolicy    = $vmsCompliantWithPolicy
-            VMsWithUpdateManagement   = $vmsWithUpdateManagement
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F04.01
-function Test-QuestionF0401 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Use Azure Site Recovery for Azure-to-Azure Virtual Machines disaster recovery scenarios.
-        # Reference: https://learn.microsoft.com/azure/site-recovery/site-recovery-overview
-
-        $totalVMs = 0
-        $vmsWithASRConfigured = 0
-
-        $vmResourceTypes = @("Microsoft.Compute/virtualMachines")
-
-        $vms = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $vmResourceTypes
-        }
-
-        foreach ($vm in $vms) {
-            $totalVMs++
-
-            # Check if Azure Site Recovery is enabled for the VM
-            $asrConfig = Get-AzRecoveryServicesAsrProtectionContainerMapping -ResourceGroupName $vm.ResourceGroupName -ErrorAction SilentlyContinue |
-                         Where-Object { $_.SourceContainerId -eq $vm.Id }
-
-            if ($asrConfig) {
-                $vmsWithASRConfigured++
-            }
-        }
-
-        if ($vmsWithASRConfigured -eq $totalVMs) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($vmsWithASRConfigured -eq 0) {
-            $status = [Status]::ManualVerificationRequired
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($vmsWithASRConfigured / $totalVMs) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalVMs                = $totalVMs
-            VMsWithASRConfigured    = $vmsWithASRConfigured
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F04.02
-function Test-QuestionF0402 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Use native PaaS service disaster recovery capabilities. Perform failover testing with these capabilities.
-        # Reference: https://learn.microsoft.com/azure/architecture/framework/resiliency/backup-and-recovery
-
-        $totalPaaSResources = 0
-        $resourcesWithDRConfigured = 0
-
-        $paasResourceTypes = @(
-            "Microsoft.Sql/servers",
-            "Microsoft.DocumentDB/databaseAccounts",
-            "Microsoft.Web/sites"
-        )
-
-        $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $paasResourceTypes
-        }
-
-        foreach ($resource in $resources) {
-            $totalPaaSResources++
-
-            # Check for disaster recovery configuration (e.g., failover groups, geo-replication)
-            if ($resource.ResourceType -eq "Microsoft.Sql/servers") {
-                $failoverGroups = Get-AzSqlDatabaseFailoverGroup -ServerName $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue
-                if ($failoverGroups) {
-                    $resourcesWithDRConfigured++
-                }
-            } elseif ($resource.ResourceType -eq "Microsoft.DocumentDB/databaseAccounts") {
-                $account = Get-AzCosmosDBAccount -Name $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue
-                if ($account.ConsistencyPolicy.DefaultConsistencyLevel -ne "Strong") {
-                    $resourcesWithDRConfigured++
-                }
-            } elseif ($resource.ResourceType -eq "Microsoft.Web/sites") {
-                $siteConfig = Get-AzWebAppSlot -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction SilentlyContinue
-                if ($siteConfig.Location -ne $resource.Location) {
-                    $resourcesWithDRConfigured++
-                }
-            }
-        }
-
-        if ($resourcesWithDRConfigured -eq $totalPaaSResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithDRConfigured -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithDRConfigured / $totalPaaSResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalPaaSResources       = $totalPaaSResources
-            ResourcesWithDRConfigured = $resourcesWithDRConfigured
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F06.01
-function Test-QuestionF0601 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Add diagnostic settings to save WAF logs from application delivery services like Azure Front Door and Azure Application Gateway.
-        # Reference: https://learn.microsoft.com/azure/web-application-firewall/afds/waf-front-door-best-practices#add-diagnostic-settings-to-save-your-wafs-logs
-
-        $totalWAFServices = 0
-        $servicesWithDiagnostics = 0
-
-        $wafResourceTypes = @(
-            "Microsoft.Network/applicationGateways",
-            "Microsoft.Cdn/profiles"
-        )
-
-        $wafServices = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $wafResourceTypes
-        }
-
-        foreach ($service in $wafServices) {
-            $totalWAFServices++
-
-            # Check for diagnostic settings
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $service.Id -ErrorAction SilentlyContinue |
-                                  Where-Object { $_.Logs.Category -contains "ApplicationGatewayAccessLog" -or $_.Logs.Category -contains "FrontDoorAccessLog" }
-
-            if ($diagnosticSettings) {
-                $servicesWithDiagnostics++
-            }
-        }
-
-        if ($servicesWithDiagnostics -eq $totalWAFServices) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($servicesWithDiagnostics -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($servicesWithDiagnostics / $totalWAFServices) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalWAFServices          = $totalWAFServices
-            ServicesWithDiagnostics   = $servicesWithDiagnostics
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F06.02
-function Test-QuestionF0602 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Send WAF logs from your application delivery services like Azure Front Door and Azure Application Gateway to Microsoft Sentinel.
-        # Reference: https://learn.microsoft.com/azure/web-application-firewall/afds/waf-front-door-best-practices#send-logs-to-microsoft-sentinel
-
-        $totalWAFServices = 0
-        $servicesWithSentinelIntegration = 0
-
-        $wafResourceTypes = @(
-            "Microsoft.Network/applicationGateways",
-            "Microsoft.Cdn/profiles"
-        )
-
-        $wafServices = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $wafResourceTypes
-        }
-
-        foreach ($service in $wafServices) {
-            $totalWAFServices++
-
-            # Check for diagnostic settings sending logs to Microsoft Sentinel
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $service.Id -ErrorAction SilentlyContinue |
-                                  Where-Object {
-                                      $null -ne $_.WorkspaceId -and $_.WorkspaceId -match "Microsoft Sentinel"
-                                  }
-
-            if ($diagnosticSettings) {
-                $servicesWithSentinelIntegration++
-            }
-        }
-
-        if ($servicesWithSentinelIntegration -eq $totalWAFServices) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($servicesWithSentinelIntegration -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($servicesWithSentinelIntegration / $totalWAFServices) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalWAFServices               = $totalWAFServices
-            ServicesWithSentinelIntegration = $servicesWithSentinelIntegration
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F01.02
-function Test-QuestionF0102 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Decide whether to use a single Azure Monitor Logs workspace for all regions or to create multiple workspaces to cover various geographical regions.
-        # Reference: https://learn.microsoft.com/azure/azure-monitor/logs/design-logs-deployment
-
-        $subscriptions = $global:AzData.Subscriptions
-
-        if ($subscriptions.Count -eq 0) {
-            $status = [Status]::NotApplicable
-            $estimatedPercentageApplied = 100
-        } else {
-            $allWorkspaces = @()
-            $totalWorkspaces = 0
-
-            foreach ($subscription in $subscriptions) {
-                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzOperationalInsightsWorkspace -SubscriptionId $subscription.Id -ErrorAction Stop
-                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
-                
-                $allWorkspaces += $workspaces
-            }
-
-            $totalWorkspaces = $allWorkspaces.Count
-
-            if ($totalWorkspaces -eq 0) {
-                $status = [Status]::NotApplicable
-                $estimatedPercentageApplied = 100
-            } else {
-                # Group workspaces by region
-                $regions = $allWorkspaces | Group-Object Location
-                $regionCount = $regions.Count
-
-                # Check for cross-region networking charges considerations
-                $hasMultiRegionWorkspaces = $regionCount -gt 1
-                $hasRegionalDistribution = $false
-
-                if ($hasMultiRegionWorkspaces) {
-                    # Check if workspaces are properly distributed across regions
-                    $maxWorkspacesPerRegion = ($regions | Measure-Object -Property Count -Maximum).Maximum
-                    $minWorkspacesPerRegion = ($regions | Measure-Object -Property Count -Minimum).Minimum
-                    
-                    # Consider well-distributed if difference is not too large
-                    $hasRegionalDistribution = ($maxWorkspacesPerRegion - $minWorkspacesPerRegion) -le 2
-                }
-
-                if ($totalWorkspaces -eq 1) {
-                    # Single workspace strategy - check if it covers multiple regions appropriately
-                    $status = [Status]::Implemented
-                    $estimatedPercentageApplied = 100
-                } elseif ($hasMultiRegionWorkspaces -and $hasRegionalDistribution) {
-                    # Multiple workspaces with good regional distribution
-                    $status = [Status]::Implemented
-                    $estimatedPercentageApplied = 100
-                } elseif ($hasMultiRegionWorkspaces) {
-                    # Multiple workspaces but poor distribution
-                    $status = [Status]::PartiallyImplemented
-                    $estimatedPercentageApplied = 60
-                } else {
-                    # Multiple workspaces in same region - may not be optimal
-                    $status = [Status]::PartiallyImplemented
-                    $estimatedPercentageApplied = 40
-                }
-
-                $rawData = @{
-                    TotalWorkspaces = $totalWorkspaces
-                    UniqueRegions = $regionCount
-                    WorkspacesByRegion = $regions | ForEach-Object { @{ Region = $_.Name; Count = $_.Count } }
-                }
-            }
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F01.04
-function Test-QuestionF0104 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Monitor OS level virtual machine (VM) configuration drift using Azure Policy. Enabling Azure Automanage Machine Configuration audit capabilities.
-        # Reference: https://learn.microsoft.com/azure/governance/machine-configuration/overview
-
-        $totalVMs = 0
-        $vmsWithGuestConfiguration = 0
-
-        $virtualMachines = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -eq "Microsoft.Compute/virtualMachines"
-        }
-
-        $totalVMs = $virtualMachines.Count
-
-        if ($totalVMs -eq 0) {
-            $status = [Status]::NotApplicable
-            $estimatedPercentageApplied = 100
-        } else {
-            foreach ($vm in $virtualMachines) {
-                # Check for Azure Policy guest configuration compliance
-                $guestConfigPolicies = $global:AzData.Policies | Where-Object {
-                    $_.ResourceId -eq $vm.Id -and
-                    $_.PolicyDefinitionCategory -eq "Guest Configuration" -and
-                    $_.ComplianceState -eq "Compliant"
-                }
-
-                # Check for VM extensions related to guest configuration
-                $extensions = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzVMExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -ErrorAction Stop
-                } -CmdletName "Get-AzVMExtension" -ModuleName "Az.Compute" -FallbackValue @() -WarningMessage "Could not check VM extensions for $($vm.Name)"
-
-                $hasGuestConfigExtension = $extensions | Where-Object {
-                    $_.ExtensionType -in @("ConfigurationForLinux", "ConfigurationForWindows", "GuestConfiguration")
-                }
-
-                if ($guestConfigPolicies.Count -gt 0 -or $hasGuestConfigExtension) {
-                    $vmsWithGuestConfiguration++
-                }
-            }
-
-            $estimatedPercentageApplied = ($vmsWithGuestConfiguration / $totalVMs) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-
-            if ($estimatedPercentageApplied -eq 100) {
-                $status = [Status]::Implemented
-            } elseif ($estimatedPercentageApplied -eq 0) {
-                $status = [Status]::NotImplemented
-            } else {
-                $status = [Status]::PartiallyImplemented
-            }
-
-            $rawData = @{
-                TotalVMs = $totalVMs
-                VMsWithGuestConfiguration = $vmsWithGuestConfiguration
-                VMsWithoutGuestConfiguration = $totalVMs - $vmsWithGuestConfiguration
-            }
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F01.14
 function Test-QuestionF0114 {
     [CmdletBinding()]
     param(
@@ -1890,7 +1194,277 @@ function Test-QuestionF0114 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F02.02
+function Test-QuestionF0115 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Use Azure Monitor Logs for insights and reporting.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-setup-guide/monitoring-reporting?tabs=AzureMonitor
+
+        $resourcesWithMonitorLogs = 0
+        $totalResources = 0
+
+        $resources = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
+        }
+
+        foreach ($resource in $resources) {
+            $totalResources++
+            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction SilentlyContinue
+
+            if ($diagnosticSettings) {
+                $logsConfigured = $diagnosticSettings.Logs | Where-Object {
+                    $_.Enabled -eq $true
+                }
+
+                if ($logsConfigured) {
+                    $resourcesWithMonitorLogs++
+                }
+            }
+        }
+
+        if ($resourcesWithMonitorLogs -eq $totalResources) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($resourcesWithMonitorLogs -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($resourcesWithMonitorLogs / $totalResources) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalResources              = $totalResources
+            ResourcesWithMonitorLogs    = $resourcesWithMonitorLogs
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0116 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+    # Since this question involves a decision-making process ("WHEN necessary"),
+    # it cannot be fully automated or analyzed purely via code.
+
+    $status = [Status]::ManualVerificationRequired
+    $estimatedPercentageApplied = 0
+    $rawData = "This requires a review of governance and organizational policies to determine necessity."
+
+    try {
+        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied 0 -checklistItem $checklistItem -rawData $_.Exception.Message
+    }
+
+    return $result
+}
+
+function Test-QuestionF0117 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Use Azure Monitor alerts for the generation of operational alerts.
+        # Reference: https://learn.microsoft.com/azure/azure-monitor/alerts/alerts-overview
+
+        $resourcesWithAlerts = 0
+        $totalResources = 0
+
+        $resources = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
+        }
+
+        foreach ($resource in $resources) {
+            $totalResources++
+            $alerts = Get-AzMetricAlertRuleV2 -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue |
+                      Where-Object { $_.TargetResourceId -eq $resource.Id }
+
+            if ($alerts) {
+                $resourcesWithAlerts++
+            }
+        }
+
+        if ($resourcesWithAlerts -eq $totalResources) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($resourcesWithAlerts -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($resourcesWithAlerts / $totalResources) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalResources          = $totalResources
+            ResourcesWithAlerts     = $resourcesWithAlerts
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0118 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Ensure that monitoring requirements have been assessed and that appropriate data collection and alerting configurations are applied.
+        # Reference: https://learn.microsoft.com/azure/architecture/best-practices/monitoring
+
+        $resourcesWithMonitoring = 0
+        $totalResources = 0
+
+        $resources = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
+        }
+
+        foreach ($resource in $resources) {
+            $totalResources++
+            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction SilentlyContinue
+
+            if ($diagnosticSettings) {
+                $logsConfigured = $diagnosticSettings.Logs | Where-Object {
+                    $_.Enabled -eq $true
+                }
+
+                $alerts = Get-AzMetricAlertRuleV2 -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue |
+                          Where-Object { $_.TargetResourceId -eq $resource.Id }
+
+                if ($logsConfigured -and $alerts) {
+                    $resourcesWithMonitoring++
+                }
+            }
+        }
+
+        if ($resourcesWithMonitoring -eq $totalResources) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($resourcesWithMonitoring -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($resourcesWithMonitoring / $totalResources) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalResources             = $totalResources
+            ResourcesWithMonitoring    = $resourcesWithMonitoring
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0201 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Enable cross-region replication in Azure for BCDR with paired regions.
+        # Reference: https://learn.microsoft.com/azure/reliability/cross-region-replication-azure
+
+        $totalStorageAccounts = 0
+        $storageWithReplication = 0
+
+        $storageAccounts = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.Storage/storageAccounts"
+        }
+
+        foreach ($account in $storageAccounts) {
+            $totalStorageAccounts++
+
+            if ($account.Sku.Name -in @("Standard_GRS", "Standard_RAGRS", "Premium_GZRS", "Premium_RAGZRS")) {
+                $storageWithReplication++
+            }
+        }
+
+        if ($storageWithReplication -eq $totalStorageAccounts) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($storageWithReplication -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($storageWithReplication / $totalStorageAccounts) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalStorageAccounts         = $totalStorageAccounts
+            StorageWithReplication       = $storageWithReplication
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
 function Test-QuestionF0202 {
     [CmdletBinding()]
     param(
@@ -1978,6 +1552,414 @@ function Test-QuestionF0202 {
                 VaultsWithAppropriateSku = $vaultsWithAppropriateSku
                 VaultsWithDefaultSku = $totalBackupVaults - $vaultsWithAppropriateSku
             }
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0301 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Use Azure guest policies to automatically deploy software configurations through VM extensions and enforce a compliant baseline VM configuration.
+        # Reference: https://learn.microsoft.com/azure/governance/policy/concepts/guest-configuration
+
+        $totalVMs = 0
+        $compliantVMs = 0
+
+        $vmResourceTypes = @("Microsoft.Compute/virtualMachines", "Microsoft.Compute/virtualMachineScaleSets")
+
+        $vms = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in $vmResourceTypes
+        }
+
+        foreach ($vm in $vms) {
+            $totalVMs++
+
+            # Check if guest policies are applied via Azure Policy
+            $policies = Get-AzPolicyAssignment -Scope $vm.Id -ErrorAction SilentlyContinue |
+                        Where-Object { $_.Properties.DisplayName -like "*Guest Configuration*" }
+
+            if ($policies) {
+                $compliantVMs++
+            }
+        }
+
+        if ($compliantVMs -eq $totalVMs) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($compliantVMs -eq 0) {
+            $status = [Status]::ManualVerificationRequired
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($compliantVMs / $totalVMs) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalVMs        = $totalVMs
+            CompliantVMs    = $compliantVMs
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0302 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Monitor VM security configuration drift via Azure Policy.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/management-operational-compliance#monitoring-for-configuration-drift
+
+        $totalVMs = 0
+        $vmsCompliantWithPolicy = 0
+        $vmsWithUpdateManagement = 0
+
+        $vmResourceTypes = @("Microsoft.Compute/virtualMachines", "Microsoft.Compute/virtualMachineScaleSets")
+
+        $vms = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in $vmResourceTypes
+        }
+
+        foreach ($vm in $vms) {
+            $totalVMs++
+
+            # Check for guest configuration policy
+            $policies = Get-AzPolicyAssignment -Scope $vm.Id -ErrorAction SilentlyContinue |
+                        Where-Object { $_.Properties.DisplayName -like "*Security Configuration*" -or $_.Properties.DisplayName -like "*Configuration Drift*" }
+
+            if ($policies) {
+                $vmsCompliantWithPolicy++
+            }
+
+            # Check for Update Management
+            $updateManagement = Get-AzAutomationAccount -ResourceGroupName $vm.ResourceGroupName -ErrorAction SilentlyContinue |
+                                Where-Object { $_.Name -like "*Update Management*" }
+
+            if ($updateManagement) {
+                $vmsWithUpdateManagement++
+            }
+        }
+
+        if ($vmsCompliantWithPolicy -eq $totalVMs -and $vmsWithUpdateManagement -eq $totalVMs) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($vmsCompliantWithPolicy -eq 0 -and $vmsWithUpdateManagement -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = (($vmsCompliantWithPolicy + $vmsWithUpdateManagement) / (2 * $totalVMs)) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalVMs                  = $totalVMs
+            VMsCompliantWithPolicy    = $vmsCompliantWithPolicy
+            VMsWithUpdateManagement   = $vmsWithUpdateManagement
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0401 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Use Azure Site Recovery for Azure-to-Azure Virtual Machines disaster recovery scenarios.
+        # Reference: https://learn.microsoft.com/azure/site-recovery/site-recovery-overview
+
+        $totalVMs = 0
+        $vmsWithASRConfigured = 0
+
+        $vmResourceTypes = @("Microsoft.Compute/virtualMachines")
+
+        $vms = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in $vmResourceTypes
+        }
+
+        foreach ($vm in $vms) {
+            $totalVMs++
+
+            # Check if Azure Site Recovery is enabled for the VM
+            $asrConfig = Get-AzRecoveryServicesAsrProtectionContainerMapping -ResourceGroupName $vm.ResourceGroupName -ErrorAction SilentlyContinue |
+                         Where-Object { $_.SourceContainerId -eq $vm.Id }
+
+            if ($asrConfig) {
+                $vmsWithASRConfigured++
+            }
+        }
+
+        if ($vmsWithASRConfigured -eq $totalVMs) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($vmsWithASRConfigured -eq 0) {
+            $status = [Status]::ManualVerificationRequired
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($vmsWithASRConfigured / $totalVMs) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalVMs                = $totalVMs
+            VMsWithASRConfigured    = $vmsWithASRConfigured
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0402 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Use native PaaS service disaster recovery capabilities. Perform failover testing with these capabilities.
+        # Reference: https://learn.microsoft.com/azure/architecture/framework/resiliency/backup-and-recovery
+
+        $totalPaaSResources = 0
+        $resourcesWithDRConfigured = 0
+
+        $paasResourceTypes = @(
+            "Microsoft.Sql/servers",
+            "Microsoft.DocumentDB/databaseAccounts",
+            "Microsoft.Web/sites"
+        )
+
+        $resources = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in $paasResourceTypes
+        }
+
+        foreach ($resource in $resources) {
+            $totalPaaSResources++
+
+            # Check for disaster recovery configuration (e.g., failover groups, geo-replication)
+            if ($resource.ResourceType -eq "Microsoft.Sql/servers") {
+                $failoverGroups = Get-AzSqlDatabaseFailoverGroup -ServerName $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue
+                if ($failoverGroups) {
+                    $resourcesWithDRConfigured++
+                }
+            } elseif ($resource.ResourceType -eq "Microsoft.DocumentDB/databaseAccounts") {
+                $account = Get-AzCosmosDBAccount -Name $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue
+                if ($account.ConsistencyPolicy.DefaultConsistencyLevel -ne "Strong") {
+                    $resourcesWithDRConfigured++
+                }
+            } elseif ($resource.ResourceType -eq "Microsoft.Web/sites") {
+                $siteConfig = Get-AzWebAppSlot -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction SilentlyContinue
+                if ($siteConfig.Location -ne $resource.Location) {
+                    $resourcesWithDRConfigured++
+                }
+            }
+        }
+
+        if ($resourcesWithDRConfigured -eq $totalPaaSResources) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($resourcesWithDRConfigured -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($resourcesWithDRConfigured / $totalPaaSResources) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalPaaSResources       = $totalPaaSResources
+            ResourcesWithDRConfigured = $resourcesWithDRConfigured
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0601 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Add diagnostic settings to save WAF logs from application delivery services like Azure Front Door and Azure Application Gateway.
+        # Reference: https://learn.microsoft.com/azure/web-application-firewall/afds/waf-front-door-best-practices#add-diagnostic-settings-to-save-your-wafs-logs
+
+        $totalWAFServices = 0
+        $servicesWithDiagnostics = 0
+
+        $wafResourceTypes = @(
+            "Microsoft.Network/applicationGateways",
+            "Microsoft.Cdn/profiles"
+        )
+
+        $wafServices = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in $wafResourceTypes
+        }
+
+        foreach ($service in $wafServices) {
+            $totalWAFServices++
+
+            # Check for diagnostic settings
+            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $service.Id -ErrorAction SilentlyContinue |
+                                  Where-Object { $_.Logs.Category -contains "ApplicationGatewayAccessLog" -or $_.Logs.Category -contains "FrontDoorAccessLog" }
+
+            if ($diagnosticSettings) {
+                $servicesWithDiagnostics++
+            }
+        }
+
+        if ($servicesWithDiagnostics -eq $totalWAFServices) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($servicesWithDiagnostics -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($servicesWithDiagnostics / $totalWAFServices) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalWAFServices          = $totalWAFServices
+            ServicesWithDiagnostics   = $servicesWithDiagnostics
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0602 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Send WAF logs from your application delivery services like Azure Front Door and Azure Application Gateway to Microsoft Sentinel.
+        # Reference: https://learn.microsoft.com/azure/web-application-firewall/afds/waf-front-door-best-practices#send-logs-to-microsoft-sentinel
+
+        $totalWAFServices = 0
+        $servicesWithSentinelIntegration = 0
+
+        $wafResourceTypes = @(
+            "Microsoft.Network/applicationGateways",
+            "Microsoft.Cdn/profiles"
+        )
+
+        $wafServices = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in $wafResourceTypes
+        }
+
+        foreach ($service in $wafServices) {
+            $totalWAFServices++
+
+            # Check for diagnostic settings sending logs to Microsoft Sentinel
+            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $service.Id -ErrorAction SilentlyContinue |
+                                  Where-Object {
+                                      $null -ne $_.WorkspaceId -and $_.WorkspaceId -match "Microsoft Sentinel"
+                                  }
+
+            if ($diagnosticSettings) {
+                $servicesWithSentinelIntegration++
+            }
+        }
+
+        if ($servicesWithSentinelIntegration -eq $totalWAFServices) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($servicesWithSentinelIntegration -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } else {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = ($servicesWithSentinelIntegration / $totalWAFServices) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+        }
+
+        $rawData = @{
+            TotalWAFServices               = $totalWAFServices
+            ServicesWithSentinelIntegration = $servicesWithSentinelIntegration
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
