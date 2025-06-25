@@ -14,9 +14,10 @@
     lramoscostah@microsoft.com
 #>
 
-# Import shared modules
-Import-Module "$PSScriptRoot/../shared/Enums.ps1"
-Import-Module "$PSScriptRoot/../shared/ErrorHandling.ps1"
+# Dot-source shared modules
+. "$PSScriptRoot/../shared/Enums.ps1"
+. "$PSScriptRoot/../shared/ErrorHandling.ps1"
+. "$PSScriptRoot/../shared/SharedFunctions.ps1"
 
 function Invoke-SecurityAssessment {
     [CmdletBinding()]
@@ -25,7 +26,7 @@ function Invoke-SecurityAssessment {
         [object]$Checklist
     )
     Measure-ExecutionTime -ScriptBlock {
-        Write-Output "Evaluating the Security design area..."
+        Write-AssessmentHeader "Evaluating the Security design area..."
 
         $results = @()
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G01.01") }) | Test-QuestionG0101
@@ -38,7 +39,8 @@ function Invoke-SecurityAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.06") }) | Test-QuestionG0206
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.07") }) | Test-QuestionG0207
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.08") }) | Test-QuestionG0208
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.09") }) | Test-QuestionG0209        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.10") }) | Test-QuestionG0210
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.09") }) | Test-QuestionG0209        
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.10") }) | Test-QuestionG0210
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.12") }) | Test-QuestionG0212
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.13") }) | Test-QuestionG0213
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.01") }) | Test-QuestionG0301
@@ -73,7 +75,7 @@ function Test-QuestionG0101 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -83,7 +85,7 @@ function Test-QuestionG0101 {
         # Question: Determine the incident response plan for Azure services before allowing it into production.
         # Reference: https://learn.microsoft.com/security/benchmark/azure/security-control-incident-response
 
-        # This question requires manual verification as it involves planning and documentation.
+        # This Security item requires manual verification as it involves planning and documentation.
         $status = [Status]::ManualVerificationRequired
         $rawData = "Incident response plan needs to be documented and verified manually."
         $estimatedPercentageApplied = 0
@@ -106,7 +108,7 @@ function Test-QuestionG0102 {
         [Object]$checklistItem
     )
     
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
         
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -161,7 +163,7 @@ function Test-QuestionG0201 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -171,20 +173,27 @@ function Test-QuestionG0201 {
         # Question: Use Azure Key Vault to store your secrets and credentials.
         # Reference: https://learn.microsoft.com/azure/key-vault/general/overview
 
-        # Retrieve all Key Vaults in the subscriptions
-        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
-
-        if ($keyVaults.Count -eq 0) {
-            $status = [Status]::NotImplemented
-            $rawData = "No Azure Key Vaults are configured in the current subscriptions."
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::Implemented
-            $rawData = @{
-                KeyVaultCount = $keyVaults.Count
-                KeyVaultNames = $keyVaults.Name
+        # Check if Key Vaults exist in the environment
+        if ($global:AzData -and $global:AzData.Resources) {
+            $keyVaults = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.KeyVault/vaults" }
+            
+            if ($keyVaults -and $keyVaults.Count -gt 0) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 90 # High score as Key Vaults are present
+                $rawData = @{
+                    KeyVaultCount = $keyVaults.Count
+                    KeyVaultNames = $keyVaults.Name
+                    Note = "Key Vaults found in environment. Manual verification recommended to confirm proper usage for secrets and credentials."
+                }
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = "No Key Vaults found in the environment. Consider implementing Key Vault to store secrets and credentials securely."
             }
-            $estimatedPercentageApplied = 100
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $estimatedPercentageApplied = 0
+            $rawData = "Unable to check Key Vault existence automatically. Manual verification required."
         }
     }
     catch {
@@ -205,7 +214,7 @@ function Test-QuestionG0202 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -266,7 +275,7 @@ function Test-QuestionG0203 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -325,7 +334,7 @@ function Test-QuestionG0204 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -397,7 +406,7 @@ function Test-QuestionG0205 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -480,7 +489,7 @@ function Test-QuestionG0205 {
                     }
                 }
                 catch {
-                    Write-Output "Error accessing certificates in Key Vault $($keyVault.Name): $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Warning "Error accessing certificates in Key Vault $($keyVault.Name): $($_.Exception.Message)" -ForegroundColor Yellow
                 }
             }
             
@@ -534,7 +543,7 @@ function Test-QuestionG0206 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -562,7 +571,7 @@ function Test-QuestionG0207 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -590,7 +599,7 @@ function Test-QuestionG0208 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -618,7 +627,7 @@ function Test-QuestionG0209 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -646,7 +655,7 @@ function Test-QuestionG0210 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -674,7 +683,7 @@ function Test-QuestionG0212 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -702,7 +711,7 @@ function Test-QuestionG0213 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -730,7 +739,7 @@ function Test-QuestionG0301 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -758,7 +767,7 @@ function Test-QuestionG0302 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -786,7 +795,7 @@ function Test-QuestionG0303 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -814,7 +823,7 @@ function Test-QuestionG0304 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -842,7 +851,7 @@ function Test-QuestionG0305 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -870,7 +879,7 @@ function Test-QuestionG0306 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -898,7 +907,7 @@ function Test-QuestionG0307 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -926,7 +935,7 @@ function Test-QuestionG0308 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -954,7 +963,7 @@ function Test-QuestionG0309 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -982,7 +991,7 @@ function Test-QuestionG0310 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -1010,7 +1019,7 @@ function Test-QuestionG0311 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -1038,7 +1047,7 @@ function Test-QuestionG0312 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -1066,13 +1075,47 @@ function Test-QuestionG0401 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
+        # Question: Enable secure transfer to storage accounts.
+        # Reference: https://learn.microsoft.com/azure/storage/common/storage-require-secure-transfer
+        
+        if ($global:AzData -and $global:AzData.Resources) {
+            $storageAccounts = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.Storage/storageAccounts" }
+            
+            if ($storageAccounts -and $storageAccounts.Count -gt 0) {
+                $totalAccounts = $storageAccounts.Count
+                $accountDetails = @()
+                
+                foreach ($storageAccount in $storageAccounts) {
+                    # This would require additional API calls to check supportsHttpsTrafficOnly property
+                    # For now, we'll recommend manual verification
+                    $accountDetails += @{
+                        Name = $storageAccount.Name
+                        ResourceGroup = $storageAccount.ResourceGroupName
+                        Note = "Manual verification required for HTTPS-only setting"
+                    }
+                }
+                
+                $status = [Status]::ManualVerificationRequired
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalStorageAccounts = $totalAccounts
+                    StorageAccountDetails = $accountDetails
+                    Note = "Found $totalAccounts storage account(s). Manual verification required to confirm secure transfer (HTTPS-only) is enabled."
+                }
+            } else {
+                $status = [Status]::NotApplicable
+                $estimatedPercentageApplied = 100
+                $rawData = "No storage accounts found in the environment."
+            }
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $estimatedPercentageApplied = 0
+            $rawData = "Unable to check storage accounts automatically. Manual verification required."
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -1094,7 +1137,7 @@ function Test-QuestionG0402 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -1122,7 +1165,7 @@ function Test-QuestionG0501 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -1150,7 +1193,7 @@ function Test-QuestionG0601 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -1178,7 +1221,7 @@ function Test-QuestionG0602 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {

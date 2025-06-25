@@ -203,7 +203,7 @@ function Test-QuestionH0106 {
             $keyVaults = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.KeyVault/vaults" }
             
             if ($keyVaults -and $keyVaults.Count -gt 0) {
-                $status = [Status]::Passed
+                $status = [Status]::Implemented
                 $estimatedPercentageApplied = 85 # Partial - existence indicates usage but manual verification needed for proper implementation
                 $rawData = @{
                     KeyVaultCount = $keyVaults.Count
@@ -211,7 +211,7 @@ function Test-QuestionH0106 {
                     Note = "Key Vaults found in environment. Manual verification needed to confirm proper usage for sensitive information storage."
                 }
             } else {
-                $status = [Status]::Failed
+                $status = [Status]::NotImplemented
                 $estimatedPercentageApplied = 0
                 $rawData = "No Key Vaults found in the environment. Consider implementing Key Vault for storing sensitive information."
             }
@@ -415,7 +415,7 @@ function Test-QuestionH0301 {
             $totalIndicators = $iacEvidence.ResourceGroupsWithDeploymentTags + $iacEvidence.DeploymentTemplates
             
             if ($totalIndicators -gt 0) {
-                $status = [Status]::Passed
+                $status = [Status]::Implemented
                 $estimatedPercentageApplied = [Math]::Min(90, ($totalIndicators / $iacEvidence.TotalResourceGroups) * 100)
                 $rawData = @{
                     IaCEvidence = $iacEvidence
