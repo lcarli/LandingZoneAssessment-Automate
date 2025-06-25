@@ -15,10 +15,9 @@
 # Removed InstallAndImportModule function - functionality integrated into Get-AzModules
 
 function Get-AzModules {    # Disable module auto-loading to prevent conflicts
-    $global:PSModuleAutoLoadingPreference = 'None'
-    
+    $global:PSModuleAutoLoadingPreference = 'None'    
     $requiredModules = @(
-        'Az.Accounts', 'Az.Resources', 'Az.Monitor',
+        'Az.Accounts', 'Az.Resources', 'Az.Monitor', 'Az.Billing',
         'Microsoft.Graph.Authentication', 'Microsoft.Graph.Identity.DirectoryManagement',
         'Microsoft.Graph.Users', 'Microsoft.Graph.Groups', 'Microsoft.Graph.Applications',
         'Microsoft.Graph.Identity.Governance', 'Microsoft.Graph.Identity.SignIns'
@@ -43,9 +42,11 @@ function Get-AzModules {    # Disable module auto-loading to prevent conflicts
                 Write-Error "Failed to install modules: $($_.Exception.Message)"
                 Write-Warning "Install manually: Install-Module -Name <ModuleName> -Scope CurrentUser -Force"
             }
-        } else {
+        } 
+        else {
             Write-Warning "Install-Module not available. Install modules manually in regular PowerShell"
-        }    }
+        }    
+    }
     
     # More aggressive Graph module cleanup to prevent assembly conflicts
     try {
@@ -97,7 +98,8 @@ function Initialize-Connect {
                 Write-Output "Graph: Already connected"
                 return
             }
-        } catch {
+        } 
+        catch {
             # Get-MgContext failed, need to load module
         }
         
@@ -107,7 +109,8 @@ function Initialize-Connect {
             # Module not loaded, try to import
             try {
                 Import-Module Microsoft.Graph.Authentication -ErrorAction Stop
-            } catch {                # Assembly conflict - try alternative approach
+            } 
+            catch {                # Assembly conflict - try alternative approach
                 Write-Output "Assembly conflict detected - attempting workaround..."
                 
                 # Try to connect anyway - sometimes the cmdlets work even with assembly warnings
@@ -122,7 +125,8 @@ function Initialize-Connect {
                     $global:GraphConnected = $true
                     Write-Output "Graph: Connected (workaround successful)"
                     return
-                } catch {
+                } 
+                catch {
                     Write-Output "Graph: Connection failed (assembly conflict)"
                     return
                 }
@@ -145,8 +149,12 @@ function Initialize-Connect {
 }
 
 function Get-AzData {
-    # Import required modules (Az.Monitor added for diagnostic settings)
-    Import-Module Az.Resources, Az.Monitor -Force -ErrorAction SilentlyContinue
+    # Import required modules (Az.Monitor and Az.Billing for diagnostics and billing)
+    # Note: Az.Consumption module has been discontinued in newer Az PowerShell versions
+    Import-Module Az.Resources, Az.Monitor, Az.Billing -Force -ErrorAction SilentlyContinue
+    
+    # Az.Consumption functionality has been moved to Az.Billing in newer versions
+    Write-Verbose "Using Az.Billing for consumption/budget operations (Az.Consumption deprecated)"
 
     $global:AzData = [PSCustomObject]@{
         Tenant = Get-AzTenant -TenantId $global:TenantId
