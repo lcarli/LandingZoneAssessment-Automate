@@ -85,13 +85,23 @@ function Initialize-Connect {
         return
     }
 
-    # Azure connection
+    # Azure connection - check if already connected and module loaded
     try {
-        Import-Module Az.Accounts -Force -ErrorAction Stop
+        # Check if Az.Accounts is already loaded
+        $azAccountsModule = Get-Module -Name Az.Accounts -ErrorAction SilentlyContinue
+        if (-not $azAccountsModule) {
+            Write-Output "Importing Az.Accounts module..."
+            Import-Module Az.Accounts -Force -ErrorAction Stop
+        } else {
+            Write-Output "Az.Accounts already loaded (version: $($azAccountsModule.Version))"
+        }
         
         $azContext = Get-AzContext -ErrorAction SilentlyContinue
         if ($null -eq $azContext -or $azContext.Tenant.Id -ne $global:TenantId) {
+            Write-Output "Connecting to Azure..."
             Connect-AzAccount -Tenant $global:TenantId | Out-Null
+        } else {
+            Write-Output "Azure: Already connected to tenant $($azContext.Tenant.Id)"
         }
         Write-Output "Azure: Connected"
     }
@@ -119,8 +129,10 @@ function Initialize-Connect {
         $authModule = Get-Module Microsoft.Graph.Authentication -ErrorAction SilentlyContinue
         if (-not $authModule) {
             # Module not loaded, try to import
+            Write-Output "Importing Microsoft.Graph.Authentication module..."
             try {
                 Import-Module Microsoft.Graph.Authentication -ErrorAction Stop
+                Write-Output "Microsoft.Graph.Authentication imported successfully"
             } 
             catch {                # Assembly conflict - try alternative approach
                 Write-Output "Assembly conflict detected - attempting workaround..."
@@ -160,32 +172,98 @@ function Initialize-Connect {
     }
 }
 
-function Get-AzData {
-    # Import specific Az modules that we need - the Az meta-module includes all of these
-    # Only import specific modules to avoid loading unnecessary ones and improve performance
-    # Import only the specific Az sub-modules we need (for performance)
-    # Note: Az meta-module is installed but we import only what we use
+# Function to import all required modules (separated from data collection)
+function Import-RequiredModules {
+    # Import Az modules
     $azSubModules = @('Az.Accounts', 'Az.Resources', 'Az.Monitor', 'Az.Billing', 'Az.Network', 'Az.Storage', 'Az.Sql', 'Az.KeyVault', 'Az.Websites')
     
-    try {
-        Write-Output "Importing required Az sub-modules..."
-        Import-Module $azSubModules -Force -ErrorAction Stop
-        Write-Output "Az modules imported successfully"
-    }
-    catch {
-        Write-Warning "Failed to import some Az modules: $($_.Exception.Message)"
-        # Try importing one by one to identify which ones fail
-        foreach ($module in $azSubModules) {
-            try {
-                Import-Module $module -Force -ErrorAction Stop
-                Write-Output "  ✓ $module imported"
-            }
-            catch {
-                Write-Warning "  ✗ Failed to import $module : $($_.Exception.Message)"
-            }
+    # Check which Az modules are already loaded to avoid unnecessary imports
+    $azModulesToImport = @()
+    $azAlreadyLoaded = @()
+    
+    foreach ($module in $azSubModules) {
+        $loadedModule = Get-Module -Name $module -ErrorAction SilentlyContinue
+        if ($loadedModule) {
+            $azAlreadyLoaded += "$module (v$($loadedModule.Version))"
+        } else {
+            $azModulesToImport += $module
         }
     }
+    
+    if ($azAlreadyLoaded.Count -gt 0) {
+        Write-Output "  Az modules already loaded: $($azAlreadyLoaded.Count)/$($azSubModules.Count)"
+    }
+    
+    if ($azModulesToImport.Count -gt 0) {
+        try {
+            Write-Output "  Importing $($azModulesToImport.Count) Az modules: $($azModulesToImport -join ', ')"
+            Import-Module $azModulesToImport -Force -ErrorAction Stop
+            Write-Output "  Az modules imported successfully"
+        }
+        catch {
+            Write-Warning "Failed to import some Az modules: $($_.Exception.Message)"
+            # Try importing one by one to identify which ones fail
+            foreach ($module in $azModulesToImport) {
+                try {
+                    Import-Module $module -Force -ErrorAction Stop
+                    Write-Output "    ✓ $module imported"
+                }
+                catch {
+                    Write-Warning "    ✗ Failed to import $module : $($_.Exception.Message)"
+                }
+            }
+        }
+    } else {
+        Write-Output "  All required Az modules already loaded - skipping import"
+    }
 
+    # Import Graph modules (only if Graph is connected)
+    if ($global:GraphConnected) {
+        $graphModules = @(
+            'Microsoft.Graph.Identity.DirectoryManagement', 'Microsoft.Graph.Users',
+            'Microsoft.Graph.Groups', 'Microsoft.Graph.Applications',
+            'Microsoft.Graph.Identity.Governance', 'Microsoft.Graph.Identity.SignIns'
+        )
+
+        # Check which Graph modules are already loaded
+        $graphModulesToImport = @()
+        $graphAlreadyLoaded = @()
+        
+        foreach ($module in $graphModules) {
+            $loadedModule = Get-Module -Name $module -ErrorAction SilentlyContinue
+            if ($loadedModule) {
+                $graphAlreadyLoaded += "$module (v$($loadedModule.Version))"
+            } else {
+                $graphModulesToImport += $module
+            }
+        }
+        
+        if ($graphAlreadyLoaded.Count -gt 0) {
+            Write-Output "  Graph modules already loaded: $($graphAlreadyLoaded.Count)/$($graphModules.Count)"
+        }
+
+        if ($graphModulesToImport.Count -gt 0) {
+            try {
+                Write-Output "  Importing $($graphModulesToImport.Count) Graph modules..."
+                $graphModulesToImport | ForEach-Object {
+                    Import-Module $_ -Force -ErrorAction Stop
+                }
+                Write-Output "  Graph modules imported successfully"
+            }
+            catch {
+                Write-Warning "Failed to import Graph modules: $($_.Exception.Message)"
+                $global:GraphConnected = $false
+            }
+        } else {
+            Write-Output "  All required Graph modules already loaded - skipping import"
+        }
+    } else {
+        Write-Output "  Graph not connected - skipping Graph module import"
+    }
+}
+
+function Collect-AzData {
+    # Collect Azure data (modules should already be imported at this point)
     $global:AzData = [PSCustomObject]@{
         Tenant = Get-AzTenant -TenantId $global:TenantId
         ManagementGroups = @()
@@ -265,22 +343,25 @@ function Initialize-Environment {
     # Check for potential conflicts early with clear guidance
     $hasConflicts = Test-ModuleConflicts
     
-    Write-Output "Step 1/6: Checking modules..."
+    Write-Output "Step 1/7: Checking and installing modules..."
     Get-AzModules
     
-    Write-Output "Step 2/6: Loading checklist..."
+    Write-Output "Step 2/7: Loading checklist..."
     Set-GlobalChecklist
     
-    Write-Output "Step 3/6: Connecting to Azure and Graph..."
+    Write-Output "Step 3/7: Connecting to Azure and Graph..."
     Initialize-Connect
     
-    Write-Output "Step 4/6: Collecting Azure data..."
-    Get-AzData
+    Write-Output "Step 4/7: Importing required modules..."
+    Import-RequiredModules
     
-    Write-Output "Step 5/6: Collecting Graph data..."
-    Get-GraphData
+    Write-Output "Step 5/7: Collecting Azure data..."
+    Collect-AzData
     
-    Write-Output "Step 6/6: Preparing reports..."
+    Write-Output "Step 6/7: Collecting Graph data..."
+    Collect-GraphData
+    
+    Write-Output "Step 7/7: Preparing reports..."
     New-ReportFolder
     
     $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
@@ -301,43 +382,15 @@ function Initialize-Environment {
 function Test-ModuleConflicts {
     $loadedGraphModules = Get-Module Microsoft.Graph* -ErrorAction SilentlyContinue
     if ($loadedGraphModules) {
-        Write-Output "⚠️  Microsoft Graph modules already loaded: $($loadedGraphModules.Name -join ', ')"
-        Write-Output "⚠️  This may cause assembly conflicts. For full Graph support:"
-        Write-Output "   1. Close this PowerShell session completely"
-        Write-Output "   2. Open fresh PowerShell session" 
-        Write-Output "   3. Run the assessment again"
-        Write-Output ""
         return $true
     }
     return $false
 }
 
 # Function to collect and cache all Microsoft Graph data
-function Get-GraphData {
+function Collect-GraphData {
     if (-not $global:GraphConnected) {
         Write-Output "Graph: Not connected, skipping data collection"
-        $global:GraphData = @{}
-        return
-    }
-
-    Write-Output "  Importing Graph modules..."
-    # Import all Graph modules at once - only if not already loaded
-    $graphModules = @(
-        'Microsoft.Graph.Identity.DirectoryManagement', 'Microsoft.Graph.Users',
-        'Microsoft.Graph.Groups', 'Microsoft.Graph.Applications',
-        'Microsoft.Graph.Identity.Governance', 'Microsoft.Graph.Identity.SignIns'
-    )
-
-    try {
-        $graphModules | ForEach-Object {
-            if (-not (Get-Module $_ -ErrorAction SilentlyContinue)) {
-                Import-Module $_ -Force -ErrorAction Stop
-            }
-        }
-        Write-Output "  Graph modules imported successfully"
-    }
-    catch {
-        Write-Warning "Failed to import Graph modules: $($_.Exception.Message)"
         $global:GraphData = @{}
         return
     }
