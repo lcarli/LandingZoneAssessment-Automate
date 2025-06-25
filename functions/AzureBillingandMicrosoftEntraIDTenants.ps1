@@ -121,8 +121,8 @@ function Test-QuestionA0101 {
         # Check if only one Entra tenant is being used for managing Azure resources
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/multi-tenant/considerations-recommendations
 
-        # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        # Get all Azure subscriptions using cached data
+        $subscriptions = $global:AzData.Subscriptions
 
         # Extract tenant IDs from the subscriptions
         $tenantIds = $subscriptions.TenantId
@@ -176,7 +176,7 @@ function Test-QuestionA0102 {
         # Use Multi-Tenant Automation approach to managing your Microsoft Entra ID Tenants
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/multi-tenant/lighthouse
 
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         # Extract tenant IDs from the subscriptions
         $tenantIds = $subscriptions.TenantId

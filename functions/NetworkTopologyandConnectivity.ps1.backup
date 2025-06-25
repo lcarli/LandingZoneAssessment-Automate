@@ -182,38 +182,19 @@ function Test-QuestionD0102 {
         [Object]$rawDataD0101
     )
 
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
         $estimatedPercentageApplied = 0
         $hubVirtualNetworkId = $rawDataD0101.MaxPeeringsVnet.id
-        
-        # Use cached data instead of direct Search-AzGraph call
-        $expressRouteGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/expressRouteGateways' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
-        $vpnGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/vpnGateways' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
-        $azureFirewalls = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/azureFirewalls' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
-        $networkInterfaces = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkInterfaces' -and $_.Properties.enableIPForwarding -eq $true }
-        $privateDnsResolvers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/privateDnsResolvers' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
-        
-        # Filter NICs that are in the hub VNet
-        $nvasInHub = @()
-        foreach ($nic in $networkInterfaces) {
-            if ($nic.Properties.ipConfigurations -and $nic.Properties.ipConfigurations[0].Properties.subnet.id) {
-                $subnetId = $nic.Properties.ipConfigurations[0].Properties.subnet.id
-                $vnetId = $subnetId.Substring(0, $subnetId.IndexOf("/subnets/"))
-                
-                if ($vnetId -eq $hubVirtualNetworkId) {
-                    $nvasInHub += $nic
-                }
-            }
-        }
-        
-        $expressRouteGatewayPresent = ($expressRouteGateways | Measure-Object).Count -gt 0
-        $vpnGatewayPresent = ($vpnGateways | Measure-Object).Count -gt 0
-        $azureFirewallPresent = ($azureFirewalls | Measure-Object).Count -gt 0
-        $nvaPresent = ($nvasInHub | Measure-Object).Count -gt 0
-        $privateDnsResolverPresent = ($privateDnsResolvers | Measure-Object).Count -gt 0
+        $resourceGraphQuery = "Resources | where type in~ ('Microsoft.Network/expressRouteGateways', 'Microsoft.Network/vpnGateways', 'Microsoft.Network/azureFirewalls', 'Microsoft.Network/networkInterfaces', 'Microsoft.Network/privateDnsResolvers') | where properties.virtualNetwork.id == '$hubVirtualNetworkId' | project type, name, properties.enableIPForwarding"
+        $resources = Search-AzGraph -Query $resourceGraphQuery
+        $expressRouteGatewayPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/expressRouteGateways' } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
+        $vpnGatewayPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/vpnGateways' } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
+        $azureFirewallPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/azureFirewalls' } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
+        $nvaPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/networkInterfaces' -and $_.properties.enableIPForwarding } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
+        $privateDnsResolverPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/privateDnsResolvers' } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
 
         if (($expressRouteGatewayPresent -or $vpnGatewayPresent) -and ($azureFirewallPresent -or $nvaPresent) -and $privateDnsResolverPresent) {
             $status = [Status]::Implemented
@@ -256,7 +237,7 @@ function Test-QuestionD0102 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
 
     return $result
 }
@@ -268,42 +249,37 @@ function Test-QuestionD0103 {
         [Object]$checklistItem
     )
 
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
         $estimatedPercentageApplied = 0
-        
-        # Use cached data instead of direct Search-AzGraph call
-        $publicIPs = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/publicIPAddresses' }
+        $publicIPs = Search-AzGraph -Query "Resources | where type == 'microsoft.network/publicIPAddresses' | project name, id, ddosSettings = properties.ddosSettings.protectionMode, ipConfigurationId = properties.ipConfiguration.id"
 
         $protectedIPs = 0
-        $totalIPs = $publicIPs.Count
 
         foreach ($ip in $publicIPs) {
-            if ($ip.Properties.ddosSettings.protectionMode -eq 'Enabled') {
+            if ($ip.ddosSettings -eq 'Enabled') {
                 $protectedIPs++
             }
-            elseif ($ip.Properties.ddosSettings.protectionMode -eq 'VirtualNetworkInherited' -and $ip.Properties.ipConfiguration.id) {
-                # Find the VNet this IP belongs to and check if DDoS protection is enabled
-                $ipConfigId = $ip.Properties.ipConfiguration.id
-                $subnetId = $ipConfigId.Substring(0, $ipConfigId.LastIndexOf("/"))
-                $vnetId = $subnetId.Substring(0, $subnetId.IndexOf("/subnets/"))
-                
-                $virtualNetwork = $global:AzData.Resources | Where-Object { $_.Id -eq $vnetId -and $_.Type -eq 'microsoft.network/virtualnetworks' } | Select-Object -First 1
-                if ($virtualNetwork -and $virtualNetwork.Properties.enableDdosProtection -eq $true) {
-                    $protectedIPs++
+            elseif ($ip.ddosSettings -eq 'VirtualNetworkInherited') {
+                $ipConfiguration = Search-AzGraph -Query "Resources | where id == '$($ip.ipConfigurationId)' | project virtualNetworkId = properties.subnet.id"
+                if ($ipConfiguration) {
+                    $virtualNetwork = Search-AzGraph -Query "Resources | where id == '$($ipConfiguration.virtualNetworkId)' | project ddosProtection = properties.enableDdosProtection"
+                    if ($virtualNetwork.ddosProtection) {
+                        $protectedIPs++
+                    }
                 }
             }
         }
 
         if ($totalIPs -gt 0) { 
-            $estimatedPercentageApplied = ($protectedIPs / $totalIPs) * 100 
+            $estimatedPercentageApplied = ($protectedIPs / $publicIPs.Count) * 100 
         } 
 
         $rawData = @{
             "PublicIPs"                  = $publicIPs
-            "TotalIPs"                   = $totalIPs
+            "TotalIPs"                   = $publicIPs.Count
             "ProtectedIPs"               = $protectedIPs
             "estimatedPercentageApplied" = $estimatedPercentageApplied
         }
@@ -325,7 +301,7 @@ function Test-QuestionD0103 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
 
     return $result
 }
@@ -337,18 +313,15 @@ function Test-QuestionD0103HS {
         [Object]$checklistItem
     )
 
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
         $estimatedPercentageApplied = 0
 
-        # Use cached data to check for NVAs (Network Virtual Appliances)
-        $networkInterfaces = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkInterfaces' -and $_.Properties.enableIPForwarding -eq $true }
-        $nvaPresent = ($networkInterfaces | Measure-Object).Count -gt 0
+        $nvaPresent = $resources | Where-Object { $_.type -eq 'Microsoft.Network/networkInterfaces' -and $_.properties.enableIPForwarding } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
 
         if ($nvaPresent) {
-            # Manual verification is required as we cannot automatically determine NVA filtering capabilities
             $status = [Status]::ManualVerificationRequired
         }
         else {
@@ -357,7 +330,6 @@ function Test-QuestionD0103HS {
 
         $rawData = @{
             "nvaPresent" = $nvaPresent
-            "NetworkInterfaces" = $networkInterfaces
         }
     }
     catch {
@@ -367,7 +339,7 @@ function Test-QuestionD0103HS {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
 
     return $result
 }
@@ -379,28 +351,26 @@ function Test-QuestionD0104 {
         [Object]$checklistItem
     )
 
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
         $estimatedPercentageApplied = 0
 
-        # Use cached data instead of direct Search-AzGraph call
-        $expressRouteGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/expressRouteGateways' }
-        $vpnGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/vpnGateways' }
+        $expressRouteGateways = Search-AzGraph -Query "Resources | where type == 'Microsoft.Network/expressRouteGateways' | project name, properties.virtualNetwork.id"
+        $vpnGateways = Search-AzGraph -Query "Resources | where type == 'Microsoft.Network/vpnGateways' | project name, properties.virtualNetwork.id"
 
         $routeServerPotentialVnets = @()
 
         foreach ($expressRouteGateway in $expressRouteGateways) {
             foreach ($vpnGateway in $vpnGateways) {
-                if ($expressRouteGateway.Properties.virtualNetwork.id -eq $vpnGateway.Properties.virtualNetwork.id) {
-                    $routeServerPotentialVnets += $expressRouteGateway.Properties.virtualNetwork.id
+                if ($expressRouteGateway.'properties.virtualNetwork.id' -eq $vpnGateway.'properties.virtualNetwork.id') {
+                    $routeServerPotentialVnets += $expressRouteGateway.'properties.virtualNetwork.id'
                 }
             }
         }
 
         if ($routeServerPotentialVnets.Count -gt 0) {
-            # Manual verification is required to check if Route Server is actually deployed
             $status = [Status]::ManualVerificationRequired
         }
         else {
@@ -421,7 +391,7 @@ function Test-QuestionD0104 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
 
     return $result
 }
@@ -433,26 +403,22 @@ function Test-QuestionD0106 {
         [Object]$checklistItem
     )
 
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
         $estimatedPercentageApplied = 0
-        
-        # Use cached data instead of direct Search-AzGraph call
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/virtualnetworks' }
+        $virtualNetworks = Search-AzGraph -Query "Resources | where type == 'microsoft.network/virtualnetworks'"
         $vnetPairs = @()
-        
         foreach ($vnet in $virtualNetworks) {
             # Check if the virtual network has peerings
-            $peerings = $vnet.Properties.virtualNetworkPeerings
+            $peerings = $vnet.properties.virtualNetworkPeerings
             if ($null -ne $peerings) {
                 foreach ($peering in $peerings) {
 
-                    $peeredVnetId = $peering.Properties.remoteVirtualNetwork.id
-                    $peeredVnet = $global:AzData.Resources | Where-Object { $_.Id -eq $peeredVnetId -and $_.Type -eq 'microsoft.network/virtualnetworks' } | Select-Object -First 1
-                    
-                    if ($peeredVnet -and $peeredVnet.Location -eq $vnet.Location) {
+                    $peeredVnetId = $peering.properties.remoteVirtualNetwork.id
+                    $peeredVnet = Search-AzGraph -Query "Resources | where id == '$peeredVnetId' | project location"
+                    if ($peeredVnet.location -eq $vnet.location) {
                         $vnetPairs += @{
                             "Vnet1" = $vnet
                             "Vnet2" = $peeredVnet
@@ -478,7 +444,7 @@ function Test-QuestionD0106 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
 
     return $result
 }
@@ -490,50 +456,44 @@ function Test-QuestionD0107 {
         [Object]$checklistItem
     )
 
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
 
     try {
         $estimatedPercentageApplied = 0
-        
-        # Use cached data instead of direct Search-AzGraph call
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/virtualnetworks' }
-        $nsgs = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/networksecuritygroups' }
-        $flowLogs = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/networkwatchers/flowlogs' }
+        $virtualNetworks = Search-AzGraph -Query "Resources | where type == 'microsoft.network/virtualnetworks'"
+        $nsgs = Search-AzGraph -Query "Resources | where type == 'microsoft.network/networksecuritygroups'"
+        $flowLogs = Search-AzGraph -Query "resources | where type =~ 'microsoft.network/networkwatchers/flowlogs' and isnotnull(properties) | extend targetResourceId = tostring(properties.targetResourceId) | extend storageId = tostring(properties.storageId) | extend status = iff(properties.enabled =~ 'true', 'Enabled', 'Disabled') | extend flowLogType = iff(properties.targetResourceId contains 'Microsoft.Network/networkSecurityGroups', 'NSG', 'VNet')| project name,resourceGroup,status,flowLogType,targetResourceId,storageId,id,type,kind,location,subscriptionId,tags"
 
         $enabledFlowLogsResources = @()
         $disabledFlowLogsResources = @()
 
         foreach ($vnet in $virtualNetworks) {
-            $vnetFlowLog = $flowLogs | Where-Object { $_.Properties.targetResourceId -eq $vnet.Id -and $_.Properties.enabled -eq $true }
-            if ($vnetFlowLog) {
-                $enabledFlowLogsResources += $vnet.Id
+            $vnetFlowLog = $flowLogs | Where-Object { $_.targetResourceId -eq $vnet.id }
+            if ($vnetFlowLog.status -eq 'Enabled') {
+                $enabledFlowLogsResources += $vnet.id
             }
             else {
-                $disabledFlowLogsResources += $vnet.Id
+                $disabledFlowLogsResources += $vnet.id
             }
         }
 
         foreach ($nsg in $nsgs) {
-            $nsgFlowLog = $flowLogs | Where-Object { $_.Properties.targetResourceId -eq $nsg.Id -and $_.Properties.enabled -eq $true }
-            if ($nsgFlowLog) {
-                $enabledFlowLogsResources += $nsg.Id
+            $nsgFlowLog = $flowLogs | Where-Object { $_.targetResourceId -eq $nsg.id }
+            if ($nsgFlowLog.status -eq 'Enabled') {
+                $enabledFlowLogsResources += $nsg
             }
             else {
-                $disabledFlowLogsResources += $nsg.Id
+                $disabledFlowLogsResources += $nsg
             }
         }
 
-        $totalResources = $virtualNetworks.Count + $nsgs.Count
-        if ($totalResources -gt 0) {
-            $estimatedPercentageApplied = ($enabledFlowLogsResources.Count / $totalResources) * 100
-        }
+        $estimatedPercentageApplied = ($enabledFlowLogsResources.Count / ($virtualNetworks.Count + $nsgs.Count)) * 100
 
         $rawData = @{
-            "EnabledFlowLogsResources"  = $enabledFlowLogsResources
-            "DisabledFlowLogsResources" = $disabledFlowLogsResources
-            "FlowLogs"                  = $flowLogs
-            "TotalResources"            = $totalResources
+            "EnabledFlowLogs"  = $enabledFlowLogs
+            "DisabledFlowLogs" = $disabledFlowLogs
+            "flowLogs"         = $flowLogs
         }
 
         if ($estimatedPercentageApplied -eq 100) {
@@ -553,7 +513,7 @@ function Test-QuestionD0107 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
 
     return $result
 }
@@ -565,11 +525,11 @@ function Test-QuestionD0201 {
         [Object]$checklistItem
     ) 
 
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $estimatedPercentageApplied = 0
     $status = [Status]::NotDeveloped
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_
 
     return $result
 }
@@ -581,20 +541,16 @@ function Test-QuestionD0202 {
         [Object]$checklistItem
     ) 
 
-    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $estimatedPercentageApplied = 0
     try {
-        # Use cached data instead of direct Search-AzGraph call
-        $expressRouteDirectCircuits = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/expressrouteports' }
-        
+        $expressRouteDirectCircuits = Search-AzGraph -Query "resources | where type == 'microsoft.network/expressrouteports' | project name"
         if ($expressRouteDirectCircuits.Count -eq 0) {
-            $expressRouteGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/expressRouteGateways' }
-            
+            $expressRouteGateways = Search-AzGraph -Query "Resources | where type == 'Microsoft.Network/expressRouteGateways' | project name, properties.virtualNetwork.id"
             if ($expressRouteGateways.Count -gt 0) {
-                $vpnGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/vpnGateways' }
-                $vpnGatewayPresent = $vpnGateways | Where-Object { $_.Properties.virtualNetwork.id -eq $expressRouteGateways[0].Properties.virtualNetwork.id } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
-                
+                $vpnGateways = Search-AzGraph -Query "Resources | where type == 'Microsoft.Network/vpnGateways' | project name, properties.virtualNetwork.id"
+                $vpnGatewayPresent = $vpnGateways | Where-Object { $_.'properties.virtualNetwork.id' -eq $expressRouteGateways[0].'properties.virtualNetwork.id' } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
                 if ($vpnGatewayPresent) {
                     $status = [Status]::ManualVerificationRequired
                     $estimatedPercentageApplied = 50
@@ -624,7 +580,7 @@ function Test-QuestionD0202 {
         $rawData = $_.Exception.Message
     }
 
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
 
     return $result
 }
