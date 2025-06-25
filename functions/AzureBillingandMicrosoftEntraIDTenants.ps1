@@ -26,8 +26,6 @@ function Get-BudgetsViaRestApi {
     )
     
     try {
-        Write-Output "DEBUG: $FunctionName - Getting budgets via REST API for subscription $SubscriptionId"
-        
         # Get access token
         $accessTokenResult = Get-AzAccessToken
         if ($accessTokenResult.Token -is [SecureString]) {
@@ -45,12 +43,11 @@ function Get-BudgetsViaRestApi {
         }
         
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue
-        Write-Output "DEBUG: $FunctionName - Successfully retrieved budgets via REST API for subscription $SubscriptionId"
         
         return $response.value
     }
     catch {
-        Write-Output "ERROR: $FunctionName - Failed to get budgets via REST API for subscription $SubscriptionId`: $($_.Exception.Message)"
+        Write-Verbose "Failed to get budgets via REST API for subscription $SubscriptionId : $($_.Exception.Message)"
         return $null
     }
 }
@@ -61,7 +58,7 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
         [string]$ContractType,
         [Parameter(Mandatory = $true)]
         [object]$Checklist
-    )    Write-Output "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..."
+    )    Write-Host "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..." -ForegroundColor Cyan
     
     # Note: Az.Billing module is imported in Initialize.ps1 for better performance
     # Verify billing module is available before proceeding
@@ -110,7 +107,7 @@ function Test-QuestionA0101 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -165,7 +162,7 @@ function Test-QuestionA0102 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -219,7 +216,7 @@ function Test-QuestionA0103 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -297,7 +294,7 @@ function Test-QuestionA0201 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -375,7 +372,7 @@ function Test-QuestionA0202 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -444,7 +441,7 @@ function Test-QuestionA0203 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -473,13 +470,11 @@ function Test-QuestionA0203 {
         foreach ($subscription in $subscriptions) {
             $budgets = $null
             try {
-                Write-Output "DEBUG: Test-QuestionA0203 - Checking budgets for subscription $($subscription.Id)"
                 # Use REST API to get budgets since Get-AzConsumptionBudget is not available
                 $budgets = Get-BudgetsViaRestApi -SubscriptionId $subscription.Id -FunctionName "Test-QuestionA0203"
             }
             catch {
-                Write-Output "ERROR: Test-QuestionA0203 - General error in budget check for subscription $($subscription.Id): $($_.Exception.Message)"
-                Write-Output "ERROR: Test-QuestionA0203 - StackTrace: $($_.ScriptStackTrace)"
+                Write-Verbose "Could not retrieve budgets for subscription $($subscription.Id): $($_.Exception.Message)"
             }
             
             if ($budgets) {
@@ -523,7 +518,7 @@ function Test-QuestionA0301 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -625,7 +620,7 @@ function Test-QuestionA0302 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -713,7 +708,7 @@ function Test-QuestionA0303 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
 
     $status = [Status]::NotImplemented
     $estimatedPercentageApplied = 0
@@ -743,7 +738,7 @@ function Test-QuestionA0303 {
                         try {
                             # Department-level budgets are complex and require different API endpoints
                             # Skipping for now to focus on subscription-level budgets
-                            Write-Output "DEBUG: Test-QuestionA0303 - Skipping department budget check (complex implementation needed)"
+                            # Department-level budget checks require complex EA enrollment API calls
                             # if (Get-Command Get-AzConsumptionBudget -ErrorAction SilentlyContinue) {
                             #     $budgets = Get-AzConsumptionBudget -Scope $departmentScope -ErrorAction SilentlyContinue
                             # } else {
@@ -781,7 +776,7 @@ function Test-QuestionA0303 {
                             try {
                                 # Account-level budgets are complex and require different API endpoints
                                 # Skipping for now to focus on subscription-level budgets
-                                Write-Output "DEBUG: Test-QuestionA0303 - Skipping account budget check (complex implementation needed)"
+                                # Account-level budget checks require complex EA enrollment API calls
                                 # if (Get-Command Get-AzConsumptionBudget -ErrorAction SilentlyContinue) {
                                 #     $budgets = Get-AzConsumptionBudget -Scope $accountScope -ErrorAction SilentlyContinue
                                 # } else {
@@ -817,12 +812,11 @@ function Test-QuestionA0303 {
         foreach ($subscription in $subscriptions) {
             $budgets = $null
             try {
-                Write-Output "DEBUG: Test-QuestionA0303 - Checking subscription budgets for $($subscription.Id)"
                 # Use REST API to get budgets since Get-AzConsumptionBudget is not available
                 $budgets = Get-BudgetsViaRestApi -SubscriptionId $subscription.Id -FunctionName "Test-QuestionA0303"
             }
             catch {
-                Write-Output "ERROR: Test-QuestionA0303 - Could not retrieve budgets for subscription $($subscription.Id): $($_.Exception.Message)"
+                Write-Verbose "Could not retrieve budgets for subscription $($subscription.Id): $($_.Exception.Message)"
             }
             
             if ($budgets) {
@@ -882,7 +876,7 @@ function Test-QuestionA0304 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -984,7 +978,7 @@ function Test-QuestionA0305 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1010,34 +1004,28 @@ function Test-QuestionA0305 {
         )          
         foreach ($subscription in $subscriptions) {
             try {
-                Write-Output "DEBUG: Test-QuestionA0305 - Processing subscription $($subscription.Id)"
                 # Get subscription details via REST API to get the OfferType
                 $subscriptionId = $subscription.Id
             
                 # Get the access token - handling both old and new Az module versions
-                Write-Output "DEBUG: Test-QuestionA0305 - Getting access token"
                 $accessTokenResult = Get-AzAccessToken
                 if ($accessTokenResult.Token -is [SecureString]) {
                     # New Az module version - Token is SecureString
-                    Write-Output "DEBUG: Test-QuestionA0305 - Token is SecureString (new Az module)"
                     $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
                         [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
                     )
                 } else {
                     # Old Az module version - Token is String
-                    Write-Output "DEBUG: Test-QuestionA0305 - Token is String (old Az module)"
                     $plainAccessToken = $accessTokenResult.Token
                 }
             
                 $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2022-12-01"
-                Write-Output "DEBUG: Test-QuestionA0305 - Making REST call to: $uri"
                 $headers = @{
                     Authorization = "Bearer $plainAccessToken"
                     'Content-Type' = 'application/json'
                 }
             
                 $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue                
-                Write-Output "DEBUG: Test-QuestionA0305 - REST call successful for subscription $subscriptionId"
             
                 if ($response -and $response.properties -and $response.properties.subscriptionPolicies) {
                     $quotaId = $response.properties.subscriptionPolicies.quotaId
@@ -1047,9 +1035,7 @@ function Test-QuestionA0305 {
                 }
             }
             catch {
-                Write-Output "ERROR: Test-QuestionA0305 - Failed to retrieve subscription details for $subscriptionId`: $($_.Exception.Message)"
-                Write-Output "ERROR: Test-QuestionA0305 - StackTrace: $($_.ScriptStackTrace)"
-                Write-Output "ERROR: Test-QuestionA0305 - ErrorRecord: $($_.ErrorRecord)"
+                Write-Verbose "Failed to retrieve subscription details for $subscriptionId : $($_.Exception.Message)"
                 # Continue with next subscription - don't fail the entire assessment
             }
         }
@@ -1095,7 +1081,7 @@ function Test-QuestionA0401 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1182,7 +1168,7 @@ function Test-QuestionA0402 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1273,7 +1259,7 @@ function Test-QuestionA0403 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1374,7 +1360,7 @@ function Test-QuestionA0404 {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
