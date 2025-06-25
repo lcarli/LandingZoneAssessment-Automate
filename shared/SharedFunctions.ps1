@@ -176,3 +176,78 @@ function Invoke-AzCmdletSafely {
         return $FallbackValue
     }
 }
+
+# ========================================
+# STANDARDIZED LOGGING FUNCTIONS
+# ========================================
+
+<#
+.SYNOPSIS
+    Standardized logging functions for consistent output formatting across the assessment.
+
+.DESCRIPTION
+    These functions provide consistent colored output for different types of messages:
+    - Write-AssessmentInfo: General information (Cyan)
+    - Write-AssessmentProgress: Progress messages (Green) 
+    - Write-AssessmentWarning: Warning messages (Yellow)
+    - Write-AssessmentError: Error messages (Red)
+    - Write-AssessmentSuccess: Success messages (Green)
+    - Write-AssessmentHeader: Section headers (Magenta)
+
+.NOTES
+    All functions write to the host (transcript) only and do not pollute the object pipeline.
+#>
+
+function Write-AssessmentInfo {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Cyan
+}
+
+function Write-AssessmentProgress {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Green
+}
+
+function Write-AssessmentWarning {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Yellow
+}
+
+function Write-AssessmentError {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Red
+}
+
+function Write-AssessmentSuccess {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Green
+}
+
+function Write-AssessmentHeader {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Magenta
+}

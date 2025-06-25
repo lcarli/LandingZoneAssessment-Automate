@@ -58,7 +58,7 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
         [string]$ContractType,
         [Parameter(Mandatory = $true)]
         [object]$Checklist
-    )    Write-Host "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..." -ForegroundColor Cyan
+    Write-AssessmentHeader "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..."
     
     # Note: Az.Billing module is imported in Initialize.ps1 for better performance
     # Verify billing module is available before proceeding
@@ -107,7 +107,7 @@ function Test-QuestionA0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -162,7 +162,7 @@ function Test-QuestionA0102 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -216,7 +216,7 @@ function Test-QuestionA0103 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -294,7 +294,7 @@ function Test-QuestionA0201 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -372,7 +372,7 @@ function Test-QuestionA0202 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -441,7 +441,7 @@ function Test-QuestionA0203 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -518,7 +518,7 @@ function Test-QuestionA0301 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -620,7 +620,7 @@ function Test-QuestionA0302 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -708,7 +708,7 @@ function Test-QuestionA0303 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotImplemented
     $estimatedPercentageApplied = 0
@@ -876,7 +876,7 @@ function Test-QuestionA0304 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -978,7 +978,7 @@ function Test-QuestionA0305 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)" -ForegroundColor Green
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1081,7 +1081,7 @@ function Test-QuestionA0401 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1168,7 +1168,7 @@ function Test-QuestionA0402 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1259,7 +1259,7 @@ function Test-QuestionA0403 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1360,7 +1360,7 @@ function Test-QuestionA0404 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
