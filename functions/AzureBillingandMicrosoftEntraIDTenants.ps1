@@ -82,7 +82,8 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
         elseif ($ContractType -eq "CloudSolutionProvider") {
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.01") }) | Test-QuestionA0201
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.02") }) | Test-QuestionA0202
-            $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.03") }) | Test-QuestionA0203        }        
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.03") }) | Test-QuestionA0203        
+        }        
         elseif ($ContractType -eq "EnterpriseAgreement") {
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.01") }) | Test-QuestionA0301
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.02") }) | Test-QuestionA0302
@@ -731,7 +732,7 @@ function Test-QuestionA0303 {
         $totalBudgets = 0
 
         # Get Enterprise Agreement billing accounts if available
-        $billingAccounts = Get-AzBillingAccount -ErrorAction SilentlyContinue
+        $billingAccounts = Get-AzBillingAccount
 
         if ($billingAccounts) {
             foreach ($billingAccount in $billingAccounts) {
@@ -740,7 +741,8 @@ function Test-QuestionA0303 {
                     $departments = Get-AzBillingProfile -BillingAccountName $billingAccount.Name -ErrorAction SilentlyContinue    
                     foreach ($department in $departments) {
                         $departmentScope = "/providers/Microsoft.Billing/billingAccounts/$($billingAccount.Name)/billingProfiles/$($department.Name)"
-                        $budgets = $null                          try {
+                        $budgets = $null                          
+                        try {
                             # Department-level budgets are complex and require different API endpoints
                             # Skipping for now to focus on subscription-level budgets
                             Write-Output "DEBUG: Test-QuestionA0303 - Skipping department budget check (complex implementation needed)"
@@ -777,7 +779,8 @@ function Test-QuestionA0303 {
                         $invoiceSections = Get-AzInvoiceSection -BillingAccountName $billingAccount.Name -BillingProfileName $profile.Name -ErrorAction SilentlyContinue                        
                         foreach ($section in $invoiceSections) {
                             $accountScope = "/providers/Microsoft.Billing/billingAccounts/$($billingAccount.Name)/billingProfiles/$($profile.Name)/invoiceSections/$($section.Name)"
-                            $budgets = $null                              try {
+                            $budgets = $null                              
+                            try {
                                 # Account-level budgets are complex and require different API endpoints
                                 # Skipping for now to focus on subscription-level budgets
                                 Write-Output "DEBUG: Test-QuestionA0303 - Skipping account budget check (complex implementation needed)"
@@ -812,7 +815,8 @@ function Test-QuestionA0303 {
 
         # Also check subscription-level budgets as fallback for Enterprise Agreement scenarios
         $subscriptions = $global:AzData.Subscriptions
-        $subscriptionBudgets = @()          foreach ($subscription in $subscriptions) {
+        $subscriptionBudgets = @()          
+        foreach ($subscription in $subscriptions) {
             $budgets = $null
             try {
                 Write-Output "DEBUG: Test-QuestionA0303 - Checking subscription budgets for $($subscription.Id)"
@@ -1005,7 +1009,8 @@ function Test-QuestionA0305 {
         $devTestOfferIds = @(
             "MS-AZR-0148P", # Enterprise Dev/Test
             "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
-        )          foreach ($subscription in $subscriptions) {
+        )          
+        foreach ($subscription in $subscriptions) {
             try {
                 Write-Output "DEBUG: Test-QuestionA0305 - Processing subscription $($subscription.Id)"
                 # Get subscription details via REST API to get the OfferType
@@ -1033,7 +1038,8 @@ function Test-QuestionA0305 {
                     'Content-Type' = 'application/json'
                 }
             
-                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue                Write-Output "DEBUG: Test-QuestionA0305 - REST call successful for subscription $subscriptionId"
+                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue                
+                Write-Output "DEBUG: Test-QuestionA0305 - REST call successful for subscription $subscriptionId"
             
                 if ($response -and $response.properties -and $response.properties.subscriptionPolicies) {
                     $quotaId = $response.properties.subscriptionPolicies.quotaId
