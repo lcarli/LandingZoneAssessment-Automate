@@ -914,8 +914,9 @@ function Replace-ErrorLogDataPlaceholder {
       # Replace the placeholder with the escaped JSON content
       return $HTMLContent -replace "__ERRORLOGDATA__", $jsonContent
   } else {
-      Write-Error "Error log file not found at $ErrorLogPath"
-      return $HTMLContent
+      # No error log file is normal - use empty error log silently
+      $emptyErrorLog = '{"errorsArray": []}'
+      return $HTMLContent -replace "__ERRORLOGDATA__", $emptyErrorLog
   }
 }
 
@@ -929,13 +930,18 @@ function Apply-ExceptionsToReport {
   if (Test-Path -Path $ReportJsonPath) {
       $reportData = Get-Content -Path $ReportJsonPath | ConvertFrom-Json
   } else {
-      Write-Error "Report file not found at $ReportJsonPath"
-      return
+      Write-Warning "Report file not found at $ReportJsonPath"
+      return @{
+          ReportData         = "{}"
+          ExceptionsApplied  = @{ exceptions = @() }
+      }
   }
 
   $exceptionsData = @{ exceptions = @() }
   if (Test-Path -Path $ExceptionsJsonPath) {
       $exceptionsData = Get-Content -Path $ExceptionsJsonPath | ConvertFrom-Json
+  } else {
+      Write-Warning "Exceptions file not found at $ExceptionsJsonPath - proceeding without exceptions"
   }
 
   $categories = @('Billing', 'IAM', 'ResourceOrganization', 'Network', 'Governance', 'Security', 'DevOps', 'Management')
@@ -957,7 +963,7 @@ function Apply-ExceptionsToReport {
 
                       # Update the status in the report
                       $item.Status = $exception.newStatus
-                      Write-Host "Exception applied for $($item.RawSource.id) in category $category"
+                      Write-Output "Exception applied for $($item.RawSource.id) in category $category"
                   }
 
                   # Update the status in exceptions for tracking

@@ -25,6 +25,7 @@ function Invoke-GovernanceAssessment {
         [object]$Checklist
     )
 
+    Write-AssessmentHeader "Evaluating the Governance design area..."
     Measure-ExecutionTime -ScriptBlock {
         $results = @()
         $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.01") }) | Test-QuestionE0101
@@ -39,6 +40,7 @@ function Invoke-GovernanceAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.11") }) | Test-QuestionE0111
         $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.12") }) | Test-QuestionE0112
         $results += ($Checklist.items | Where-Object { ($_.id -eq "E01.13") }) | Test-QuestionE0113
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "E02.02") }) | Test-QuestionE0202
 
         $script:FunctionResult = $results
     } -FunctionName "Invoke-GovernanceAssessment"
@@ -54,7 +56,7 @@ function Test-QuestionE0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -115,7 +117,7 @@ function Test-QuestionE0103 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -175,7 +177,7 @@ function Test-QuestionE0104 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -261,7 +263,7 @@ function Test-QuestionE0105 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -334,7 +336,7 @@ function Test-QuestionE0106 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -357,13 +359,19 @@ function Test-QuestionE0106 {
             $policiesRestrictingServices = @()
 
             foreach ($assignment in $policyAssignments) {
-                $policyDefinition = Get-AzPolicyDefinition -Id $assignment.Properties.PolicyDefinitionId
+                try {
+                    $policyDefinition = Get-AzPolicyDefinition -Id $assignment.Properties.PolicyDefinitionId -ErrorAction Stop
 
-                if ($policyDefinition) {
-                    $policyRules = $policyDefinition.Properties.PolicyRule
-                    if (($policyRules.then.effect -eq "Deny" -or $policyRules.then.effect -eq "Allow") -and $policyRules.if.field -eq "type") {
-                        $policiesRestrictingServices += $assignment
+                    if ($policyDefinition -and $policyDefinition.Properties -and $policyDefinition.Properties.PolicyRule) {
+                        $policyRules = $policyDefinition.Properties.PolicyRule
+                        if (($policyRules.then.effect -eq "Deny" -or $policyRules.then.effect -eq "Allow") -and $policyRules.if.field -eq "type") {
+                            $policiesRestrictingServices += $assignment
+                        }
                     }
+                }
+                catch {
+                    Write-Warning "Failed to get policy definition for assignment $($assignment.Properties.PolicyDefinitionId): $($_.Exception.Message)"
+                    continue
                 }
             }
 
@@ -407,7 +415,7 @@ function Test-QuestionE0107 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -436,7 +444,7 @@ function Test-QuestionE0108 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -508,7 +516,7 @@ function Test-QuestionE0109 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -537,7 +545,7 @@ function Test-QuestionE0110 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -566,7 +574,7 @@ function Test-QuestionE0111 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -595,7 +603,7 @@ function Test-QuestionE0112 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -624,7 +632,7 @@ function Test-QuestionE0113 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -653,7 +661,7 @@ function Test-QuestionE0202 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -668,13 +676,13 @@ function Test-QuestionE0202 {
         $subscriptionsWithBudgetAlerts = 0
 
         foreach ($subscription in $subscriptions) {
-            Set-AzContext -Subscription $subscription.Id -Tenant $TenantId
+            Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId
 
             # Get all budgets for the subscription
             $budgets = Get-AzConsumptionBudget
 
             if ($budgets.Count -eq 0) {
-                Write-Host "No budgets found for subscription: $($subscription.Name)"
+                Write-Warning "No budgets found for subscription: $($subscription.Name)"
                 continue
             }
 

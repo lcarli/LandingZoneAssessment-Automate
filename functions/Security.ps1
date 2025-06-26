@@ -14,9 +14,10 @@
     lramoscostah@microsoft.com
 #>
 
-# Import shared modules
-Import-Module "$PSScriptRoot/../shared/Enums.ps1"
-Import-Module "$PSScriptRoot/../shared/ErrorHandling.ps1"
+# Dot-source shared modules
+. "$PSScriptRoot/../shared/Enums.ps1"
+. "$PSScriptRoot/../shared/ErrorHandling.ps1"
+. "$PSScriptRoot/../shared/SharedFunctions.ps1"
 
 function Invoke-SecurityAssessment {
     [CmdletBinding()]
@@ -25,7 +26,7 @@ function Invoke-SecurityAssessment {
         [object]$Checklist
     )
     Measure-ExecutionTime -ScriptBlock {
-        Write-Host "Evaluating the Security design area..."
+        Write-AssessmentHeader "Evaluating the Security design area..."
 
         $results = @()
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G01.01") }) | Test-QuestionG0101
@@ -38,9 +39,8 @@ function Invoke-SecurityAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.06") }) | Test-QuestionG0206
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.07") }) | Test-QuestionG0207
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.08") }) | Test-QuestionG0208
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.09") }) | Test-QuestionG0209
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.09") }) | Test-QuestionG0209        
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.10") }) | Test-QuestionG0210
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.11") }) | Test-QuestionG0211
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.12") }) | Test-QuestionG0212
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G02.13") }) | Test-QuestionG0213
         $results += ($Checklist.items | Where-Object { ($_.id -eq "G03.01") }) | Test-QuestionG0301
@@ -66,8 +66,6 @@ function Invoke-SecurityAssessment {
 
     return $script:FunctionResult
 }
-
-# Function for Security item G01.01
 function Test-QuestionG0101 {
     [CmdletBinding()]
     param(
@@ -75,7 +73,7 @@ function Test-QuestionG0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -85,7 +83,7 @@ function Test-QuestionG0101 {
         # Question: Determine the incident response plan for Azure services before allowing it into production.
         # Reference: https://learn.microsoft.com/security/benchmark/azure/security-control-incident-response
 
-        # This question requires manual verification as it involves planning and documentation.
+        # This Security item requires manual verification as it involves planning and documentation.
         $status = [Status]::ManualVerificationRequired
         $rawData = "Incident response plan needs to be documented and verified manually."
         $estimatedPercentageApplied = 0
@@ -100,7 +98,6 @@ function Test-QuestionG0101 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Security item G01.02
 function Test-QuestionG0102 {
     [CmdletBinding()]
     param(
@@ -108,7 +105,7 @@ function Test-QuestionG0102 {
         [Object]$checklistItem
     )
     
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
         
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -118,30 +115,61 @@ function Test-QuestionG0102 {
         # Question: Apply a zero-trust approach for access to the Azure platform.
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/security-zero-trust
     
-        # Retrieve all Conditional Access Policies
-        $conditionalAccessPolicies = Get-AzConditionalAccessPolicy
+        # Check for Conditional Access policies using safe cmdlet execution
+        $conditionalAccessPolicies = Invoke-AzCmdletSafely -ScriptBlock {
+            Get-AzConditionalAccessPolicy
+        } -CmdletName "Get-AzConditionalAccessPolicy" -ModuleName "Microsoft.Graph.Identity.SignIns" -FallbackValue @()
+        
+        $rbacPolicies = Invoke-AzCmdletSafely -ScriptBlock {
+            Get-AzRoleAssignment | Where-Object { $_.RoleDefinitionName -match "Owner|Contributor" -and $_.Scope -match "/subscriptions/" }
+        } -CmdletName "Get-AzRoleAssignment" -ModuleName "Az.Resources" -FallbackValue @()
             
-        if ($conditionalAccessPolicies.Count -eq 0) {
-            $status = [Status]::NotImplemented
-            $rawData = "No Conditional Access Policies are configured."
+        if ($conditionalAccessPolicies.Count -eq 0 -and $rbacPolicies.Count -eq 0) {
+            $status = [Status]::ManualVerificationRequired
+            $rawData = @{
+                Message = "Unable to assess Zero Trust implementation automatically."
+                Recommendation = "Manually verify that Conditional Access policies with MFA are configured and RBAC is properly implemented."
+                ConditionalAccessPolicies = $conditionalAccessPolicies.Count
+                RBACPolicies = $rbacPolicies.Count
+            }
             $estimatedPercentageApplied = 0
         }
+        elseif ($conditionalAccessPolicies.Count -eq 0) {
+            $status = [Status]::PartiallyImplemented
+            $rawData = @{
+                Message = "RBAC policies found but Conditional Access policies not detected."
+                Recommendation = "Implement Conditional Access policies with MFA requirements for Zero Trust approach."
+                ConditionalAccessPolicies = $conditionalAccessPolicies.Count
+                RBACPolicies = $rbacPolicies.Count
+            }
+            $estimatedPercentageApplied = 50
+        }
         else {
-            $mfaPolicies = $conditionalAccessPolicies | Where-Object { $_.Conditions.Users.IncludeUsers -contains 'All' -and $_.Controls.Mfa } 
-            $rbacPolicies = Get-AzRoleAssignment | Where-Object { $_.RoleDefinitionName -match "Owner|Contributor" -and $_.Scope -match "/subscriptions/" }
-                
+            # Check for MFA-enabled policies
+            $mfaPolicies = $conditionalAccessPolicies | Where-Object { 
+                $_.Conditions.Users.IncludeUsers -contains 'All' -and $_.Controls.Mfa 
+            }
+            
             if ($mfaPolicies.Count -gt 0 -and $rbacPolicies.Count -gt 0) {
                 $status = [Status]::Implemented
-                $rawData = "Zero Trust approach is enforced with MFA and RBAC policies."
+                $rawData = @{
+                    Message = "Zero Trust approach is enforced with MFA and RBAC policies."
+                    ConditionalAccessPolicies = $conditionalAccessPolicies.Count
+                    MFAPolicies = $mfaPolicies.Count
+                    RBACPolicies = $rbacPolicies.Count
+                }
                 $estimatedPercentageApplied = 100
             }
             else {
                 $status = [Status]::PartiallyImplemented
                 $rawData = @{
-                    MFA_PoliciesConfigured  = $mfaPolicies.Count
-                    RBAC_PoliciesConfigured = $rbacPolicies.Count
+                    Message = "Conditional Access policies found but may not fully implement Zero Trust approach."
+                    ConditionalAccessPolicies = $conditionalAccessPolicies.Count
+                    MFAPolicies = if ($mfaPolicies) { $mfaPolicies.Count } else { 0 }
+                    RBACPolicies = $rbacPolicies.Count
+                    Recommendation = "Review Conditional Access policies to ensure MFA is required for all users."
                 }
-                $estimatedPercentageApplied = ($mfaPolicies.Count -gt 0 ? 50 : 0) + ($rbacPolicies.Count -gt 0 ? 50 : 0)
+                $estimatedPercentageApplied = 75
             }
         }
     }
@@ -154,8 +182,7 @@ function Test-QuestionG0102 {
     
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-    
-# Function for Security item G02.01
+
 function Test-QuestionG0201 {
     [CmdletBinding()]
     param(
@@ -163,7 +190,7 @@ function Test-QuestionG0201 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -173,20 +200,27 @@ function Test-QuestionG0201 {
         # Question: Use Azure Key Vault to store your secrets and credentials.
         # Reference: https://learn.microsoft.com/azure/key-vault/general/overview
 
-        # Retrieve all Key Vaults in the subscriptions
-        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
-
-        if ($keyVaults.Count -eq 0) {
-            $status = [Status]::NotImplemented
-            $rawData = "No Azure Key Vaults are configured in the current subscriptions."
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::Implemented
-            $rawData = @{
-                KeyVaultCount = $keyVaults.Count
-                KeyVaultNames = $keyVaults.Name
+        # Check if Key Vaults exist in the environment
+        if ($global:AzData -and $global:AzData.Resources) {
+            $keyVaults = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.KeyVault/vaults" }
+            
+            if ($keyVaults -and $keyVaults.Count -gt 0) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 90 # High score as Key Vaults are present
+                $rawData = @{
+                    KeyVaultCount = $keyVaults.Count
+                    KeyVaultNames = $keyVaults.Name
+                    Note = "Key Vaults found in environment. Manual verification recommended to confirm proper usage for secrets and credentials."
+                }
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = "No Key Vaults found in the environment. Consider implementing Key Vault to store secrets and credentials securely."
             }
-            $estimatedPercentageApplied = 100
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $estimatedPercentageApplied = 0
+            $rawData = "Unable to check Key Vault existence automatically. Manual verification required."
         }
     }
     catch {
@@ -199,7 +233,6 @@ function Test-QuestionG0201 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Security item G02.02
 function Test-QuestionG0202 {
     [CmdletBinding()]
     param(
@@ -207,7 +240,7 @@ function Test-QuestionG0202 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -260,7 +293,6 @@ function Test-QuestionG0202 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Security item G02.03
 function Test-QuestionG0203 {
     [CmdletBinding()]
     param(
@@ -268,7 +300,7 @@ function Test-QuestionG0203 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -319,7 +351,6 @@ function Test-QuestionG0203 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Security item G02.04
 function Test-QuestionG0204 {
     [CmdletBinding()]
     param(
@@ -327,7 +358,7 @@ function Test-QuestionG0204 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -338,8 +369,7 @@ function Test-QuestionG0204 {
         # Reference: https://learn.microsoft.com/azure/key-vault/general/best-practices
 
         # Retrieve all Key Vaults using AzData.Resources
-        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
-
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }        
         if ($keyVaults.Count -eq 0) {
             $status = [Status]::NotImplemented
             $rawData = "No Azure Key Vaults are configured in the current subscriptions."
@@ -347,12 +377,30 @@ function Test-QuestionG0204 {
         } else {
             # Check Key Vault configuration for certificates, secrets, keys, and tags
             $vaultStatus = $keyVaults | ForEach-Object {
+                $vault = $_
+                
+                # Ensure we're in the correct subscription context for this Key Vault
+                try {
+                    Set-AzContext -Subscription $vault.SubscriptionId -Tenant $global:TenantId | Out-Null
+                } catch {
+                    Write-AssessmentWarning "Failed to set context for subscription $($vault.SubscriptionId): $($_.Exception.Message)"
+                }
+                
                 [PSCustomObject]@{
-                    VaultName    = $_.Name
-                    HasCertificates = ($_ | Get-AzKeyVaultCertificate -ErrorAction SilentlyContinue) -ne $null
-                    HasSecrets   = ($_ | Get-AzKeyVaultSecret -ErrorAction SilentlyContinue) -ne $null
-                    HasKeys      = ($_ | Get-AzKeyVaultKey -ErrorAction SilentlyContinue) -ne $null
-                    HasTags      = ($_.Tags -ne $null -and $_.Tags.Count -gt 0)
+                    VaultName       = $vault.Name
+                    HasCertificates = Invoke-AzCmdletSafely -ScriptBlock {
+                        $certs = Get-AzKeyVaultCertificate -VaultName $vault.Name -ErrorAction SilentlyContinue
+                        return $null -ne $certs -and $certs.Count -gt 0
+                    } -CmdletName "Get-AzKeyVaultCertificate" -ModuleName "Az.KeyVault" -FallbackValue $false
+                    HasSecrets      = Invoke-AzCmdletSafely -ScriptBlock {
+                        $secrets = Get-AzKeyVaultSecret -VaultName $vault.Name -ErrorAction SilentlyContinue
+                        return $null -ne $secrets -and $secrets.Count -gt 0
+                    } -CmdletName "Get-AzKeyVaultSecret" -ModuleName "Az.KeyVault" -FallbackValue $false
+                    HasKeys         = Invoke-AzCmdletSafely -ScriptBlock {
+                        $keys = Get-AzKeyVaultKey -VaultName $vault.Name -ErrorAction SilentlyContinue
+                        return $null -ne $keys -and $keys.Count -gt 0
+                    } -CmdletName "Get-AzKeyVaultKey" -ModuleName "Az.KeyVault" -FallbackValue $false
+                    HasTags         = ($null -ne $vault.Tags -and $vault.Tags.Count -gt 0)
                 }
             }
 
@@ -382,8 +430,6 @@ function Test-QuestionG0204 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
-# Function for Security item G02.05
 function Test-QuestionG0205 {
     [cmdletbinding()]
     param(
@@ -391,13 +437,123 @@ function Test-QuestionG0205 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
+        # Question: Automate the certificate management and renewal process with public certificate authorities to ease administration.
+        # Reference: https://learn.microsoft.com/azure/key-vault/general/best-practices
+        
+        # Get all Key Vaults in the environment
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }
+        
+        if ($keyVaults.Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No Azure Key Vaults are configured in the current subscriptions."
+            $estimatedPercentageApplied = 0
+        } else {
+            # Initialize counters
+            $totalCertificates = 0
+            $automatedCertificates = 0
+            $automationDetails = @()
+            
+            # Loop through each Key Vault to check certificates
+            foreach ($keyVault in $keyVaults) {
+                try {
+                    # Set the context to the subscription containing the Key Vault with explicit tenant
+                    Set-AzContext -Subscription $keyVault.SubscriptionId -Tenant $global:TenantId | Out-Null
+                    
+                    # Get all certificates in the Key Vault using cached context
+                    # The global data should already be in the correct subscription context
+                    $certificates = Invoke-AzCmdletSafely -ScriptBlock {
+                        Get-AzKeyVaultCertificate -VaultName $keyVault.Name -ErrorAction SilentlyContinue
+                    } -CmdletName "Get-AzKeyVaultCertificate" -ModuleName "Az.KeyVault" -FallbackValue @()
+                    
+                    if ($certificates.Count -gt 0) {
+                        foreach ($cert in $certificates) {
+                            $totalCertificates++
+                            $isAutomated = $false
+                            $issuerInfo = $null
+                            
+                            # Get the certificate issuer - this indicates if it's using a public CA
+                            try {
+                                $issuerName = if ($cert.Certificate.Issuer -and $cert.Certificate.Issuer.Contains("=")) {
+                                    $cert.Certificate.Issuer.Split("=")[1].Split(",")[0]
+                                } else {
+                                    "Unknown"
+                                }
+                                
+                                $issuer = Invoke-AzCmdletSafely -ScriptBlock {
+                                    Get-AzKeyVaultCertificateIssuer -VaultName $keyVault.Name -Name $issuerName -ErrorAction SilentlyContinue
+                                } -CmdletName "Get-AzKeyVaultCertificateIssuer" -ModuleName "Az.KeyVault"
+                                
+                                $issuerInfo = $issuer
+                                
+                                # Check if certificate uses automated renewal
+                                # Automated certificates typically have an IssuerProvider set and policy with auto-renewal settings
+                                $policy = Invoke-AzCmdletSafely -ScriptBlock {
+                                    Get-AzKeyVaultCertificatePolicy -VaultName $keyVault.Name -Name $cert.Name -ErrorAction SilentlyContinue
+                                } -CmdletName "Get-AzKeyVaultCertificatePolicy" -ModuleName "Az.KeyVault"
+                                
+                                if ($issuer -and $issuer.IssuerProvider -and 
+                                    $policy -and $policy.LifetimeActions -and 
+                                    $policy.LifetimeActions.Count -gt 0) {
+                                    $isAutomated = $true
+                                    $automatedCertificates++
+                                }
+                            }
+                            catch {
+                                # If we can't get the issuer details, default to not automated
+                                $issuerInfo = "Unknown"
+                            }
+                            
+                            $automationDetails += [PSCustomObject]@{
+                                KeyVaultName = $keyVault.Name
+                                CertificateName = $cert.Name
+                                Issuer = $cert.Certificate.Issuer
+                                IssuerProvider = $issuerInfo.IssuerProvider
+                                ExpiresOn = $cert.Expires
+                                IsAutomated = $isAutomated
+                            }
+                        }
+                    }
+                }
+                catch {
+                    Write-Warning "Error accessing certificates in Key Vault $($keyVault.Name): $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+            }
+            
+            # Determine the status based on findings
+            if ($totalCertificates -eq 0) {
+                $status = [Status]::NotImplemented
+                $rawData = "No certificates found in any Key Vaults."
+                $estimatedPercentageApplied = 0
+            }
+            else {
+                if ($automatedCertificates -eq $totalCertificates) {
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                }
+                elseif ($automatedCertificates -gt 0) {
+                    $status = [Status]::PartiallyImplemented
+                    $estimatedPercentageApplied = [Math]::Round(($automatedCertificates / $totalCertificates) * 100, 2)
+                }
+                else {
+                    $status = [Status]::NotImplemented
+                    $estimatedPercentageApplied = 0
+                }
+                
+                $rawData = @{
+                    TotalKeyVaults = $keyVaults.Count
+                    TotalCertificates = $totalCertificates
+                    AutomatedCertificates = $automatedCertificates
+                    AutomationPercentage = $estimatedPercentageApplied
+                    CertificateDetails = $automationDetails
+                }
+            }
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -411,7 +567,6 @@ function Test-QuestionG0205 {
     return $result
 }
 
-# Function for Security item G02.06
 function Test-QuestionG0206 {
     [cmdletbinding()]
     param(
@@ -419,7 +574,7 @@ function Test-QuestionG0206 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -439,7 +594,6 @@ function Test-QuestionG0206 {
     return $result
 }
 
-# Function for Security item G02.07
 function Test-QuestionG0207 {
     [cmdletbinding()]
     param(
@@ -447,7 +601,7 @@ function Test-QuestionG0207 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -467,7 +621,6 @@ function Test-QuestionG0207 {
     return $result
 }
 
-# Function for Security item G02.08
 function Test-QuestionG0208 {
     [cmdletbinding()]
     param(
@@ -475,7 +628,7 @@ function Test-QuestionG0208 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -495,7 +648,6 @@ function Test-QuestionG0208 {
     return $result
 }
 
-# Function for Security item G02.09
 function Test-QuestionG0209 {
     [cmdletbinding()]
     param(
@@ -503,7 +655,7 @@ function Test-QuestionG0209 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -523,7 +675,6 @@ function Test-QuestionG0209 {
     return $result
 }
 
-# Function for Security item G02.10
 function Test-QuestionG0210 {
     [cmdletbinding()]
     param(
@@ -531,7 +682,7 @@ function Test-QuestionG0210 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -551,35 +702,6 @@ function Test-QuestionG0210 {
     return $result
 }
 
-# Function for Security item G02.11
-function Test-QuestionG0211 {
-    [cmdletbinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-
-    try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-# Function for Security item G02.12
 function Test-QuestionG0212 {
     [cmdletbinding()]
     param(
@@ -587,7 +709,7 @@ function Test-QuestionG0212 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -607,7 +729,6 @@ function Test-QuestionG0212 {
     return $result
 }
 
-# Function for Security item G02.13
 function Test-QuestionG0213 {
     [cmdletbinding()]
     param(
@@ -615,7 +736,7 @@ function Test-QuestionG0213 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -635,7 +756,6 @@ function Test-QuestionG0213 {
     return $result
 }
 
-# Function for Security item G03.01
 function Test-QuestionG0301 {
     [cmdletbinding()]
     param(
@@ -643,7 +763,7 @@ function Test-QuestionG0301 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -663,7 +783,6 @@ function Test-QuestionG0301 {
     return $result
 }
 
-# Function for Security item G03.02
 function Test-QuestionG0302 {
     [cmdletbinding()]
     param(
@@ -671,7 +790,7 @@ function Test-QuestionG0302 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -691,7 +810,6 @@ function Test-QuestionG0302 {
     return $result
 }
 
-# Function for Security item G03.03
 function Test-QuestionG0303 {
     [cmdletbinding()]
     param(
@@ -699,7 +817,7 @@ function Test-QuestionG0303 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -719,7 +837,6 @@ function Test-QuestionG0303 {
     return $result
 }
 
-# Function for Security item G03.04
 function Test-QuestionG0304 {
     [cmdletbinding()]
     param(
@@ -727,7 +844,7 @@ function Test-QuestionG0304 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -747,7 +864,6 @@ function Test-QuestionG0304 {
     return $result
 }
 
-# Function for Security item G03.05
 function Test-QuestionG0305 {
     [cmdletbinding()]
     param(
@@ -755,7 +871,7 @@ function Test-QuestionG0305 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -775,7 +891,6 @@ function Test-QuestionG0305 {
     return $result
 }
 
-# Function for Security item G03.06
 function Test-QuestionG0306 {
     [cmdletbinding()]
     param(
@@ -783,7 +898,7 @@ function Test-QuestionG0306 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -803,7 +918,6 @@ function Test-QuestionG0306 {
     return $result
 }
 
-# Function for Security item G03.07
 function Test-QuestionG0307 {
     [cmdletbinding()]
     param(
@@ -811,7 +925,7 @@ function Test-QuestionG0307 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -831,7 +945,6 @@ function Test-QuestionG0307 {
     return $result
 }
 
-# Function for Security item G03.08
 function Test-QuestionG0308 {
     [cmdletbinding()]
     param(
@@ -839,7 +952,7 @@ function Test-QuestionG0308 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -859,7 +972,6 @@ function Test-QuestionG0308 {
     return $result
 }
 
-# Function for Security item G03.09
 function Test-QuestionG0309 {
     [cmdletbinding()]
     param(
@@ -867,7 +979,7 @@ function Test-QuestionG0309 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -887,7 +999,6 @@ function Test-QuestionG0309 {
     return $result
 }
 
-# Function for Security item G03.10
 function Test-QuestionG0310 {
     [cmdletbinding()]
     param(
@@ -895,7 +1006,7 @@ function Test-QuestionG0310 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -915,7 +1026,6 @@ function Test-QuestionG0310 {
     return $result
 }
 
-# Function for Security item G03.11
 function Test-QuestionG0311 {
     [cmdletbinding()]
     param(
@@ -923,7 +1033,7 @@ function Test-QuestionG0311 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -943,7 +1053,6 @@ function Test-QuestionG0311 {
     return $result
 }
 
-# Function for Security item G03.12
 function Test-QuestionG0312 {
     [cmdletbinding()]
     param(
@@ -951,7 +1060,7 @@ function Test-QuestionG0312 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -971,7 +1080,6 @@ function Test-QuestionG0312 {
     return $result
 }
 
-# Function for Security item G04.01
 function Test-QuestionG0401 {
     [cmdletbinding()]
     param(
@@ -979,13 +1087,47 @@ function Test-QuestionG0401 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
-        $status = [Status]::NotDeveloped
-        $rawData = "In development"
-        $estimatedPercentageApplied = 0
+        # Question: Enable secure transfer to storage accounts.
+        # Reference: https://learn.microsoft.com/azure/storage/common/storage-require-secure-transfer
+        
+        if ($global:AzData -and $global:AzData.Resources) {
+            $storageAccounts = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.Storage/storageAccounts" }
+            
+            if ($storageAccounts -and $storageAccounts.Count -gt 0) {
+                $totalAccounts = $storageAccounts.Count
+                $accountDetails = @()
+                
+                foreach ($storageAccount in $storageAccounts) {
+                    # This would require additional API calls to check supportsHttpsTrafficOnly property
+                    # For now, we'll recommend manual verification
+                    $accountDetails += @{
+                        Name = $storageAccount.Name
+                        ResourceGroup = $storageAccount.ResourceGroupName
+                        Note = "Manual verification required for HTTPS-only setting"
+                    }
+                }
+                
+                $status = [Status]::ManualVerificationRequired
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalStorageAccounts = $totalAccounts
+                    StorageAccountDetails = $accountDetails
+                    Note = "Found $totalAccounts storage account(s). Manual verification required to confirm secure transfer (HTTPS-only) is enabled."
+                }
+            } else {
+                $status = [Status]::NotApplicable
+                $estimatedPercentageApplied = 100
+                $rawData = "No storage accounts found in the environment."
+            }
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $estimatedPercentageApplied = 0
+            $rawData = "Unable to check storage accounts automatically. Manual verification required."
+        }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -999,7 +1141,6 @@ function Test-QuestionG0401 {
     return $result
 }
 
-# Function for Security item G04.02
 function Test-QuestionG0402 {
     [cmdletbinding()]
     param(
@@ -1007,7 +1148,7 @@ function Test-QuestionG0402 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -1027,7 +1168,6 @@ function Test-QuestionG0402 {
     return $result
 }
 
-# Function for Security item G05.01
 function Test-QuestionG0501 {
     [cmdletbinding()]
     param(
@@ -1035,7 +1175,7 @@ function Test-QuestionG0501 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -1055,7 +1195,6 @@ function Test-QuestionG0501 {
     return $result
 }
 
-# Function for Security item G06.01
 function Test-QuestionG0601 {
     [cmdletbinding()]
     param(
@@ -1063,7 +1202,7 @@ function Test-QuestionG0601 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {
@@ -1083,7 +1222,6 @@ function Test-QuestionG0601 {
     return $result
 }
 
-# Function for Security item G06.02
 function Test-QuestionG0602 {
     [cmdletbinding()]
     param(
@@ -1091,7 +1229,7 @@ function Test-QuestionG0602 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)" 
     $status = [Status]::Unknown
 
     try {

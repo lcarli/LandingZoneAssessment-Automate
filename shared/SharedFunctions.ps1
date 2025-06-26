@@ -69,7 +69,7 @@ function Test-QuestionAzureResourceGraph {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
 
@@ -113,67 +113,141 @@ function Measure-ExecutionTime {
 
     # Record the start time
     $startTime = Get-Date
-    $originalErrorActionPreference = $ErrorActionPreference
-    $originalProgressPreference = $ProgressPreference
+    
+    # Execute the script block
+    & $ScriptBlock
+    
+    # Record the end time
+    $endTime = Get-Date
+    
+    # Calculate and output the duration
+    $executionTime = $endTime - $startTime
+    Write-Output "Function '$FunctionName' Execution Time: $($executionTime.TotalSeconds) seconds"
+}
 
+# Helper function to test if a cmdlet is available
+function Test-CmdletAvailable {
+    param(
+        [string]$CmdletName,
+        [string]$ModuleName = $null
+    )
+    
     try {
-        # Create a runspace to execute the script block
-        # This approach isolates the execution to prevent issues when interrupted with Ctrl+C
-        $runspace = [runspacefactory]::CreateRunspace()
-        $runspace.Open()
-        $runspace.SessionStateProxy.SetVariable("ScriptBlock", $ScriptBlock)
-        $runspace.SessionStateProxy.SetVariable("ErrorActionPreference", $ErrorActionPreference)
-        $runspace.SessionStateProxy.SetVariable("ProgressPreference", $ProgressPreference)
-        
-        $powershell = [powershell]::Create()
-        $powershell.Runspace = $runspace
-        $powershell.AddScript({
-            # Execute the script block in an isolated context
-            & $ScriptBlock
-        }) | Out-Null
-
-        # Execute the script and handle interruptions
-        $asyncResult = $powershell.BeginInvoke()
-        
-        # Wait for the script to complete or be interrupted
-        while (-not $asyncResult.IsCompleted) {
-            # Check if Ctrl+C was pressed
-            if ([Console]::KeyAvailable -and [Console]::ReadKey($true).Key -eq [ConsoleKey]::C -and [Console]::KeyAvailable -and [Console]::ReadKey($true).Modifiers -eq [ConsoleModifiers]::Control) {
-                Write-Host "`nExecution canceled by user (Ctrl+C). Cleaning up resources..."
-                $powershell.Stop()
-                break
-            }
-            # Add small delay to reduce CPU usage
-            Start-Sleep -Milliseconds 100
+        $cmd = Get-Command $CmdletName -ErrorAction SilentlyContinue
+        if ($cmd) {
+            return $true
         }
-
-        # Get the result (if not interrupted)
-        if ($asyncResult.IsCompleted) {
-            $powershell.EndInvoke($asyncResult)
+        
+        # If module name is provided, try to import it
+        if ($ModuleName) {
+            Import-Module $ModuleName -Force -ErrorAction SilentlyContinue
+            $cmd = Get-Command $CmdletName -ErrorAction SilentlyContinue
+            return $null -ne $cmd
         }
+        
+        return $false
     }
     catch {
-        Write-Host "An error occurred during execution: $_"
+        return $false
     }
-    finally {
-        # Ensure resources are properly disposed
-        if ($powershell) {
-            $powershell.Dispose()
-        }
-        if ($runspace) {
-            $runspace.Close()
-            $runspace.Dispose()
-        }
-        
-        # Restore original preferences
-        $ErrorActionPreference = $originalErrorActionPreference
-        $ProgressPreference = $originalProgressPreference
+}
 
-        # Record the end time
-        $endTime = Get-Date
-
-        # Calculate and output the duration
-        $executionTime = $endTime - $startTime
-        Write-Host "Function '$FunctionName' Execution Time: $($executionTime.TotalSeconds) seconds"
+# Helper function to safely execute Azure cmdlets with fallback
+function Invoke-AzCmdletSafely {
+    param(
+        [scriptblock]$ScriptBlock,
+        [string]$CmdletName,
+        [string]$ModuleName = $null,
+        [object]$FallbackValue = $null,
+        [string]$WarningMessage = "Cmdlet not available"
+    )
+    
+    if (Test-CmdletAvailable -CmdletName $CmdletName -ModuleName $ModuleName) {
+        try {
+            return & $ScriptBlock
+        }
+        catch {
+            Write-Output "  Warning: $WarningMessage - $($_.Exception.Message)"
+            return $FallbackValue
+        }
     }
+    else {
+        Write-Output "  Warning: $CmdletName not available. Install module: $ModuleName"
+        return $FallbackValue
+    }
+}
+
+# ========================================
+# STANDARDIZED LOGGING FUNCTIONS
+# ========================================
+
+<#
+.SYNOPSIS
+    Standardized logging functions for consistent output formatting across the assessment.
+
+.DESCRIPTION
+    These functions provide consistent colored output for different types of messages:
+    - Write-AssessmentInfo: General information (Cyan)
+    - Write-AssessmentProgress: Progress messages (Green) 
+    - Write-AssessmentWarning: Warning messages (Yellow)
+    - Write-AssessmentError: Error messages (Red)
+    - Write-AssessmentSuccess: Success messages (Green)
+    - Write-AssessmentHeader: Section headers (Magenta)
+
+.NOTES
+    All functions write to the host (transcript) only and do not pollute the object pipeline.
+#>
+
+function Write-AssessmentInfo {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Cyan
+}
+
+function Write-AssessmentProgress {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Green
+}
+
+function Write-AssessmentWarning {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Yellow
+}
+
+function Write-AssessmentError {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Red
+}
+
+function Write-AssessmentSuccess {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Green
+}
+
+function Write-AssessmentHeader {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+    Write-Host $Message -ForegroundColor Magenta
 }

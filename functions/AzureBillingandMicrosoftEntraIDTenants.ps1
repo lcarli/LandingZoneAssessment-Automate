@@ -18,6 +18,40 @@
 Import-Module "$PSScriptRoot/../shared/Enums.ps1"
 Import-Module "$PSScriptRoot/../shared/ErrorHandling.ps1"
 
+# Helper function to get budgets via REST API since Get-AzConsumptionBudget is not available
+function Get-BudgetsViaRestApi {
+    param(
+        [string]$SubscriptionId,
+        [string]$FunctionName = "Unknown"
+    )
+    
+    try {
+        # Get access token
+        $accessTokenResult = Get-AzAccessToken
+        if ($accessTokenResult.Token -is [SecureString]) {
+            $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
+            )
+        } else {
+            $plainAccessToken = $accessTokenResult.Token
+        }
+        
+        $uri = "https://management.azure.com/subscriptions/$SubscriptionId/providers/Microsoft.Consumption/budgets?api-version=2021-10-01"
+        $headers = @{
+            Authorization = "Bearer $plainAccessToken"
+            'Content-Type' = 'application/json'
+        }
+        
+        $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue
+        
+        return $response.value
+    }
+    catch {
+        Write-Verbose "Failed to get budgets via REST API for subscription $SubscriptionId : $($_.Exception.Message)"
+        return $null
+    }
+}
+
 function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
     param(
         [Parameter(Mandatory = $true)]
@@ -25,8 +59,14 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
         [Parameter(Mandatory = $true)]
         [object]$Checklist
     )
-
-    Write-Host "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..."
+    
+    Write-AssessmentHeader "Evaluating the AzureBillingandMicrosoftEntraIDTenants design area..."
+    
+    # Note: Az.Billing module is imported in Initialize.ps1 for better performance
+    # Verify billing module is available before proceeding
+    if (-not (Test-CmdletAvailable -CmdletName 'Get-AzBillingAccount')) {
+        Write-Warning "Az.Billing module not properly loaded. Some billing assessments may not work correctly."
+    }
 
     Measure-ExecutionTime -ScriptBlock {
         $results = @()
@@ -39,11 +79,12 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
         elseif ($ContractType -eq "CloudSolutionProvider") {
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.01") }) | Test-QuestionA0201
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.02") }) | Test-QuestionA0202
-            $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.03") }) | Test-QuestionA0203
-        }
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A02.03") }) | Test-QuestionA0203        
+        }        
         elseif ($ContractType -eq "EnterpriseAgreement") {
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.01") }) | Test-QuestionA0301
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.02") }) | Test-QuestionA0302
+            $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.03") }) | Test-QuestionA0303
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.04") }) | Test-QuestionA0304
             $results += ($Checklist.items | Where-Object { ($_.id -eq "A03.05") }) | Test-QuestionA0305
         }
@@ -62,7 +103,13 @@ function Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment {
 
 
 function Test-QuestionA0101 {
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -74,8 +121,8 @@ function Test-QuestionA0101 {
         # Check if only one Entra tenant is being used for managing Azure resources
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/multi-tenant/considerations-recommendations
 
-        # Get all Azure subscriptions
-        $subscriptions = Get-AzSubscription
+        # Get all Azure subscriptions using cached data
+        $subscriptions = $global:AzData.Subscriptions
 
         # Extract tenant IDs from the subscriptions
         $tenantIds = $subscriptions.TenantId
@@ -117,7 +164,7 @@ function Test-QuestionA0102 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -129,7 +176,7 @@ function Test-QuestionA0102 {
         # Use Multi-Tenant Automation approach to managing your Microsoft Entra ID Tenants
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/multi-tenant/lighthouse
 
-        $subscriptions = Get-AzSubscription
+        $subscriptions = $global:AzData.Subscriptions
 
         # Extract tenant IDs from the subscriptions
         $tenantIds = $subscriptions.TenantId
@@ -171,7 +218,7 @@ function Test-QuestionA0103 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -249,7 +296,7 @@ function Test-QuestionA0201 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -261,16 +308,27 @@ function Test-QuestionA0201 {
         # Verify if a partner has access to administer the tenant and ensure Azure Lighthouse is used
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-microsoft-customer-agreement#design-recommendations
 
-        # Import the Microsoft Graph module
-        if (-not (Get-Module -ListAvailable -Name 'Microsoft.Graph.Identity.DirectoryManagement')) {
-            Install-Module -Name 'Microsoft.Graph' -Scope CurrentUser -Force
+        # Import the Microsoft Graph module        # Check if Microsoft Graph is connected
+        if ($global:GraphConnected -eq $false) {
+            Write-Warning "Microsoft Graph is not connected. Cannot assess partner directory roles."
+            $status = [Status]::Unknown
+            $estimatedPercentageApplied = 0
+            $rawData = "Microsoft Graph connection not available for partner assessment"
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }        # Try to get the list of service principals (partners) with directory roles from cached data
+        try {
+            if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.ServicePrincipals) {
+                $servicePrincipals = $global:GraphData.ServicePrincipals | Where-Object { $_.servicePrincipalType -eq 'Partner' }
+            } else {
+                $servicePrincipals = $null
+            }
         }
-        Import-Module Microsoft.Graph.Identity.DirectoryManagement
+        catch {
+            Write-Warning "Could not retrieve partner service principals: $($_.Exception.Message)"
+            $servicePrincipals = $null
+        }
 
-        # Get the list of service principals (partners) with directory roles
-        $servicePrincipals = Get-MgServicePrincipal -Filter "servicePrincipalType eq 'Partner'"
-
-        if ($servicePrincipals.Count -eq 0) {
+        if (-not $servicePrincipals -or $servicePrincipals.Count -eq 0) {
             # No partners found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
@@ -316,7 +374,7 @@ function Test-QuestionA0202 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -385,7 +443,7 @@ function Test-QuestionA0203 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -410,12 +468,17 @@ function Test-QuestionA0203 {
             if ($exports) {
                 $hasExports = $true
                 break
-            }
-        }
-
-        # Check for Budgets at the subscription level
+            }        }        # Check for Budgets at the subscription level
         foreach ($subscription in $subscriptions) {
-            $budgets = Get-AzConsumptionBudget -Scope "/subscriptions/$($subscription.Id)" -ErrorAction SilentlyContinue
+            $budgets = $null
+            try {
+                # Use REST API to get budgets since Get-AzConsumptionBudget is not available
+                $budgets = Get-BudgetsViaRestApi -SubscriptionId $subscription.Id -FunctionName "Test-QuestionA0203"
+            }
+            catch {
+                Write-Verbose "Could not retrieve budgets for subscription $($subscription.Id): $($_.Exception.Message)"
+            }
+            
             if ($budgets) {
                 $hasBudgets = $true
                 break
@@ -457,16 +520,16 @@ function Test-QuestionA0301 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
-    $rawData = $null
+    $rawData = $null   
 
     try {
-        # Configure Notification Contacts to a group mailbox
+        # Set up a Notification Contact email address to ensure notifications are sent to an appropriate group mailbox
         # Reference: https://learn.microsoft.com/azure/cost-management-billing/manage/direct-ea-administration#manage-notification-contacts
 
         # Get the billing accounts
@@ -559,7 +622,7 @@ function Test-QuestionA0302 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -640,6 +703,174 @@ function Test-QuestionA0302 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
+function Test-QuestionA0303 {
+    [cmdletbinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+    $status = [Status]::NotImplemented
+    $estimatedPercentageApplied = 0
+    $weight = 1
+    $score = 0
+    $rawData = $null
+    try {
+        # Assign a budget for each department and account, and establish an alert associated with the budget
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-considerations
+
+        $departmentBudgets = @()
+        $accountBudgets = @()
+        $budgetsWithAlerts = 0
+        $totalBudgets = 0
+
+        # Get Enterprise Agreement billing accounts if available
+        $billingAccounts = Get-AzBillingAccount
+
+        if ($billingAccounts) {
+            foreach ($billingAccount in $billingAccounts) {
+                # Check for department-level budgets
+                try {
+                    $departments = Get-AzBillingProfile -BillingAccountName $billingAccount.Name -ErrorAction SilentlyContinue    
+                    foreach ($department in $departments) {
+                        $departmentScope = "/providers/Microsoft.Billing/billingAccounts/$($billingAccount.Name)/billingProfiles/$($department.Name)"
+                        $budgets = $null                          
+                        try {
+                            # Department-level budgets are complex and require different API endpoints
+                            # Skipping for now to focus on subscription-level budgets
+                            # Department-level budget checks require complex EA enrollment API calls
+                            # if (Get-Command Get-AzConsumptionBudget -ErrorAction SilentlyContinue) {
+                            #     $budgets = Get-AzConsumptionBudget -Scope $departmentScope -ErrorAction SilentlyContinue
+                            # } else {
+                            #     Write-Verbose "Get-AzConsumptionBudget cmdlet not available. Skipping department budget check for scope $departmentScope"
+                            # }
+                        }
+                        catch {
+                            Write-Verbose "Could not retrieve department budgets for scope $departmentScope"
+                        }
+                        
+                        if ($budgets) {
+                            $departmentBudgets += $budgets
+                            $totalBudgets += $budgets.Count
+                            
+                            # Check for alerts on each budget
+                            foreach ($budget in $budgets) {
+                                if ($budget.Notification -and $budget.Notification.Count -gt 0) {
+                                    $budgetsWithAlerts++
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    Write-Verbose "Could not retrieve department budgets: $($_.Exception.Message)"
+                }
+
+                # Check for account-level budgets within billing profiles
+                try {
+                    $billingProfiles = Get-AzBillingProfile -BillingAccountName $billingAccount.Name -ErrorAction SilentlyContinue
+                    foreach ($profile in $billingProfiles) {
+                        $invoiceSections = Get-AzInvoiceSection -BillingAccountName $billingAccount.Name -BillingProfileName $profile.Name -ErrorAction SilentlyContinue                        
+                        foreach ($section in $invoiceSections) {
+                            $accountScope = "/providers/Microsoft.Billing/billingAccounts/$($billingAccount.Name)/billingProfiles/$($profile.Name)/invoiceSections/$($section.Name)"
+                            $budgets = $null                              
+                            try {
+                                # Account-level budgets are complex and require different API endpoints
+                                # Skipping for now to focus on subscription-level budgets
+                                # Account-level budget checks require complex EA enrollment API calls
+                                # if (Get-Command Get-AzConsumptionBudget -ErrorAction SilentlyContinue) {
+                                #     $budgets = Get-AzConsumptionBudget -Scope $accountScope -ErrorAction SilentlyContinue
+                                # } else {
+                                #     Write-Verbose "Get-AzConsumptionBudget cmdlet not available. Skipping account budget check for scope $accountScope"
+                                # }
+                            }
+                            catch {
+                                Write-Verbose "Could not retrieve account budgets for scope $accountScope"
+                            }
+                            
+                            if ($budgets) {
+                                $accountBudgets += $budgets
+                                $totalBudgets += $budgets.Count
+                                
+                                # Check for alerts on each budget
+                                foreach ($budget in $budgets) {
+                                    if ($budget.Notification -and $budget.Notification.Count -gt 0) {
+                                        $budgetsWithAlerts++
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    Write-Verbose "Could not retrieve account budgets: $($_.Exception.Message)"
+                }
+            }
+        }
+
+        # Also check subscription-level budgets as fallback for Enterprise Agreement scenarios
+        $subscriptions = $global:AzData.Subscriptions
+        $subscriptionBudgets = @()          
+        foreach ($subscription in $subscriptions) {
+            $budgets = $null
+            try {
+                # Use REST API to get budgets since Get-AzConsumptionBudget is not available
+                $budgets = Get-BudgetsViaRestApi -SubscriptionId $subscription.Id -FunctionName "Test-QuestionA0303"
+            }
+            catch {
+                Write-Verbose "Could not retrieve budgets for subscription $($subscription.Id): $($_.Exception.Message)"
+            }
+            
+            if ($budgets) {
+                $subscriptionBudgets += $budgets
+                $totalBudgets += $budgets.Count
+                
+                # Check for alerts on each budget
+                foreach ($budget in $budgets) {
+                    if ($budget.Notification -and $budget.Notification.Count -gt 0) {
+                        $budgetsWithAlerts++
+                    }
+                }
+            }
+        }
+
+        # Determine status based on findings
+        if ($totalBudgets -eq 0) {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        } elseif ($budgetsWithAlerts -eq $totalBudgets) {
+            $status = [Status]::Implemented
+            $estimatedPercentageApplied = 100
+        } elseif ($budgetsWithAlerts -gt 0) {
+            $status = [Status]::PartiallyImplemented
+            $estimatedPercentageApplied = [Math]::Round(($budgetsWithAlerts / $totalBudgets) * 100, 2)
+        } else {
+            $status = [Status]::NotImplemented
+            $estimatedPercentageApplied = 0
+        }
+
+        $score = ($weight * $estimatedPercentageApplied) / 100
+        $rawData = @{
+            DepartmentBudgets    = $departmentBudgets
+            AccountBudgets       = $accountBudgets
+            SubscriptionBudgets  = $subscriptionBudgets
+            TotalBudgets         = $totalBudgets
+            BudgetsWithAlerts    = $budgetsWithAlerts
+            BudgetsWithoutAlerts = $totalBudgets - $budgetsWithAlerts
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $score = 0
+        $rawData = $_.Exception.Message
+    }
+
+    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
 function Test-QuestionA0304 {
     [cmdletbinding()]
     param(
@@ -647,16 +878,15 @@ function Test-QuestionA0304 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 3
     $score = 0
-    $rawData = $null
-
+    $rawData = $null    
     try {
-        # Enable both DA View Charges and AO View Charges on your EA Enrollments to allow users with the correct perms review Cost and Billing Data
+        # Enable both DA View Charges and AO View Charges on your EA Enrollments to allow users with the correct permissions to review Cost Management Data
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get the billing accounts (EA Enrollment) and relevant scopes
@@ -750,16 +980,16 @@ function Test-QuestionA0305 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $weight = 1
     $score = 0
-    $rawData = $null
-
+    $rawData = $null    
+    
     try {
-        # Ensure use of Enterprise Dev/Test subscriptions for non-production workloads to reduce costs
+        # Use of Enterprise Dev/Test Subscriptions to reduce costs for non-production workloads
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get all Azure subscriptions
@@ -773,29 +1003,42 @@ function Test-QuestionA0305 {
         $devTestOfferIds = @(
             "MS-AZR-0148P", # Enterprise Dev/Test
             "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
-        )
-
+        )          
         foreach ($subscription in $subscriptions) {
-            # Get subscription details via REST API to get the OfferType
-            $subscriptionId = $subscription.Id
-        
-            # Get the access token securely
-            $accessToken = (Get-AzAccessToken -AsSecureString).Token
-        
-            # Convert SecureString to a plain string for use in the Authorization header
-            $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessToken)
-            )
-        
-            $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2020-01-01"
-            $headers = @{
-                Authorization = "Bearer $plainAccessToken"
+            try {
+                # Get subscription details via REST API to get the OfferType
+                $subscriptionId = $subscription.Id
+            
+                # Get the access token - handling both old and new Az module versions
+                $accessTokenResult = Get-AzAccessToken
+                if ($accessTokenResult.Token -is [SecureString]) {
+                    # New Az module version - Token is SecureString
+                    $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
+                    )
+                } else {
+                    # Old Az module version - Token is String
+                    $plainAccessToken = $accessTokenResult.Token
+                }
+            
+                $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2022-12-01"
+                $headers = @{
+                    Authorization = "Bearer $plainAccessToken"
+                    'Content-Type' = 'application/json'
+                }
+            
+                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue                
+            
+                if ($response -and $response.properties -and $response.properties.subscriptionPolicies) {
+                    $quotaId = $response.properties.subscriptionPolicies.quotaId
+                    if ($devTestOfferIds -contains $quotaId) {
+                        $devTestSubscriptions++
+                    }
+                }
             }
-        
-            $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-        
-            if ($devTestOfferIds -contains $response.properties.subscriptionPolicies.quotaId) {
-                $devTestSubscriptions++
+            catch {
+                Write-Verbose "Failed to retrieve subscription details for $subscriptionId : $($_.Exception.Message)"
+                # Continue with next subscription - don't fail the entire assessment
             }
         }
         
@@ -840,7 +1083,7 @@ function Test-QuestionA0401 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -927,7 +1170,7 @@ function Test-QuestionA0402 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1018,7 +1261,7 @@ function Test-QuestionA0403 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
@@ -1041,20 +1284,41 @@ function Test-QuestionA0403 {
         $devTestQuotaIds = @(
             "MS-AZR-0148P", # Enterprise Dev/Test
             "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
-        )
-
+        )          
         foreach ($subscription in $subscriptions) {
-            # Get subscription details via REST API to get the OfferType
-            $subscriptionId = $subscription.Id
-            $accessToken = (Get-AzAccessToken).Token
-            $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2020-01-01"
-            $headers = @{
-                Authorization = "Bearer $accessToken"
-            }
-            $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+            try {
+                # Get subscription details via REST API to get the OfferType
+                $subscriptionId = $subscription.Id
+                
+                # Get the access token - handling both old and new Az module versions
+                $accessTokenResult = Get-AzAccessToken
+                if ($accessTokenResult.Token -is [SecureString]) {
+                    # New Az module version - Token is SecureString
+                    $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
+                    )
+                } else {
+                    # Old Az module version - Token is String
+                    $plainAccessToken = $accessTokenResult.Token
+                }
+                
+                $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2022-12-01"
+                $headers = @{
+                    Authorization = "Bearer $plainAccessToken"
+                    'Content-Type' = 'application/json'
+                }
+                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue
 
-            if ($devTestQuotaIds -contains $response.properties.subscriptionPolicies.quotaId) {
-                $devTestSubscriptions++
+                if ($response -and $response.properties -and $response.properties.subscriptionPolicies) {
+                    $quotaId = $response.properties.subscriptionPolicies.quotaId
+                    if ($devTestQuotaIds -contains $quotaId) {
+                        $devTestSubscriptions++
+                    }
+                }
+            }
+            catch {
+                Write-Verbose "Could not retrieve subscription details for $subscriptionId`: $($_.Exception.Message)"
+                # Continue with next subscription - don't fail the entire assessment
             }
         }
 
@@ -1098,7 +1362,7 @@ function Test-QuestionA0404 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0

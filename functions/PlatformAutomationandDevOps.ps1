@@ -14,9 +14,10 @@
     lramoscostah@microsoft.com
 #>
 
-# Import shared modules
-Import-Module "$PSScriptRoot/../shared/Enums.ps1"
-Import-Module "$PSScriptRoot/../shared/ErrorHandling.ps1"
+# Dot-source shared modules
+. "$PSScriptRoot/../shared/Enums.ps1"
+. "$PSScriptRoot/../shared/ErrorHandling.ps1"
+. "$PSScriptRoot/../shared/SharedFunctions.ps1"
 
 function Invoke-PlatformAutomationandDevOpsAssessment {
     [CmdletBinding()]
@@ -24,6 +25,9 @@ function Invoke-PlatformAutomationandDevOpsAssessment {
         [Parameter(Mandatory = $true)]
         [object]$Checklist
     )
+
+    Write-AssessmentHeader "Evaluating the Platform Automation and DevOps design area..."
+    
     Measure-ExecutionTime -ScriptBlock {
         $results = @()
         $results += ($Checklist.items | Where-Object { ($_.id -eq "H01.01") }) | Test-QuestionH0101
@@ -46,7 +50,6 @@ function Invoke-PlatformAutomationandDevOpsAssessment {
     return $script:FunctionResult
 }
 
-# Function for Management item H01.01
 function Test-QuestionH0101 {
     [CmdletBinding()]
     param(
@@ -54,10 +57,10 @@ function Test-QuestionH0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires a manual verification of the organizational setup, roles, and responsibilities for the Azure Landing Zone DevOps Platform Team."
+    $rawData = "This Platform Automation and DevOps item requires a manual verification of the organizational setup, roles, and responsibilities for the Azure Landing Zone DevOps Platform Team."
 
     try {
         # Question: Ensure you have a cross functional DevOps Platform Team to build, manage and maintain your Azure Landing Zone architecture.
@@ -73,7 +76,6 @@ function Test-QuestionH0101 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item H01.02
 function Test-QuestionH0102 {
     [CmdletBinding()]
     param(
@@ -81,10 +83,10 @@ function Test-QuestionH0102 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires a manual verification to ensure that Azure Landing Zone Platform team functions are well-defined and documented."
+    $rawData = "This Platform Automation and DevOps item requires a manual verification to ensure that Azure Landing Zone Platform team functions are well-defined and documented."
 
     try {
         # Question: Aim to define functions for Azure Landing Zone Platform team.
@@ -100,7 +102,6 @@ function Test-QuestionH0102 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item H01.03
 function Test-QuestionH0103 {
     [CmdletBinding()]
     param(
@@ -108,7 +109,7 @@ function Test-QuestionH0103 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires a manual verification to ensure that RBAC roles are defined and applied appropriately for application workload team self-sufficiency."
@@ -128,7 +129,6 @@ function Test-QuestionH0103 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Platform Automation and DevOps item H01.04
 function Test-QuestionH0104 {
     [cmdletbinding()]
     param(
@@ -136,7 +136,7 @@ function Test-QuestionH0104 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = "This question requires a manual verification to ensure that RBAC roles are defined and applied appropriately for application workload team self-sufficiency."
@@ -154,10 +154,8 @@ function Test-QuestionH0104 {
     }
 
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-    return $result
 }
 
-# Function for H01.05
 function Test-QuestionH0105 {
     [CmdletBinding()]
     param(
@@ -165,10 +163,10 @@ function Test-QuestionH0105 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification of unit test integration in build pipelines."
+    $rawData = "This Platform Automation and DevOps item requires manual verification of unit test integration in build pipelines."
 
     try {
         # Question: Include unit tests for IaC and application code as part of your build process.
@@ -184,7 +182,6 @@ function Test-QuestionH0105 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for H01.06
 function Test-QuestionH0106 {
     [CmdletBinding()]
     param(
@@ -192,15 +189,36 @@ function Test-QuestionH0106 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to ensure proper implementation of end-to-end tests."
+    $rawData = "This Platform Automation and DevOps item requires manual verification to ensure Key Vault is used for sensitive information."
 
     try {
-        # Question: Ensure end-to-end tests are included in your deployment pipeline.
+        # Question: Use Key Vault secrets to avoid hard-coding sensitive information such as credentials (virtual machines user passwords), certificates or keys.
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/development-strategy-development-lifecycle#automated-builds
-        $status = [Status]::ManualVerificationRequired
+        
+        # Check if Key Vaults exist in the environment
+        if ($global:AzData -and $global:AzData.Resources) {
+            $keyVaults = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.KeyVault/vaults" }
+            
+            if ($keyVaults -and $keyVaults.Count -gt 0) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 85 # Partial - existence indicates usage but manual verification needed for proper implementation
+                $rawData = @{
+                    KeyVaultCount = $keyVaults.Count
+                    KeyVaultNames = $keyVaults.Name
+                    Note = "Key Vaults found in environment. Manual verification needed to confirm proper usage for sensitive information storage."
+                }
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = "No Key Vaults found in the environment. Consider implementing Key Vault for storing sensitive information."
+            }
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $rawData = "Unable to check Key Vault existence automatically. Manual verification required."
+        }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
@@ -211,7 +229,6 @@ function Test-QuestionH0106 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for H01.07
 function Test-QuestionH0107 {
     [CmdletBinding()]
     param(
@@ -219,10 +236,10 @@ function Test-QuestionH0107 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to validate code quality gates in your pipelines."
+    $rawData = "This Platform Automation and DevOps item requires manual verification to validate code quality gates in your pipelines."
 
     try {
         # Question: Validate code quality gates in your pipelines.
@@ -238,7 +255,6 @@ function Test-QuestionH0107 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for H02.01
 function Test-QuestionH0201 {
     [CmdletBinding()]
     param(
@@ -246,10 +262,10 @@ function Test-QuestionH0201 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to confirm proper use of IaC in deployment pipelines."
+    $rawData = "This Platform Automation and DevOps item requires manual verification to confirm proper use of IaC in deployment pipelines."
 
     try {
         # Question: Use Infrastructure as Code (IaC) in deployment pipelines.
@@ -265,7 +281,6 @@ function Test-QuestionH0201 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for H02.02
 function Test-QuestionH0202 {
     [CmdletBinding()]
     param(
@@ -273,10 +288,10 @@ function Test-QuestionH0202 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification for RBAC compliance within deployment pipelines."
+    $rawData = "This Platform Automation and DevOps item requires manual verification for RBAC compliance within deployment pipelines."
 
     try {
         # Question: Ensure RBAC compliance in deployment pipelines.
@@ -292,7 +307,6 @@ function Test-QuestionH0202 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for H02.03
 function Test-QuestionH0203 {
     [CmdletBinding()]
     param(
@@ -300,10 +314,10 @@ function Test-QuestionH0203 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification for artifact repository management in pipelines."
+    $rawData = "This Platform Automation and DevOps item requires manual verification for artifact repository management in pipelines."
 
     try {
         # Question: Use artifact repositories to manage shared libraries in pipelines.
@@ -319,7 +333,6 @@ function Test-QuestionH0203 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for H02.04
 function Test-QuestionH0204 {
     [CmdletBinding()]
     param(
@@ -327,10 +340,10 @@ function Test-QuestionH0204 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification of secrets management integration in pipelines."
+    $rawData = "This Platform Automation and DevOps item requires manual verification of secrets management integration in pipelines."
 
     try {
         # Question: Integrate secrets management in deployment pipelines.
@@ -346,7 +359,6 @@ function Test-QuestionH0204 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item H03.01
 function Test-QuestionH0301 {
     [CmdletBinding()]
     param(
@@ -354,15 +366,73 @@ function Test-QuestionH0301 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to ensure that processes and policies are aligned."
+    $rawData = "This Platform Automation and DevOps item requires manual verification to ensure Infrastructure as Code usage."
 
     try {
-        # Question: Ensure appropriate processes and practices are in place for H03.01.
+        # Question: Leverage Declarative Infrastructure as Code Tools such as Azure Bicep, ARM Templates or Terraform to build and maintain your Azure Landing Zone architecture.
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/infrastructure-as-code
-        $status = [Status]::ManualVerificationRequired
+        
+        # Check for evidence of IaC usage through resource group tags or deployment history
+        $iacEvidence = @{
+            DeploymentTemplates = 0
+            ResourceGroupsWithDeploymentTags = 0
+            TotalResourceGroups = 0
+        }
+        
+        if ($global:AzData -and $global:AzData.ResourceGroups) {
+            $iacEvidence.TotalResourceGroups = $global:AzData.ResourceGroups.Count
+            
+            # Check for deployment-related tags that indicate IaC usage
+            $deploymentTags = @('deployedBy', 'deployment', 'template', 'bicep', 'terraform', 'arm', 'iac')
+            $rgWithDeploymentTags = $global:AzData.ResourceGroups | Where-Object {
+                $rgTags = $_.Tags
+                if ($rgTags) {
+                    $tagKeys = $rgTags.Keys | ForEach-Object { $_.ToLower() }
+                    ($deploymentTags | Where-Object { $tagKeys -contains $_ }).Count -gt 0
+                }
+            }
+            
+            if ($rgWithDeploymentTags) {
+                $iacEvidence.ResourceGroupsWithDeploymentTags = $rgWithDeploymentTags.Count
+            }
+            
+            # Check deployment history for template deployments (limited check)
+            if ($global:AzData.Resources) {
+                # Look for resources that typically indicate template deployment
+                $templateDeployedResources = $global:AzData.Resources | Where-Object {
+                    $_.Tags -and ($_.Tags.Keys | Where-Object { $deploymentTags -contains $_.ToLower() })
+                }
+                
+                if ($templateDeployedResources) {
+                    $iacEvidence.DeploymentTemplates = $templateDeployedResources.Count
+                }
+            }
+            
+            # Evaluate IaC usage
+            $totalIndicators = $iacEvidence.ResourceGroupsWithDeploymentTags + $iacEvidence.DeploymentTemplates
+            
+            if ($totalIndicators -gt 0) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = [Math]::Min(90, ($totalIndicators / $iacEvidence.TotalResourceGroups) * 100)
+                $rawData = @{
+                    IaCEvidence = $iacEvidence
+                    Note = "Found evidence of IaC usage through deployment tags and resource metadata. Full verification recommended."
+                }
+            } else {
+                $status = [Status]::ManualVerificationRequired
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    IaCEvidence = $iacEvidence
+                    Note = "No clear evidence of IaC usage found in resource tags. Manual verification required to assess actual IaC implementation."
+                }
+            }
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $rawData = "Unable to check IaC evidence automatically. Manual verification required to assess Infrastructure as Code implementation."
+        }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
@@ -373,7 +443,6 @@ function Test-QuestionH0301 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item H04.01
 function Test-QuestionH0401 {
     [CmdletBinding()]
     param(
@@ -381,13 +450,13 @@ function Test-QuestionH0401 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to ensure that processes and policies are aligned."
+    $rawData = "This Platform Automation and DevOps item requires manual verification to ensure that processes and policies are aligned."
 
     try {
-        # Question: Ensure appropriate processes and practices are in place for H04.01.
+        # Question: Integrate security into the already combined process of development and operations in DevOps to mitigate risks in the innovation process.
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/landing-zone-security#secure
         $status = [Status]::ManualVerificationRequired
     } catch {

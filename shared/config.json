@@ -3,11 +3,12 @@
     "DefaultSubscriptionId": "",
     "ContractType": "EnterpriseAgreement",  // Options: EnterpriseAgreement, MicrosoftCustomerAgreement, CloudSolutionProvider, MicrosoftEntraIDTenants
     "AlzChecklist": "alz_checklist.en.json",
+    "DefaultRegion": "canadaeast",  // Default Azure region for assessment queries
     "DesignAreas": {
         "Billing": false,
-        "IAM": true,
+        "IAM": false,
         "ResourceOrganization": false,
-        "Network": false,
+        "Network": true,
         "Governance": false,
         "Security": false,
         "DevOps": false,

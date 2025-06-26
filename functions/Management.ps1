@@ -26,11 +26,13 @@ function Invoke-ManagementAssessment {
         [object]$Checklist
     )
 
-    Write-Host "Evaluating the Management design area..."
+    Write-AssessmentHeader "Evaluating the Management design area..."
     Measure-ExecutionTime -ScriptBlock {
         $results = @()
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.01") }) | Test-QuestionF0101
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.02") }) | Test-QuestionF0102
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.03") }) | Test-QuestionF0103
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.04") }) | Test-QuestionF0104
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.05") }) | Test-QuestionF0105
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.06") }) | Test-QuestionF0106
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.07") }) | Test-QuestionF0107
@@ -40,19 +42,17 @@ function Invoke-ManagementAssessment {
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.11") }) | Test-QuestionF0111
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.12") }) | Test-QuestionF0112
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.13") }) | Test-QuestionF0113
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.14") }) | Test-QuestionF0114
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.15") }) | Test-QuestionF0115
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.16") }) | Test-QuestionF0116
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.17") }) | Test-QuestionF0117
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.17") }) | Test-QuestionF0117        
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.18") }) | Test-QuestionF0118
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.19") }) | Test-QuestionF0119
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.20") }) | Test-QuestionF0120
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F01.21") }) | Test-QuestionF0121
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F02.01") }) | Test-QuestionF0201
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F02.02") }) | Test-QuestionF0202
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.01") }) | Test-QuestionF0301
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F03.02") }) | Test-QuestionF0302
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.01") }) | Test-QuestionF0401
+        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.01") }) | Test-QuestionF0401        
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.02") }) | Test-QuestionF0402
-        $results += ($Checklist.items | Where-Object { ($_.id -eq "F04.03") }) | Test-QuestionF0403
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.01") }) | Test-QuestionF0601
         $results += ($Checklist.items | Where-Object { ($_.id -eq "F06.02") }) | Test-QuestionF0602
 
@@ -69,35 +69,30 @@ function Test-QuestionF0101 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
-    $score = 0
     $rawData = $null
 
     try {
-        # Question: Use tagging to define data classification and retention policies for sensitive data in Azure resources.
-        # Reference: https://learn.microsoft.com/azure/governance/policy/concepts/definition-structure#tags
+        # Question: Use a single monitor logs workspace to manage platforms centrally except where Azure role-based access control (Azure RBAC), data sovereignty requirements, or data retention policies mandate separate workspaces.
+        # Reference: https://learn.microsoft.com/azure/azure-monitor/logs/workspace-design#azure-regions
 
-        # Get all subscriptions
         $subscriptions = $global:AzData.Subscriptions
 
         if ($subscriptions.Count -eq 0) {
-            # No subscriptions found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        }
-        else {
+        } else {
             $totalWorkspaces = 0
             $justifiedWorkspaces = 0
             $allWorkspaces = @()
 
             foreach ($subscription in $subscriptions) {
-                Set-AzContext -SubscriptionId $subscription.Id -TenantId $TenantId
-
-                # Get all Log Analytics workspaces in the subscription
-                $workspaces = Get-AzOperationalInsightsWorkspace
+                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzOperationalInsightsWorkspace -SubscriptionId $subscription.Id -ErrorAction Stop
+                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
 
                 $allWorkspaces += $workspaces
             }
@@ -105,20 +100,16 @@ function Test-QuestionF0101 {
             $totalWorkspaces = $allWorkspaces.Count
 
             if ($totalWorkspaces -eq 0) {
-                # No workspaces found
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            }
-            elseif ($totalWorkspaces -eq 1) {
-                # Only one workspace exists
+            } elseif ($totalWorkspaces -eq 1) {
+                # Single workspace - compliant with recommendation
                 $status = [Status]::Implemented
                 $estimatedPercentageApplied = 100
-            }
-            else {
-                # Multiple workspaces found
-                # Check for data sovereignty, data retention, and RBAC differences
-
-                # Group workspaces by region
+            } else {
+                # Multiple workspaces - check if they are justified by RBAC, data sovereignty, or retention policies
+                
+                # Group workspaces by region (data sovereignty)
                 $regions = $allWorkspaces | Select-Object -ExpandProperty Location -Unique
 
                 # Check data retention settings
@@ -126,78 +117,162 @@ function Test-QuestionF0101 {
 
                 # For RBAC, collect role assignments per workspace
                 $rbacAssignments = @{}
+                $rbacJustified = $false
 
                 foreach ($workspace in $allWorkspaces) {
                     $workspaceId = $workspace.ResourceId
-                    $roleAssignments = Get-AzRoleAssignment -Scope $workspaceId
+                    $roleAssignments = Invoke-AzCmdletSafely -ScriptBlock {
+                        Get-AzRoleAssignment -Scope $workspaceId -ErrorAction Stop
+                    } -CmdletName "Get-AzRoleAssignment" -ModuleName "Az.Resources" -FallbackValue @() -WarningMessage "Could not get role assignments for workspace $($workspace.Name)"
+                    
                     $rbacAssignments[$workspaceId] = $roleAssignments
                 }
 
-                # Determine if workspaces are justified
-                # If regions, retention policies, or RBAC assignments differ, increment justifiedWorkspaces
-
-                $justifiedWorkspaces = 0
-
-                if ($regions.Count -gt 1) {
-                    # Multiple regions
-                    $justifiedWorkspaces++
-                }
-
-                if ($retentionValues.Count -gt 1) {
-                    # Multiple retention policies
-                    $justifiedWorkspaces++
-                }
-
-                # Compare RBAC assignments
-                $rbacDifferent = $false
-
-                $firstWorkspaceAssignments = $rbacAssignments.Values | Select-Object -First 1
-
-                foreach ($assignments in $rbacAssignments.Values) {
-                    if ($assignments.Count -ne $firstWorkspaceAssignments.Count) {
-                        $rbacDifferent = $true
-                        break
-                    }
-                    else {
-                        # Compare the assignments
-                        if ($firstWorkspaceAssignments && $assignments) {
-                            $diff = Compare-Object -ReferenceObject $firstWorkspaceAssignments -DifferenceObject $assignments -Property RoleDefinitionName, PrincipalId, PrincipalType
-                            if ($diff) {
-                                $rbacDifferent = $true
-                                break
+                # Check if multiple workspaces are justified
+                $dataSovereigntyJustified = $regions.Count -gt 1
+                $retentionJustified = $retentionValues.Count -gt 1
+                
+                # Check RBAC differences
+                if ($rbacAssignments.Count -gt 1) {
+                    $firstWorkspaceAssignments = $rbacAssignments.Values | Select-Object -First 1
+                    foreach ($assignments in $rbacAssignments.Values) {
+                        if ($assignments.Count -ne $firstWorkspaceAssignments.Count) {
+                            $rbacJustified = $true
+                            break
+                        } else {
+                            if ($firstWorkspaceAssignments -and $assignments) {
+                                $diff = Compare-Object -ReferenceObject $firstWorkspaceAssignments -DifferenceObject $assignments -Property RoleDefinitionName, PrincipalId, PrincipalType -ErrorAction SilentlyContinue
+                                if ($diff) {
+                                    $rbacJustified = $true
+                                    break
+                                }
                             }
                         }
                     }
                 }
 
-                if ($rbacDifferent) {
-                    $justifiedWorkspaces++
+                # Calculate compliance based on justification
+                $justificationReasons = @()
+                if ($dataSovereigntyJustified) { $justificationReasons += "Data Sovereignty" }
+                if ($retentionJustified) { $justificationReasons += "Retention Policies" }
+                if ($rbacJustified) { $justificationReasons += "RBAC Requirements" }
+
+                if ($justificationReasons.Count -gt 0) {
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                } else {
+                    # Multiple workspaces without clear justification
+                    $status = [Status]::PartiallyImplemented
+                    $estimatedPercentageApplied = 40
                 }
 
-                if ($justifiedWorkspaces -gt 0) {
-                    $status = [Status]::PartiallyImplemented
-                    $estimatedPercentageApplied = [Math]::Round((($totalWorkspaces - $justifiedWorkspaces) / $totalWorkspaces) * 100, 2)
-                }
-                else {
-                    $status = [Status]::NotImplemented
-                    $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalWorkspaces = $totalWorkspaces
+                    UniqueRegions = $regions.Count
+                    UniqueRetentionPolicies = $retentionValues.Count
+                    JustificationReasons = $justificationReasons
+                    WorkspaceDetails = $allWorkspaces | Select-Object Name, Location, RetentionInDays, ResourceGroupName
                 }
             }
-
-            $rawData = $justifiedWorkspaces
-
-            $score = ($weight * $estimatedPercentageApplied) / 100
         }
-    }
-    catch {
+    } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Unknown
         $estimatedPercentageApplied = 0
-        $score = 0
         $rawData = $_.Exception.Message
     }
 
-    # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0102 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Decide whether to use a single Azure Monitor Logs workspace for all regions or to create multiple workspaces to cover various geographical regions.
+        # Reference: https://learn.microsoft.com/azure/azure-monitor/logs/design-logs-deployment
+
+        $subscriptions = $global:AzData.Subscriptions
+
+        if ($subscriptions.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+        } else {
+            $allWorkspaces = @()
+            $totalWorkspaces = 0
+
+            foreach ($subscription in $subscriptions) {
+                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzOperationalInsightsWorkspace -SubscriptionId $subscription.Id -ErrorAction Stop
+                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
+                
+                $allWorkspaces += $workspaces
+            }
+
+            $totalWorkspaces = $allWorkspaces.Count
+
+            if ($totalWorkspaces -eq 0) {
+                $status = [Status]::NotApplicable
+                $estimatedPercentageApplied = 100
+            } else {
+                # Group workspaces by region
+                $regions = $allWorkspaces | Group-Object Location
+                $regionCount = $regions.Count
+
+                # Check for cross-region networking charges considerations
+                $hasMultiRegionWorkspaces = $regionCount -gt 1
+                $hasRegionalDistribution = $false
+
+                if ($hasMultiRegionWorkspaces) {
+                    # Check if workspaces are properly distributed across regions
+                    $maxWorkspacesPerRegion = ($regions | Measure-Object -Property Count -Maximum).Maximum
+                    $minWorkspacesPerRegion = ($regions | Measure-Object -Property Count -Minimum).Minimum
+                    
+                    # Consider well-distributed if difference is not too large
+                    $hasRegionalDistribution = ($maxWorkspacesPerRegion - $minWorkspacesPerRegion) -le 2
+                }
+
+                if ($totalWorkspaces -eq 1) {
+                    # Single workspace strategy - check if it covers multiple regions appropriately
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                } elseif ($hasMultiRegionWorkspaces -and $hasRegionalDistribution) {
+                    # Multiple workspaces with good regional distribution
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                } elseif ($hasMultiRegionWorkspaces) {
+                    # Multiple workspaces but poor distribution
+                    $status = [Status]::PartiallyImplemented
+                    $estimatedPercentageApplied = 60
+                } else {
+                    # Multiple workspaces in same region - may not be optimal
+                    $status = [Status]::PartiallyImplemented
+                    $estimatedPercentageApplied = 40
+                }
+
+                $rawData = @{
+                    TotalWorkspaces = $totalWorkspaces
+                    UniqueRegions = $regionCount
+                    WorkspacesByRegion = $regions | ForEach-Object { @{ Region = $_.Name; Count = $_.Count } }
+                }
+            }
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
@@ -208,56 +283,46 @@ function Test-QuestionF0103 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $weight = 3
-    $score = 0
     $rawData = $null
 
     try {
-        # Question: Configure logging and auditing for data plane and management plane operations for sensitive data and resources.
-        # Reference: https://learn.microsoft.com/azure/azure-monitor/essentials/logs-overview
+        # Question: Export logs to Azure Storage if your log retention requirements exceed twelve years. Use immutable storage with a write-once, read-many policy to make data non-erasable and non-modifiable for a user-specified interval.
+        # Reference: https://learn.microsoft.com/azure/azure-monitor/logs/data-retention-archive?tabs=portal-1%2Cportal-2#how-retention-and-archiving-work
 
-        # Get all subscriptions
         $subscriptions = $global:AzData.Subscriptions
 
         if ($subscriptions.Count -eq 0) {
-            # No subscriptions found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        }
-        else {
+        } else {
             $workspacesExceedingRetention = @()
             $workspacesCompliant = 0
             $workspacesNonCompliant = 0
             $totalWorkspacesChecked = 0
 
             foreach ($subscription in $subscriptions) {
-                Set-AzContext -SubscriptionId $subscription.Id -TenantId $TenantId
-
-                # Get all Log Analytics workspaces in the subscription
-                $workspaces = Get-AzOperationalInsightsWorkspace
+                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzOperationalInsightsWorkspace -SubscriptionId $subscription.Id -ErrorAction Stop
+                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
 
                 foreach ($workspace in $workspaces) {
                     $totalWorkspacesChecked++
 
                     $retentionInDays = $workspace.RetentionInDays
-                    $archiveRetentionInDays = $workspace.ArchivedDataRetentionInDays
-
-                    if (-not $archiveRetentionInDays) {
-                        $archiveRetentionInDays = 0
-                    }
-
+                    $archiveRetentionInDays = if ($workspace.ArchivedDataRetentionInDays) { $workspace.ArchivedDataRetentionInDays } else { 0 }
                     $totalRetention = $retentionInDays + $archiveRetentionInDays
 
-                    if ($totalRetention -gt 4380) {
-                        # Workspace retention exceeds 12 years
+                    if ($totalRetention -gt 4380) { # 12 years = 4380 days
                         $workspacesExceedingRetention += $workspace
 
                         # Check if workspace has export rules to Azure Storage
-                        # Get Data Export rules for the workspace
-                        $exportRules = Get-AzOperationalInsightsDataExport -ResourceGroupName $workspace.ResourceGroupName -WorkspaceName $workspace.Name
+                        $exportRules = Invoke-AzCmdletSafely -ScriptBlock {
+                            Get-AzOperationalInsightsDataExport -ResourceGroupName $workspace.ResourceGroupName -WorkspaceName $workspace.Name -ErrorAction Stop
+                        } -CmdletName "Get-AzOperationalInsightsDataExport" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not check data export rules for workspace $($workspace.Name)"
 
                         $storageExportConfigured = $false
                         $storageCompliant = $false
@@ -266,68 +331,152 @@ function Test-QuestionF0103 {
                             if ($rule.Destination -like "/subscriptions/*/resourceGroups/*/providers/Microsoft.Storage/storageAccounts/*") {
                                 $storageExportConfigured = $true
 
-                                # Get the storage account
+                                # Get the storage account to check for immutable storage (WORM)
                                 $storageAccountId = $rule.Destination
-                                $storageAccount = Get-AzStorageAccount -ResourceId $storageAccountId
+                                $storageAccount = Invoke-AzCmdletSafely -ScriptBlock {
+                                    Get-AzStorageAccount -ResourceId $storageAccountId -ErrorAction Stop
+                                } -CmdletName "Get-AzStorageAccount" -ModuleName "Az.Storage" -WarningMessage "Could not check Storage Account for WORM: $storageAccountId"
 
-                                # Check if immutable storage with WORM is enabled
-                                if ($storageAccount.ImmutableStorageWithVersioning.Enabled -eq $true) {
-                                    $storageCompliant = $true
-                                    break
+                                if ($storageAccount) {
+                                    # Check for immutable storage policies (WORM)
+                                    $immutablePolicies = Invoke-AzCmdletSafely -ScriptBlock {
+                                        Get-AzRmStorageContainerImmutabilityPolicy -ResourceGroupName $storageAccount.ResourceGroupName -StorageAccountName $storageAccount.StorageAccountName -ErrorAction Stop
+                                    } -CmdletName "Get-AzRmStorageContainerImmutabilityPolicy" -ModuleName "Az.Storage" -FallbackValue @() -WarningMessage "Could not check immutability policies for storage account $($storageAccount.StorageAccountName)"
+
+                                    if ($immutablePolicies.Count -gt 0) {
+                                        $storageCompliant = $true
+                                        break
+                                    }
                                 }
                             }
                         }
 
                         if ($storageExportConfigured -and $storageCompliant) {
                             $workspacesCompliant++
-                        }
-                        else {
+                        } else {
                             $workspacesNonCompliant++
                         }
-                    }
-                    else {
-                        # Workspace retention does not exceed 12 years
-                        # Consider compliant
+                    } else {
+                        # Workspace retention does not exceed 12 years - compliant by default
                         $workspacesCompliant++
                     }
                 }
             }
 
             if ($workspacesExceedingRetention.Count -eq 0) {
-                # No workspaces exceeding retention
+                # No workspaces exceeding 12-year retention
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            }
-            else {
+                $rawData = "No Log Analytics workspaces have retention requirements exceeding 12 years"
+            } else {
                 if ($workspacesNonCompliant -eq 0) {
                     $status = [Status]::Implemented
                     $estimatedPercentageApplied = 100
-                }
-                elseif ($workspacesCompliant -eq 0) {
+                } elseif ($workspacesCompliant -eq 0) {
                     $status = [Status]::NotImplemented
                     $estimatedPercentageApplied = 0
-                }
-                else {
+                } else {
                     $status = [Status]::PartiallyImplemented
                     $estimatedPercentageApplied = ($workspacesCompliant / $workspacesExceedingRetention.Count) * 100
                     $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
                 }
+
+                $rawData = @{
+                    TotalWorkspacesChecked = $totalWorkspacesChecked
+                    WorkspacesExceedingRetention = $workspacesExceedingRetention.Count
+                    WorkspacesCompliant = $workspacesCompliant
+                    WorkspacesNonCompliant = $workspacesNonCompliant
+                    WorkspaceDetails = $workspacesExceedingRetention | Select-Object Name, Location, RetentionInDays, ArchivedDataRetentionInDays, ResourceGroupName
+                }
             }
-
-            $rawData = $workspacesExceedingRetention
-
-            $score = ($weight * $estimatedPercentageApplied) / 100
         }
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = $status
         $estimatedPercentageApplied = 0
-        $score = 0
         $rawData = $_.Exception.Message
     }
 
     # Return result object using Set-EvaluationResultObject
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
+function Test-QuestionF0104 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: Monitor OS level virtual machine (VM) configuration drift using Azure Policy. Enabling Azure Automanage Machine Configuration audit capabilities.
+        # Reference: https://learn.microsoft.com/azure/governance/machine-configuration/overview
+
+        $totalVMs = 0
+        $vmsWithGuestConfiguration = 0
+
+        $virtualMachines = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.Compute/virtualMachines"
+        }
+
+        $totalVMs = $virtualMachines.Count
+
+        if ($totalVMs -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+        } else {
+            foreach ($vm in $virtualMachines) {
+                # Check for Azure Policy guest configuration compliance
+                $guestConfigPolicies = $global:AzData.Policies | Where-Object {
+                    $_.ResourceId -eq $vm.Id -and
+                    $_.PolicyDefinitionCategory -eq "Guest Configuration" -and
+                    $_.ComplianceState -eq "Compliant"
+                }
+
+                # Check for VM extensions related to guest configuration
+                $extensions = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzVMExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -ErrorAction Stop
+                } -CmdletName "Get-AzVMExtension" -ModuleName "Az.Compute" -FallbackValue @() -WarningMessage "Could not check VM extensions for $($vm.Name)"
+
+                $hasGuestConfigExtension = $extensions | Where-Object {
+                    $_.ExtensionType -in @("ConfigurationForLinux", "ConfigurationForWindows", "GuestConfiguration")
+                }
+
+                if ($guestConfigPolicies.Count -gt 0 -or $hasGuestConfigExtension) {
+                    $vmsWithGuestConfiguration++
+                }
+            }
+
+            $estimatedPercentageApplied = ($vmsWithGuestConfiguration / $totalVMs) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+
+            if ($estimatedPercentageApplied -eq 100) {
+                $status = [Status]::Implemented
+            } elseif ($estimatedPercentageApplied -eq 0) {
+                $status = [Status]::NotImplemented
+            } else {
+                $status = [Status]::PartiallyImplemented
+            }
+
+            $rawData = @{
+                TotalVMs = $totalVMs
+                VMsWithGuestConfiguration = $vmsWithGuestConfiguration
+                VMsWithoutGuestConfiguration = $totalVMs - $vmsWithGuestConfiguration
+            }
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
@@ -337,24 +486,23 @@ function Test-QuestionF0105 {
         [Parameter(ValueFromPipeline = $true)]
         [Object]$checklistItem
     )
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
 
     try {
-        # Question: Enable Microsoft Defender for Cloud to protect sensitive data and resources by detecting potential threats.
-        # Reference: https://learn.microsoft.com/azure/defender-for-cloud/defender-for-cloud-introduction
+        # Question: Use Azure Update Manager as a patching mechanism for Windows and Linux VMs in Azure.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/management-operational-compliance#update-management-considerations
 
         $subscriptions = $global:AzData.Subscriptions
 
         if ($subscriptions.Count -eq 0) {
-            # No subscriptions found
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-        }
-        else {
+        } else {
             $totalVms = 0
-            $compliantVms = 0
+            $vmsWithUpdateManager = 0
+            $vmsDetails = @()
 
             foreach ($subscription in $subscriptions) {
                 $vms = $global:AzData.Resources | Where-Object {
@@ -365,45 +513,61 @@ function Test-QuestionF0105 {
                 $totalVms += $vms.Count
 
                 foreach ($vm in $vms) {
-                    $isCompliant = $true
+                    $vmDetails = @{
+                        Name = $vm.Name
+                        ResourceGroup = $vm.ResourceGroupName
+                        Location = $vm.Location
+                        HasUpdateManager = $false
+                        PatchMode = "Unknown"
+                    }
 
-                    $complianceStates = $global:AzData.Policies | Where-Object {
+                    # Check for Update Manager configuration via policies or extensions
+                    $updatePolicies = $global:AzData.Policies | Where-Object {
                         $_.ResourceId -eq $vm.Id -and
-                        $_.PolicyDefinitionAction -eq 'deployIfNotExists' -and
-                        $_.PolicyDefinitionCategory -eq 'Guest Configuration' -and
-                        $_.ComplianceState -eq 'NonCompliant'
+                        ($_.PolicyDefinitionDisplayName -like "*Update Manager*" -or
+                         $_.PolicyDefinitionDisplayName -like "*Patch Management*" -or
+                         $_.PolicyDefinitionDisplayName -like "*Automatic VM guest patching*") -and
+                        $_.ComplianceState -eq 'Compliant'
                     }
 
-                    if ($complianceStates.Count -gt 0) {
-                        $isCompliant = $false
+                    # Check for Azure Update Manager extension or automatic patch settings
+                    if ($updatePolicies.Count -gt 0) {
+                        $vmDetails.HasUpdateManager = $true
+                        $vmDetails.PatchMode = "Managed"
+                        $vmsWithUpdateManager++
+                    } else {
+                        # Check if VM has automatic patching enabled (this is a basic check)
+                        # In real implementation, this would require more detailed VM configuration checks
+                        $vmDetails.PatchMode = "Manual"
                     }
 
-                    if ($isCompliant) {
-                        $compliantVms++
-                    }
+                    $vmsDetails += $vmDetails
                 }
             }
 
             if ($totalVms -eq 0) {
                 $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            }
-            else {
-                $estimatedPercentageApplied = ($compliantVms / $totalVms) * 100
+                $rawData = "No virtual machines found"
+            } else {
+                $estimatedPercentageApplied = ($vmsWithUpdateManager / $totalVms) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
 
                 if ($estimatedPercentageApplied -eq 100) {
                     $status = [Status]::Implemented
-                }
-                elseif ($estimatedPercentageApplied -eq 0) {
+                } elseif ($estimatedPercentageApplied -eq 0) {
                     $status = [Status]::NotImplemented
-                }
-                else {
+                } else {
                     $status = [Status]::PartiallyImplemented
                 }
-            }
 
-            $rawData = $totalVms
+                $rawData = @{
+                    TotalVMs = $totalVms
+                    VMsWithUpdateManager = $vmsWithUpdateManager
+                    VMsWithoutUpdateManager = $totalVms - $vmsWithUpdateManager
+                    VMDetails = $vmsDetails
+                }
+            }
         }
     }
     catch {
@@ -424,69 +588,90 @@ function Test-QuestionF0106 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
 
     try {
-        # Question: Encrypt sensitive data at rest using customer-managed keys (CMK).
-        # Reference: https://learn.microsoft.com/azure/security/fundamentals/encryption-atrest
+        # Question: Use Azure Update Manager as a patching mechanism for Windows and Linux VMs outside of Azure using Azure Arc.
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/management-operational-compliance#update-management-considerations
 
-        $resourcesWithCMK = 0
-        $totalResources = 0
+        $subscriptions = $global:AzData.Subscriptions
 
-        $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in @("Microsoft.Storage/storageAccounts", "Microsoft.Sql/servers", "Microsoft.KeyVault/vaults")
-        }
-
-        if (-not $resources -or $resources.Count -eq 0) {
+        if ($subscriptions.Count -eq 0) {
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
-            $rawData = "No resources of the specified types are configured in this environment."
         } else {
-            $totalResources = $resources.Count
+            $totalArcVms = 0
+            $arcVmsWithUpdateManager = 0
+            $arcVmDetails = @()
 
-            foreach ($resource in $resources) {
-                switch ($resource.ResourceType) {
-                    "Microsoft.Storage/storageAccounts" {
-                        $storageAccount = Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
-                        if ($storageAccount.EnableEncryptionService && $storageAccount.KeyVaultProperties) {
-                            $resourcesWithCMK++
-                        }
+            foreach ($subscription in $subscriptions) {
+                # Look for Azure Arc-enabled servers (hybrid machines)
+                $arcVms = $global:AzData.Resources | Where-Object {
+                    $_.ResourceType -eq "Microsoft.HybridCompute/machines" -and
+                    $_.SubscriptionId -eq $subscription.Id
+                }
+
+                $totalArcVms += $arcVms.Count
+
+                foreach ($arcVm in $arcVms) {
+                    $vmDetails = @{
+                        Name = $arcVm.Name
+                        ResourceGroup = $arcVm.ResourceGroupName
+                        Location = $arcVm.Location
+                        HasUpdateManager = $false
+                        PatchMode = "Unknown"
+                        OSType = "Unknown"
                     }
-                    "Microsoft.Sql/servers" {
-                        $sqlServer = Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name
-                        if ($sqlServer.EncryptionProtector -and $sqlServer.EncryptionProtector.ServerKeyType -eq "AzureKeyVault") {
-                            $resourcesWithCMK++
-                        }
+
+                    # Check for Update Manager configuration via policies on Arc machines
+                    $updatePolicies = $global:AzData.Policies | Where-Object {
+                        $_.ResourceId -eq $arcVm.Id -and
+                        ($_.PolicyDefinitionDisplayName -like "*Update Manager*" -or
+                         $_.PolicyDefinitionDisplayName -like "*Patch Management*" -or
+                         $_.PolicyDefinitionDisplayName -like "*Arc machine*" -or
+                         $_.PolicyDefinitionDisplayName -like "*Hybrid*") -and
+                        $_.ComplianceState -eq 'Compliant'
                     }
-                    "Microsoft.KeyVault/vaults" {
-                        $keyVault = Get-AzKeyVault -VaultName $resource.Name -ResourceGroupName $resource.ResourceGroupName
-                        if ($keyVault.Properties.EnablePurgeProtection -and $keyVault.Properties.VaultUri) {
-                            $resourcesWithCMK++
-                        }
+
+                    # Check for Azure Update Manager extension on Arc machines
+                    if ($updatePolicies.Count -gt 0) {
+                        $vmDetails.HasUpdateManager = $true
+                        $vmDetails.PatchMode = "Managed"
+                        $arcVmsWithUpdateManager++
+                    } else {
+                        $vmDetails.PatchMode = "Manual"
                     }
+
+                    $arcVmDetails += $vmDetails
                 }
             }
 
-            if ($resourcesWithCMK -eq $totalResources) {
-                $status = [Status]::Implemented
+            if ($totalArcVms -eq 0) {
+                $status = [Status]::NotApplicable
                 $estimatedPercentageApplied = 100
-            } elseif ($resourcesWithCMK -eq 0) {
-                $status = [Status]::NotImplemented
-                $estimatedPercentageApplied = 0
+                $rawData = "No Azure Arc-enabled servers found"
             } else {
-                $status = [Status]::PartiallyImplemented
-                $estimatedPercentageApplied = ($resourcesWithCMK / $totalResources) * 100
+                $estimatedPercentageApplied = ($arcVmsWithUpdateManager / $totalArcVms) * 100
                 $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-            }
 
-            $rawData = @{
-                TotalResources      = $totalResources
-                ResourcesWithCMK    = $resourcesWithCMK
-                ResourcesWithoutCMK = $totalResources - $resourcesWithCMK
+                if ($estimatedPercentageApplied -eq 100) {
+                    $status = [Status]::Implemented
+                } elseif ($estimatedPercentageApplied -eq 0) {
+                    $status = [Status]::NotImplemented
+                } else {
+                    $status = [Status]::PartiallyImplemented
+                }
+
+                $rawData = @{
+                    TotalArcVMs = $totalArcVms
+                    ArcVMsWithUpdateManager = $arcVmsWithUpdateManager
+                    ArcVMsWithoutUpdateManager = $totalArcVms - $arcVmsWithUpdateManager
+                    ArcVMDetails = $arcVmDetails
+                }
             }
         }
     } catch {
@@ -506,7 +691,7 @@ function Test-QuestionF0107 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -531,25 +716,39 @@ function Test-QuestionF0107 {
             foreach ($resource in $resources) {
                 $resourcesChecked++
 
-                switch ($resource.ResourceType) {
-                    "Microsoft.Sql/servers" {
-                        $sqlServer = Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name
-                        if ($sqlServer.MinimalTlsVersion -ge "1.2") {
-                            $resourcesCompliant++
+                try {
+                    switch ($resource.ResourceType) {
+                        "Microsoft.Sql/servers" {
+                            $sqlServer = Invoke-AzCmdletSafely -ScriptBlock {
+                                Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name -ErrorAction Stop
+                            } -CmdletName "Get-AzSqlServer" -ModuleName "Az.Sql" -WarningMessage "Could not check SQL Server TLS for $($resource.Name)"
+                            
+                            if ($sqlServer -and $sqlServer.MinimalTlsVersion -ge "1.2") {
+                                $resourcesCompliant++
+                            }
+                        }
+                        "Microsoft.Web/sites" {
+                            $webApp = Invoke-AzCmdletSafely -ScriptBlock {
+                                Get-AzWebApp -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction Stop
+                            } -CmdletName "Get-AzWebApp" -ModuleName "Az.Websites" -WarningMessage "Could not check Web App HTTPS for $($resource.Name)"
+                            
+                            if ($webApp -and $webApp.HttpsOnly -eq $true) {
+                                $resourcesCompliant++
+                            }
+                        }
+                        "Microsoft.Storage/storageAccounts" {
+                            $storageAccount = Invoke-AzCmdletSafely -ScriptBlock {
+                                Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction Stop
+                            } -CmdletName "Get-AzStorageAccount" -ModuleName "Az.Storage" -WarningMessage "Could not check Storage Account TLS for $($resource.Name)"
+                            
+                            if ($storageAccount -and $storageAccount.MinimumTlsVersion -eq "TLS1_2") {
+                                $resourcesCompliant++
+                            }
                         }
                     }
-                    "Microsoft.Web/sites" {
-                        $webApp = Get-AzWebApp -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
-                        if ($webApp.HttpsOnly -eq $true) {
-                            $resourcesCompliant++
-                        }
-                    }
-                    "Microsoft.Storage/storageAccounts" {
-                        $storageAccount = Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name
-                        if ($storageAccount.MinimumTlsVersion -eq "TLS1_2") {
-                            $resourcesCompliant++
-                        }
-                    }
+                }
+                catch {
+                    Write-Warning "  Warning: Error processing resource $($resource.Name): $($_.Exception.Message)"
                 }
             }
 
@@ -588,7 +787,7 @@ function Test-QuestionF0108 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -641,7 +840,7 @@ function Test-QuestionF0109 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -655,7 +854,10 @@ function Test-QuestionF0109 {
         $vaultsWithRotationPolicy = 0
 
         foreach ($keyVault in $keyVaults) {
-            $keys = Get-AzKeyVaultKey -VaultName $keyVault.Name
+            $keys = Invoke-AzCmdletSafely -ScriptBlock {
+                Get-AzKeyVaultKey -VaultName $keyVault.Name -ErrorAction SilentlyContinue
+            } -CmdletName "Get-AzKeyVaultKey" -ModuleName "Az.KeyVault" -FallbackValue @() -WarningMessage "Could not check Key Vault keys for $($keyVault.Name)"
+            
             foreach ($key in $keys) {
                 if ($key.Attributes.Expires -and ($key.Attributes.Expires -gt (Get-Date))) {
                     $vaultsWithRotationPolicy++
@@ -697,7 +899,7 @@ function Test-QuestionF0110 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
@@ -747,7 +949,6 @@ function Test-QuestionF0110 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.11
 function Test-QuestionF0111 {
     [CmdletBinding()]
     param(
@@ -755,7 +956,7 @@ function Test-QuestionF0111 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -812,7 +1013,6 @@ function Test-QuestionF0111 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.12
 function Test-QuestionF0112 {
     [CmdletBinding()]
     param(
@@ -820,7 +1020,7 @@ function Test-QuestionF0112 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -880,7 +1080,6 @@ function Test-QuestionF0112 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.13
 function Test-QuestionF0113 {
     [CmdletBinding()]
     param(
@@ -888,7 +1087,7 @@ function Test-QuestionF0113 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     
     # Since this question involves organizational practices and policies,
     # it cannot be fully automated or analyzed purely via code.
@@ -907,7 +1106,94 @@ function Test-QuestionF0113 {
     return $result
 }
 
-# Function for Management item F01.15
+function Test-QuestionF0114 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: When necessary, use shared storage accounts within the landing zone for Azure diagnostic extension log storage.
+        # Reference: https://learn.microsoft.com/azure/azure-monitor/agents/diagnostics-extension-overview
+
+        $totalVMs = 0
+        $vmsWithDiagnosticExtension = 0
+        $sharedStorageAccounts = 0
+
+        $virtualMachines = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.Compute/virtualMachines"
+        }
+
+        $storageAccounts = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.Storage/storageAccounts"
+        }
+
+        $totalVMs = $virtualMachines.Count
+
+        if ($totalVMs -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+        } else {
+            # Check for diagnostic storage accounts with appropriate tags or naming convention
+            foreach ($storage in $storageAccounts) {
+                if ($storage.Name -like "*diag*" -or 
+                    $storage.Name -like "*diagnostic*" -or 
+                    $storage.Tags["purpose"] -eq "diagnostics" -or
+                    $storage.Tags["usage"] -eq "logging") {
+                    $sharedStorageAccounts++
+                }
+            }
+
+            foreach ($vm in $virtualMachines) {
+                $extensions = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzVMExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -ErrorAction Stop
+                } -CmdletName "Get-AzVMExtension" -ModuleName "Az.Compute" -FallbackValue @() -WarningMessage "Could not check VM extensions for $($vm.Name)"
+
+                $hasDiagnosticExtension = $extensions | Where-Object {
+                    $_.ExtensionType -in @("IaaSDiagnostics", "LinuxDiagnostic", "Microsoft.Azure.Diagnostics")
+                }
+
+                if ($hasDiagnosticExtension) {
+                    $vmsWithDiagnosticExtension++
+                }
+            }
+
+            # Evaluate based on presence of shared storage and diagnostic extensions
+            if ($sharedStorageAccounts -gt 0 -and $vmsWithDiagnosticExtension -gt 0) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($sharedStorageAccounts -gt 0 -or $vmsWithDiagnosticExtension -gt 0) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = 50
+            } else {
+                # This might be acceptable if not necessary for the environment
+                $status = [Status]::ManualVerificationRequired
+                $estimatedPercentageApplied = 0
+            }
+
+            $rawData = @{
+                TotalVMs = $totalVMs
+                VMsWithDiagnosticExtension = $vmsWithDiagnosticExtension
+                SharedStorageAccounts = $sharedStorageAccounts
+                TotalStorageAccounts = $storageAccounts.Count
+            }
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
 function Test-QuestionF0115 {
     [CmdletBinding()]
     param(
@@ -915,7 +1201,7 @@ function Test-QuestionF0115 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -972,7 +1258,6 @@ function Test-QuestionF0115 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.16
 function Test-QuestionF0116 {
     [CmdletBinding()]
     param(
@@ -980,7 +1265,7 @@ function Test-QuestionF0116 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
     # Since this question involves a decision-making process ("WHEN necessary"),
     # it cannot be fully automated or analyzed purely via code.
@@ -999,7 +1284,6 @@ function Test-QuestionF0116 {
     return $result
 }
 
-# Function for Management item F01.17
 function Test-QuestionF0117 {
     [CmdletBinding()]
     param(
@@ -1007,7 +1291,7 @@ function Test-QuestionF0117 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1059,7 +1343,6 @@ function Test-QuestionF0117 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.18
 function Test-QuestionF0118 {
     [CmdletBinding()]
     param(
@@ -1067,7 +1350,7 @@ function Test-QuestionF0118 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1122,165 +1405,9 @@ function Test-QuestionF0118 {
         $status = $status
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F01.19
-function Test-QuestionF0119 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-    # Since this question involves implementing a specific framework (AMBA),
-    # it requires a manual decision and implementation verification.
-
-    $status = [Status]::ManualVerificationRequired
-    $estimatedPercentageApplied = 0
-    $rawData = "This requires verification that AMBA has been implemented and configured correctly."
-
-    try {
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied 0 -checklistItem $checklistItem -rawData $_.Exception.Message
-    }
-
-    return $result
-}
-
-# Function for Management item F01.20
-function Test-QuestionF0120 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Use Azure Monitoring Agent (AMA). The Log Analytics agent is deprecated since August 31, 2024.
-        # Reference: https://learn.microsoft.com/azure/azure-monitor/agents/azure-monitor-agent-overview
-
-        $resourcesWithAMA = 0
-        $totalResources = 0
-
-        $vmResourceTypes = @(
-            "Microsoft.Compute/virtualMachines",
-            "Microsoft.Compute/virtualMachineScaleSets",
-            "Microsoft.DesktopVirtualization/applicationGroups",
-            "Microsoft.DesktopVirtualization/hostPools"
-        )
-
-        $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $vmResourceTypes
-        }
-
-        foreach ($resource in $resources) {
-            $totalResources++
-
-            # Check for Azure Monitor Agent (AMA) extension
-            $extensions = Get-AzVMExtension -ResourceGroupName $resource.ResourceGroupName -VMName $resource.Name -ErrorAction SilentlyContinue |
-                          Where-Object { $_.Type -eq "AzureMonitorWindowsAgent" -or $_.Type -eq "AzureMonitorLinuxAgent" }
-
-            if ($extensions) {
-                $resourcesWithAMA++
-            }
-        }
-
-        if ($resourcesWithAMA -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithAMA -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithAMA / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalResources       = $totalResources
-            ResourcesWithAMA     = $resourcesWithAMA
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F01.21
-function Test-QuestionF0121 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Ensure that storage accounts are zone or region redundant.
-        # Reference: https://learn.microsoft.com/en-gb/azure/storage/common/redundancy-migration?tabs=portal
-
-        $totalStorageAccounts = 0
-        $compliantStorageAccounts = 0
-
-        $storageAccounts = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -eq "Microsoft.Storage/storageAccounts"
-        }
-
-        foreach ($storageAccount in $storageAccounts) {
-            $totalStorageAccounts++
-            if ($storageAccount.Sku.Name -notin @("Standard_LRS", "Premium_LRS")) {
-                $compliantStorageAccounts++
-            }
-        }
-
-        if ($compliantStorageAccounts -eq $totalStorageAccounts) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($compliantStorageAccounts -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($compliantStorageAccounts / $totalStorageAccounts) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalStorageAccounts      = $totalStorageAccounts
-            CompliantStorageAccounts  = $compliantStorageAccounts
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F02.01
 function Test-QuestionF0201 {
     [CmdletBinding()]
     param(
@@ -1288,7 +1415,7 @@ function Test-QuestionF0201 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1338,7 +1465,104 @@ function Test-QuestionF0201 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F03.01
+function Test-QuestionF0202 {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [Object]$checklistItem
+    )
+
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    $status = [Status]::Unknown
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        # Question: When using Azure Backup, use the correct backup types (GRS, ZRS & LRS) for your backup, as the default setting is GRS.
+        # Reference: https://learn.microsoft.com/azure/storage/common/storage-redundancy
+
+        $totalBackupVaults = 0
+        $vaultsWithAppropriateSku = 0
+
+        $backupVaults = $global:AzData.Resources | Where-Object {
+            $_.ResourceType -in @("Microsoft.RecoveryServices/vaults", "Microsoft.DataProtection/backupVaults")
+        }
+
+        $totalBackupVaults = $backupVaults.Count
+
+        if ($totalBackupVaults -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 100
+        } else {
+            foreach ($vault in $backupVaults) {
+                $vaultProperties = $null
+                
+                if ($vault.ResourceType -eq "Microsoft.RecoveryServices/vaults") {
+                    $vaultProperties = Invoke-AzCmdletSafely -ScriptBlock {
+                        Get-AzRecoveryServicesVault -ResourceGroupName $vault.ResourceGroupName -Name $vault.Name -ErrorAction Stop
+                    } -CmdletName "Get-AzRecoveryServicesVault" -ModuleName "Az.RecoveryServices" -WarningMessage "Could not check Recovery Services Vault $($vault.Name)"
+                    
+                    if ($vaultProperties) {
+                        # Get backup storage redundancy
+                        $backupStorageRedundancy = Invoke-AzCmdletSafely -ScriptBlock {
+                            Get-AzRecoveryServicesBackupProperty -Vault $vaultProperties -ErrorAction Stop
+                        } -CmdletName "Get-AzRecoveryServicesBackupProperty" -ModuleName "Az.RecoveryServices" -WarningMessage "Could not check backup properties for $($vault.Name)"
+                        
+                        if ($backupStorageRedundancy) {
+                            # Check if storage redundancy is set appropriately (not default GRS if not needed)
+                            $redundancyType = $backupStorageRedundancy.BackupStorageRedundancy
+                            
+                            # Consider appropriate if it's been explicitly configured (not default)
+                            # or if it matches regional requirements
+                            if ($redundancyType -in @("LocallyRedundant", "ZoneRedundant", "GeoRedundant")) {
+                                # Check if the choice is appropriate for the region and requirements
+                                # For simplicity, we'll consider any explicit setting as appropriate
+                                $vaultsWithAppropriateSku++
+                            }
+                        }
+                    }
+                } elseif ($vault.ResourceType -eq "Microsoft.DataProtection/backupVaults") {
+                    # For DataProtection backup vaults, check storage settings
+                    $vaultProperties = Invoke-AzCmdletSafely -ScriptBlock {
+                        Get-AzDataProtectionBackupVault -ResourceGroupName $vault.ResourceGroupName -VaultName $vault.Name -ErrorAction Stop
+                    } -CmdletName "Get-AzDataProtectionBackupVault" -ModuleName "Az.DataProtection" -WarningMessage "Could not check Data Protection Vault $($vault.Name)"
+                    
+                    if ($vaultProperties -and $vaultProperties.StorageSetting) {
+                        $redundancyType = $vaultProperties.StorageSetting.Type
+                        if ($redundancyType -in @("LocallyRedundant", "ZoneRedundant", "GeoRedundant")) {
+                            $vaultsWithAppropriateSku++
+                        }
+                    }
+                }
+            }
+
+            $estimatedPercentageApplied = ($vaultsWithAppropriateSku / $totalBackupVaults) * 100
+            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+
+            if ($estimatedPercentageApplied -eq 100) {
+                $status = [Status]::Implemented
+            } elseif ($estimatedPercentageApplied -eq 0) {
+                $status = [Status]::NotImplemented
+            } else {
+                $status = [Status]::PartiallyImplemented
+            }
+
+            $rawData = @{
+                TotalBackupVaults = $totalBackupVaults
+                VaultsWithAppropriateSku = $vaultsWithAppropriateSku
+                VaultsWithDefaultSku = $totalBackupVaults - $vaultsWithAppropriateSku
+            }
+        }
+    } catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = $status
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+}
+
 function Test-QuestionF0301 {
     [CmdletBinding()]
     param(
@@ -1346,7 +1570,7 @@ function Test-QuestionF0301 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1402,7 +1626,6 @@ function Test-QuestionF0301 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F03.02
 function Test-QuestionF0302 {
     [CmdletBinding()]
     param(
@@ -1410,7 +1633,7 @@ function Test-QuestionF0302 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1476,7 +1699,6 @@ function Test-QuestionF0302 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F04.01
 function Test-QuestionF0401 {
     [CmdletBinding()]
     param(
@@ -1484,7 +1706,7 @@ function Test-QuestionF0401 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1540,7 +1762,6 @@ function Test-QuestionF0401 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F04.02
 function Test-QuestionF0402 {
     [CmdletBinding()]
     param(
@@ -1548,7 +1769,7 @@ function Test-QuestionF0402 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1613,76 +1834,9 @@ function Test-QuestionF0402 {
         $status = $status
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+    }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F04.03
-function Test-QuestionF0403 {
-    [CmdletBinding()]
-    param(
-        [Parameter(ValueFromPipeline = $true)]
-        [Object]$checklistItem
-    )
-
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    $status = [Status]::Unknown
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        # Question: Use Azure-native backup capabilities, or an Azure-compatible, 3rd-party backup solution.
-        # Reference: https://learn.microsoft.com/azure/backup/backup-center-overview
-
-        $totalResources = 0
-        $resourcesWithBackup = 0
-
-        $backupEligibleResources = @("Microsoft.Compute/virtualMachines", "Microsoft.Sql/servers/databases", "Microsoft.Storage/storageAccounts")
-
-        $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -in $backupEligibleResources
-        }
-
-        foreach ($resource in $resources) {
-            $totalResources++
-
-            # Check for backup configuration in Azure Backup Center
-            $backupItems = Get-AzRecoveryServicesBackupItem -ResourceGroupName $resource.ResourceGroupName -WorkloadType AzureVM -ErrorAction SilentlyContinue |
-                           Where-Object { $_.SourceResourceId -eq $resource.Id }
-
-            if ($backupItems) {
-                $resourcesWithBackup++
-            }
-        }
-
-        if ($resourcesWithBackup -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithBackup -eq 0) {
-            $status = [Status]::ManualVerificationRequired
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithBackup / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
-
-        $rawData = @{
-            TotalResources       = $totalResources
-            ResourcesWithBackup  = $resourcesWithBackup
-        }
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-}
-
-# Function for Management item F06.01
 function Test-QuestionF0601 {
     [CmdletBinding()]
     param(
@@ -1690,7 +1844,7 @@ function Test-QuestionF0601 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1749,7 +1903,6 @@ function Test-QuestionF0601 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Management item F06.02
 function Test-QuestionF0602 {
     [CmdletBinding()]
     param(
@@ -1757,7 +1910,7 @@ function Test-QuestionF0602 {
         [Object]$checklistItem
     )
 
-    Write-Host "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
     $rawData = $null
@@ -1784,7 +1937,7 @@ function Test-QuestionF0602 {
             # Check for diagnostic settings sending logs to Microsoft Sentinel
             $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $service.Id -ErrorAction SilentlyContinue |
                                   Where-Object {
-                                      $_.WorkspaceId -ne $null -and $_.WorkspaceId -match "Microsoft Sentinel"
+                                      $null -ne $_.WorkspaceId -and $_.WorkspaceId -match "Microsoft Sentinel"
                                   }
 
             if ($diagnosticSettings) {

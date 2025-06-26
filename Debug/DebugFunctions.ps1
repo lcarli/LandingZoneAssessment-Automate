@@ -21,6 +21,7 @@ param (
 # Import the necessary modules
 . "$PSScriptRoot/../functions/AzureBillingandMicrosoftEntraIDTenants.ps1"
 . "$PSScriptRoot/../functions/IdentityandAccessManagement.ps1"
+. "$PSScriptRoot/../functions/Governance.ps1"
 . "$PSScriptRoot/../functions/NetworkTopologyandConnectivity.ps1"
 . "$PSScriptRoot/../functions/Management.ps1"
 . "$PSScriptRoot/../scripts/Initialize.ps1"
@@ -38,16 +39,36 @@ function Test-Custom {
     )
 
     try {
-        # Execute the function using Invoke-Expression
-        $result = Invoke-Expression $functionName
+        # For testing specific questions, we need to create a mock checklist item
+        if ($functionName -like "Test-Question*") {
+            # Create a sample checklist item for the test
+            $checklistItem = [PSCustomObject]@{
+                id = "E01.06"
+                text = "Use Azure Policy to control which services users can provision at the subscription/management group level."
+                category = "Governance"
+            }
+            
+            Write-Host "`nTesting function: $functionName"
+            Write-Host "Mock checklist item: $($checklistItem.id) - $($checklistItem.text)"
+            Write-Host ""
+            
+            # Execute the function with the checklist item
+            $result = & $functionName $checklistItem
+        } else {
+            # Execute the function using Invoke-Expression for other types
+            $result = Invoke-Expression $functionName
+        }
 
         if ($result) {
             Write-Host "`nFunction Output:"
             $result | Format-List
+        } else {
+            Write-Host "`nFunction executed but returned no output."
         }
     }
     catch {
-        Write-Host "Error executing function ${functionName}: $_"
+        Write-Host "Error executing function ${functionName}: $_" -ForegroundColor Red
+        Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Yellow
     }
 }
 
