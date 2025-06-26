@@ -377,7 +377,7 @@ function Test-QuestionB0303 {
                 $subscriptionId = $subscription.Id
 
                 # Set the context to the current subscription
-                Set-AzContext -SubscriptionId $subscriptionId -TenantId $TenantId
+                Set-AzContext -SubscriptionId $subscriptionId -TenantId $global:TenantId
 
                 Write-AssessmentInfo "Checking role assignments for Subscription ID: $subscriptionId"
 

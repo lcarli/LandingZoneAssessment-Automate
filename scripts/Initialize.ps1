@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Script de inicialização e configuração.
+    Initialization and configuration script.
 
 .DESCRIPTION
-    Este script contém funções de inicialização, como autenticação ao Azure.
+    This script contains initialization functions, such as Azure authentication.
 
 .LICENSE
     MIT License
@@ -99,10 +99,16 @@ function Initialize-Connect {
         $azContext = Get-AzContext -ErrorAction SilentlyContinue
         if ($null -eq $azContext -or $azContext.Tenant.Id -ne $global:TenantId) {
             Write-Output "Connecting to Azure..."
+            # Disable automatic tenant discovery to prevent cross-tenant operations
+            $Env:AZURE_TENANT_ID = $global:TenantId
             Connect-AzAccount -Tenant $global:TenantId | Out-Null
         } else {
             Write-Output "Azure: Already connected to tenant $($azContext.Tenant.Id)"
         }
+        
+        # Set additional protections against cross-tenant operations
+        $Env:AZURE_TENANT_ID = $global:TenantId
+        
         Write-Output "Azure: Connected"
     }
     catch {
@@ -172,7 +178,6 @@ function Initialize-Connect {
     }
 }
 
-# Function to import all required modules (separated from data collection)
 function Import-RequiredModules {
     # Import Az modules
     $azSubModules = @('Az.Accounts', 'Az.Resources', 'Az.Monitor', 'Az.Billing', 'Az.Network', 'Az.Storage', 'Az.Sql', 'Az.KeyVault', 'Az.Websites')
@@ -274,10 +279,14 @@ function Collect-AzData {
 
     # Get Management Groups
     try {
-        $mgs = Get-AzManagementGroup -ErrorAction SilentlyContinue
-        foreach ($mg in $mgs) {
-            $detailed = Get-AzManagementGroup -GroupName $mg.Name -ErrorAction SilentlyContinue
-            if ($detailed) { $global:AzData.ManagementGroups += $detailed }
+        # Get Management Groups for the specific tenant only
+        $context = Get-AzContext
+        if ($context -and $context.Tenant.Id -eq $global:TenantId) {
+            $mgs = Get-AzManagementGroup -ErrorAction SilentlyContinue
+            foreach ($mg in $mgs) {
+                $detailed = Get-AzManagementGroup -GroupName $mg.Name -ErrorAction SilentlyContinue
+                if ($detailed) { $global:AzData.ManagementGroups += $detailed }
+            }
         }
     }
     catch {
@@ -286,7 +295,11 @@ function Collect-AzData {
 
     # Get Policy Assignments
     try {
-        $global:AzData.Policies = Get-AzPolicyAssignment -ErrorAction SilentlyContinue
+        # Only get policies for the specific tenant context
+        $context = Get-AzContext
+        if ($context -and $context.Tenant.Id -eq $global:TenantId) {
+            $global:AzData.Policies = Get-AzPolicyAssignment -ErrorAction SilentlyContinue
+        }
     }
     catch {
         Write-Warning "Policies: $($_.Exception.Message)"
@@ -378,7 +391,6 @@ function Initialize-Environment {
     }
 }
 
-# Function to check for potential assembly conflicts
 function Test-ModuleConflicts {
     $loadedGraphModules = Get-Module Microsoft.Graph* -ErrorAction SilentlyContinue
     if ($loadedGraphModules) {
@@ -387,7 +399,6 @@ function Test-ModuleConflicts {
     return $false
 }
 
-# Function to collect and cache all Microsoft Graph data
 function Collect-GraphData {
     if (-not $global:GraphConnected) {
         Write-Output "Graph: Not connected, skipping data collection"

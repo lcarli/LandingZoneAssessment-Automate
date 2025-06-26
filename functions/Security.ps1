@@ -378,6 +378,14 @@ function Test-QuestionG0204 {
             # Check Key Vault configuration for certificates, secrets, keys, and tags
             $vaultStatus = $keyVaults | ForEach-Object {
                 $vault = $_
+                
+                # Ensure we're in the correct subscription context for this Key Vault
+                try {
+                    Set-AzContext -Subscription $vault.SubscriptionId -Tenant $global:TenantId | Out-Null
+                } catch {
+                    Write-AssessmentWarning "Failed to set context for subscription $($vault.SubscriptionId): $($_.Exception.Message)"
+                }
+                
                 [PSCustomObject]@{
                     VaultName       = $vault.Name
                     HasCertificates = Invoke-AzCmdletSafely -ScriptBlock {
@@ -453,11 +461,12 @@ function Test-QuestionG0205 {
             
             # Loop through each Key Vault to check certificates
             foreach ($keyVault in $keyVaults) {
-                # Set the context to the subscription containing the Key Vault
-                Set-AzContext -Subscription $keyVault.SubscriptionId | Out-Null
-                
                 try {
-                    # Get all certificates in the Key Vault
+                    # Set the context to the subscription containing the Key Vault with explicit tenant
+                    Set-AzContext -Subscription $keyVault.SubscriptionId -Tenant $global:TenantId | Out-Null
+                    
+                    # Get all certificates in the Key Vault using cached context
+                    # The global data should already be in the correct subscription context
                     $certificates = Invoke-AzCmdletSafely -ScriptBlock {
                         Get-AzKeyVaultCertificate -VaultName $keyVault.Name -ErrorAction SilentlyContinue
                     } -CmdletName "Get-AzKeyVaultCertificate" -ModuleName "Az.KeyVault" -FallbackValue @()

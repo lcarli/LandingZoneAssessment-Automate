@@ -676,7 +676,7 @@ function Test-QuestionE0202 {
         $subscriptionsWithBudgetAlerts = 0
 
         foreach ($subscription in $subscriptions) {
-            Set-AzContext -Subscription $subscription.Id -Tenant $TenantId
+            Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId
 
             # Get all budgets for the subscription
             $budgets = Get-AzConsumptionBudget
