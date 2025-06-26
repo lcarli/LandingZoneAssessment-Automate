@@ -715,7 +715,7 @@ function Test-QuestionD0108 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D01.08" -Status "Checking if Route Server subnets use /27 prefix..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         # Get all virtual networks with Route Server subnets
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
@@ -806,7 +806,7 @@ function Test-QuestionD0109 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D01.09" -Status "Checking global VNet peerings between hub VNets across regions..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         # This requires manual verification as it involves architectural decisions
         # about multi-region hub-and-spoke topologies
@@ -873,7 +873,7 @@ function Test-QuestionD0110 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D01.10" -Status "Checking Azure Monitor for Networks usage..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         # Check for Network Watcher and related monitoring resources
         $networkWatchers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers' }
@@ -924,7 +924,7 @@ function Test-QuestionD0111 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D01.11" -Status "Checking VNet peering limits..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
@@ -1013,7 +1013,7 @@ function Test-QuestionD0112 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D01.12" -Status "Checking route table route limits..."
+         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $routeTables = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/routeTables' }
         
@@ -1091,7 +1091,7 @@ function Test-QuestionD0113 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D01.13" -Status "Checking VNet peering traffic settings..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
@@ -1178,7 +1178,7 @@ function Test-QuestionD0114 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D01.14" -Status "Checking Load Balancer SKU and zone redundancy..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $loadBalancers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/loadBalancers' }
         
@@ -1278,7 +1278,7 @@ function Test-QuestionD0115 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D01.15" -Status "Checking Load Balancer backend pool instance counts..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $loadBalancers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/loadBalancers' }
         
@@ -1375,7 +1375,7 @@ function Test-QuestionD0301 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D03.01" -Status "Checking for overlapping IP address spaces..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
@@ -1455,7 +1455,7 @@ function Test-QuestionD0302 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D03.02" -Status "Checking if VNets use RFC 1918 private IP addresses..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
@@ -1566,7 +1566,7 @@ function Test-QuestionD0303 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D03.03" -Status "Checking for appropriately sized VNet address spaces..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
@@ -1673,7 +1673,7 @@ function Test-QuestionD0304 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D03.04" -Status "Checking for overlapping IP ranges between production and DR sites..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
@@ -1754,7 +1754,7 @@ function Test-QuestionD0305 {
     $rawData = $null
 
     try {
-        Write-AssessmentProgress -Activity "Testing D03.05" -Status "Checking Public IP SKU and zone redundancy..."
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         $publicIPs = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/publicIPAddresses' }
         

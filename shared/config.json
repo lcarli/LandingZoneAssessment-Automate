@@ -7,10 +7,10 @@
     "DesignAreas": {
         "Billing": false,
         "IAM": false,
-        "ResourceOrganization": true,
+        "ResourceOrganization": false,
         "Network": false,
         "Governance": false,
-        "Security": false,
+        "Security": true,
         "DevOps": false,
         "Management": false
     }

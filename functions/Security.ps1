@@ -66,8 +66,6 @@ function Invoke-SecurityAssessment {
 
     return $script:FunctionResult
 }
-
-# Function for Security item G01.01
 function Test-QuestionG0101 {
     [CmdletBinding()]
     param(
@@ -100,7 +98,6 @@ function Test-QuestionG0101 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Security item G01.02
 function Test-QuestionG0102 {
     [CmdletBinding()]
     param(
@@ -118,30 +115,61 @@ function Test-QuestionG0102 {
         # Question: Apply a zero-trust approach for access to the Azure platform.
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/security-zero-trust
     
-        # Retrieve all Conditional Access Policies
-        $conditionalAccessPolicies = Get-AzConditionalAccessPolicy
+        # Check for Conditional Access policies using safe cmdlet execution
+        $conditionalAccessPolicies = Invoke-AzCmdletSafely -ScriptBlock {
+            Get-AzConditionalAccessPolicy
+        } -CmdletName "Get-AzConditionalAccessPolicy" -ModuleName "Microsoft.Graph.Identity.SignIns" -FallbackValue @()
+        
+        $rbacPolicies = Invoke-AzCmdletSafely -ScriptBlock {
+            Get-AzRoleAssignment | Where-Object { $_.RoleDefinitionName -match "Owner|Contributor" -and $_.Scope -match "/subscriptions/" }
+        } -CmdletName "Get-AzRoleAssignment" -ModuleName "Az.Resources" -FallbackValue @()
             
-        if ($conditionalAccessPolicies.Count -eq 0) {
-            $status = [Status]::NotImplemented
-            $rawData = "No Conditional Access Policies are configured."
+        if ($conditionalAccessPolicies.Count -eq 0 -and $rbacPolicies.Count -eq 0) {
+            $status = [Status]::ManualVerificationRequired
+            $rawData = @{
+                Message = "Unable to assess Zero Trust implementation automatically."
+                Recommendation = "Manually verify that Conditional Access policies with MFA are configured and RBAC is properly implemented."
+                ConditionalAccessPolicies = $conditionalAccessPolicies.Count
+                RBACPolicies = $rbacPolicies.Count
+            }
             $estimatedPercentageApplied = 0
         }
+        elseif ($conditionalAccessPolicies.Count -eq 0) {
+            $status = [Status]::PartiallyImplemented
+            $rawData = @{
+                Message = "RBAC policies found but Conditional Access policies not detected."
+                Recommendation = "Implement Conditional Access policies with MFA requirements for Zero Trust approach."
+                ConditionalAccessPolicies = $conditionalAccessPolicies.Count
+                RBACPolicies = $rbacPolicies.Count
+            }
+            $estimatedPercentageApplied = 50
+        }
         else {
-            $mfaPolicies = $conditionalAccessPolicies | Where-Object { $_.Conditions.Users.IncludeUsers -contains 'All' -and $_.Controls.Mfa } 
-            $rbacPolicies = Get-AzRoleAssignment | Where-Object { $_.RoleDefinitionName -match "Owner|Contributor" -and $_.Scope -match "/subscriptions/" }
-                
+            # Check for MFA-enabled policies
+            $mfaPolicies = $conditionalAccessPolicies | Where-Object { 
+                $_.Conditions.Users.IncludeUsers -contains 'All' -and $_.Controls.Mfa 
+            }
+            
             if ($mfaPolicies.Count -gt 0 -and $rbacPolicies.Count -gt 0) {
                 $status = [Status]::Implemented
-                $rawData = "Zero Trust approach is enforced with MFA and RBAC policies."
+                $rawData = @{
+                    Message = "Zero Trust approach is enforced with MFA and RBAC policies."
+                    ConditionalAccessPolicies = $conditionalAccessPolicies.Count
+                    MFAPolicies = $mfaPolicies.Count
+                    RBACPolicies = $rbacPolicies.Count
+                }
                 $estimatedPercentageApplied = 100
             }
             else {
                 $status = [Status]::PartiallyImplemented
                 $rawData = @{
-                    MFA_PoliciesConfigured  = $mfaPolicies.Count
-                    RBAC_PoliciesConfigured = $rbacPolicies.Count
+                    Message = "Conditional Access policies found but may not fully implement Zero Trust approach."
+                    ConditionalAccessPolicies = $conditionalAccessPolicies.Count
+                    MFAPolicies = if ($mfaPolicies) { $mfaPolicies.Count } else { 0 }
+                    RBACPolicies = $rbacPolicies.Count
+                    Recommendation = "Review Conditional Access policies to ensure MFA is required for all users."
                 }
-                $estimatedPercentageApplied = ($mfaPolicies.Count -gt 0 ? 50 : 0) + ($rbacPolicies.Count -gt 0 ? 50 : 0)
+                $estimatedPercentageApplied = 75
             }
         }
     }
@@ -154,8 +182,7 @@ function Test-QuestionG0102 {
     
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
-    
-# Function for Security item G02.01
+
 function Test-QuestionG0201 {
     [CmdletBinding()]
     param(
@@ -206,7 +233,6 @@ function Test-QuestionG0201 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Security item G02.02
 function Test-QuestionG0202 {
     [CmdletBinding()]
     param(
@@ -267,7 +293,6 @@ function Test-QuestionG0202 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Security item G02.03
 function Test-QuestionG0203 {
     [CmdletBinding()]
     param(
@@ -326,7 +351,6 @@ function Test-QuestionG0203 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-# Function for Security item G02.04
 function Test-QuestionG0204 {
     [CmdletBinding()]
     param(
@@ -345,7 +369,8 @@ function Test-QuestionG0204 {
         # Reference: https://learn.microsoft.com/azure/key-vault/general/best-practices
 
         # Retrieve all Key Vaults using AzData.Resources
-        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }        if ($keyVaults.Count -eq 0) {
+        $keyVaults = $global:AzData.Resources | Where-Object { $_.Type -eq "Microsoft.KeyVault/vaults" }        
+        if ($keyVaults.Count -eq 0) {
             $status = [Status]::NotImplemented
             $rawData = "No Azure Key Vaults are configured in the current subscriptions."
             $estimatedPercentageApplied = 0
@@ -397,8 +422,6 @@ function Test-QuestionG0204 {
     return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
-
-# Function for Security item G02.05
 function Test-QuestionG0205 {
     [cmdletbinding()]
     param(
@@ -535,7 +558,6 @@ function Test-QuestionG0205 {
     return $result
 }
 
-# Function for Security item G02.06
 function Test-QuestionG0206 {
     [cmdletbinding()]
     param(
@@ -563,7 +585,6 @@ function Test-QuestionG0206 {
     return $result
 }
 
-# Function for Security item G02.07
 function Test-QuestionG0207 {
     [cmdletbinding()]
     param(
@@ -591,7 +612,6 @@ function Test-QuestionG0207 {
     return $result
 }
 
-# Function for Security item G02.08
 function Test-QuestionG0208 {
     [cmdletbinding()]
     param(
@@ -619,7 +639,6 @@ function Test-QuestionG0208 {
     return $result
 }
 
-# Function for Security item G02.09
 function Test-QuestionG0209 {
     [cmdletbinding()]
     param(
@@ -647,7 +666,6 @@ function Test-QuestionG0209 {
     return $result
 }
 
-# Function for Security item G02.10
 function Test-QuestionG0210 {
     [cmdletbinding()]
     param(
@@ -675,7 +693,6 @@ function Test-QuestionG0210 {
     return $result
 }
 
-# Function for Security item G02.12
 function Test-QuestionG0212 {
     [cmdletbinding()]
     param(
@@ -703,7 +720,6 @@ function Test-QuestionG0212 {
     return $result
 }
 
-# Function for Security item G02.13
 function Test-QuestionG0213 {
     [cmdletbinding()]
     param(
@@ -731,7 +747,6 @@ function Test-QuestionG0213 {
     return $result
 }
 
-# Function for Security item G03.01
 function Test-QuestionG0301 {
     [cmdletbinding()]
     param(
@@ -759,7 +774,6 @@ function Test-QuestionG0301 {
     return $result
 }
 
-# Function for Security item G03.02
 function Test-QuestionG0302 {
     [cmdletbinding()]
     param(
@@ -787,7 +801,6 @@ function Test-QuestionG0302 {
     return $result
 }
 
-# Function for Security item G03.03
 function Test-QuestionG0303 {
     [cmdletbinding()]
     param(
@@ -815,7 +828,6 @@ function Test-QuestionG0303 {
     return $result
 }
 
-# Function for Security item G03.04
 function Test-QuestionG0304 {
     [cmdletbinding()]
     param(
@@ -843,7 +855,6 @@ function Test-QuestionG0304 {
     return $result
 }
 
-# Function for Security item G03.05
 function Test-QuestionG0305 {
     [cmdletbinding()]
     param(
@@ -871,7 +882,6 @@ function Test-QuestionG0305 {
     return $result
 }
 
-# Function for Security item G03.06
 function Test-QuestionG0306 {
     [cmdletbinding()]
     param(
@@ -899,7 +909,6 @@ function Test-QuestionG0306 {
     return $result
 }
 
-# Function for Security item G03.07
 function Test-QuestionG0307 {
     [cmdletbinding()]
     param(
@@ -927,7 +936,6 @@ function Test-QuestionG0307 {
     return $result
 }
 
-# Function for Security item G03.08
 function Test-QuestionG0308 {
     [cmdletbinding()]
     param(
@@ -955,7 +963,6 @@ function Test-QuestionG0308 {
     return $result
 }
 
-# Function for Security item G03.09
 function Test-QuestionG0309 {
     [cmdletbinding()]
     param(
@@ -983,7 +990,6 @@ function Test-QuestionG0309 {
     return $result
 }
 
-# Function for Security item G03.10
 function Test-QuestionG0310 {
     [cmdletbinding()]
     param(
@@ -1011,7 +1017,6 @@ function Test-QuestionG0310 {
     return $result
 }
 
-# Function for Security item G03.11
 function Test-QuestionG0311 {
     [cmdletbinding()]
     param(
@@ -1039,7 +1044,6 @@ function Test-QuestionG0311 {
     return $result
 }
 
-# Function for Security item G03.12
 function Test-QuestionG0312 {
     [cmdletbinding()]
     param(
@@ -1067,7 +1071,6 @@ function Test-QuestionG0312 {
     return $result
 }
 
-# Function for Security item G04.01
 function Test-QuestionG0401 {
     [cmdletbinding()]
     param(
@@ -1129,7 +1132,6 @@ function Test-QuestionG0401 {
     return $result
 }
 
-# Function for Security item G04.02
 function Test-QuestionG0402 {
     [cmdletbinding()]
     param(
@@ -1157,7 +1159,6 @@ function Test-QuestionG0402 {
     return $result
 }
 
-# Function for Security item G05.01
 function Test-QuestionG0501 {
     [cmdletbinding()]
     param(
@@ -1185,7 +1186,6 @@ function Test-QuestionG0501 {
     return $result
 }
 
-# Function for Security item G06.01
 function Test-QuestionG0601 {
     [cmdletbinding()]
     param(
@@ -1213,7 +1213,6 @@ function Test-QuestionG0601 {
     return $result
 }
 
-# Function for Security item G06.02
 function Test-QuestionG0602 {
     [cmdletbinding()]
     param(
