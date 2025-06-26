@@ -8,9 +8,9 @@
         "Billing": false,
         "IAM": false,
         "ResourceOrganization": false,
-        "Network": false,
+        "Network": true,
         "Governance": false,
-        "Security": true,
+        "Security": false,
         "DevOps": false,
         "Management": false
     }

@@ -140,7 +140,7 @@ function Test-QuestionD0101 {
             }
         }
         
-        if ($maxPeeringsCount -ge 2) {
+        if ($maxPeeringsCount -ge 2 -and $maxPeeringsVnet -and $maxPeeringsVnet.Properties -and $maxPeeringsVnet.Properties.subnets) {
             $vnetSpecialSubnets = $maxPeeringsVnet.Properties.subnets | Where-Object { $_.Name -eq "GatewaySubnet" -or $_.Name -eq "AzureFirewallSubnet" }
             
             # Check for devices with IP forwarding using cached data
@@ -150,10 +150,12 @@ function Test-QuestionD0101 {
             foreach ($nic in $networkInterfaces) {
                 if ($nic.Properties.ipConfigurations -and $nic.Properties.ipConfigurations[0].Properties.subnet.id) {
                     $subnetId = $nic.Properties.ipConfigurations[0].Properties.subnet.id
-                    $vnetId = $subnetId.Substring(0, $subnetId.IndexOf("/subnets/"))
-                    
-                    if ($vnetId -eq $maxPeeringsVnet.Id) {
-                        $vnetDevicesWithIPForwarding += $nic
+                    if ($subnetId -and $subnetId.Contains("/subnets/")) {
+                        $vnetId = $subnetId.Substring(0, $subnetId.IndexOf("/subnets/"))
+                        
+                        if ($vnetId -eq $maxPeeringsVnet.Id) {
+                            $vnetDevicesWithIPForwarding += $nic
+                        }
                     }
                 }
             }
@@ -216,10 +218,12 @@ function Test-QuestionD0102 {
         foreach ($nic in $networkInterfaces) {
             if ($nic.Properties.ipConfigurations -and $nic.Properties.ipConfigurations[0].Properties.subnet.id) {
                 $subnetId = $nic.Properties.ipConfigurations[0].Properties.subnet.id
-                $vnetId = $subnetId.Substring(0, $subnetId.IndexOf("/subnets/"))
-                
-                if ($vnetId -eq $hubVirtualNetworkId) {
-                    $nvasInHub += $nic
+                if ($subnetId -and $subnetId.Contains("/subnets/")) {
+                    $vnetId = $subnetId.Substring(0, $subnetId.IndexOf("/subnets/"))
+                    
+                    if ($vnetId -eq $hubVirtualNetworkId) {
+                        $nvasInHub += $nic
+                    }
                 }
             }
         }
@@ -296,18 +300,20 @@ function Test-QuestionD0103 {
         $totalIPs = $publicIPs.Count
 
         foreach ($ip in $publicIPs) {
-            if ($ip.Properties.ddosSettings.protectionMode -eq 'Enabled') {
+            if ($ip.Properties -and $ip.Properties.ddosSettings -and $ip.Properties.ddosSettings.protectionMode -eq 'Enabled') {
                 $protectedIPs++
             }
-            elseif ($ip.Properties.ddosSettings.protectionMode -eq 'VirtualNetworkInherited' -and $ip.Properties.ipConfiguration.id) {
+            elseif ($ip.Properties -and $ip.Properties.ddosSettings -and $ip.Properties.ddosSettings.protectionMode -eq 'VirtualNetworkInherited' -and $ip.Properties.ipConfiguration -and $ip.Properties.ipConfiguration.id) {
                 # Find the VNet this IP belongs to and check if DDoS protection is enabled
                 $ipConfigId = $ip.Properties.ipConfiguration.id
-                $subnetId = $ipConfigId.Substring(0, $ipConfigId.LastIndexOf("/"))
-                $vnetId = $subnetId.Substring(0, $subnetId.IndexOf("/subnets/"))
-                
-                $virtualNetwork = $global:AzData.Resources | Where-Object { $_.Id -eq $vnetId -and $_.Type -eq 'microsoft.network/virtualnetworks' } | Select-Object -First 1
-                if ($virtualNetwork -and $virtualNetwork.Properties.enableDdosProtection -eq $true) {
-                    $protectedIPs++
+                if ($ipConfigId -and $ipConfigId.Contains("/subnets/")) {
+                    $subnetId = $ipConfigId.Substring(0, $ipConfigId.LastIndexOf("/"))
+                    $vnetId = $subnetId.Substring(0, $subnetId.IndexOf("/subnets/"))
+                    
+                    $virtualNetwork = $global:AzData.Resources | Where-Object { $_.Id -eq $vnetId -and $_.Type -eq 'microsoft.network/virtualnetworks' } | Select-Object -First 1
+                    if ($virtualNetwork -and $virtualNetwork.Properties.enableDdosProtection -eq $true) {
+                        $protectedIPs++
+                    }
                 }
             }
         }
@@ -371,7 +377,7 @@ function Test-QuestionD0103HS {
         }
 
         $rawData = @{
-            "nvaPresent" = $nvaPresent
+            "nvaPresent"        = $nvaPresent
             "NetworkInterfaces" = $networkInterfaces
         }
     }
@@ -573,6 +579,713 @@ function Test-QuestionD0107 {
     return $result
 }
 
+function Test-QuestionD0108 {
+    [CmdletBinding()
+    ]
+    param (
+        [Parameter(ValueFromPipeline = $true)]
+        [object]$checklistItem
+    )
+
+    $status = [Status]::NotApplicable
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+        # Get all virtual networks with Route Server subnets
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        
+        if (($virtualNetworks | Measure-Object).Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No virtual networks found"
+        }
+        else {
+            $routeServerSubnets = @()
+            $compliantSubnets = 0
+            $totalRouteServerSubnets = 0
+
+            foreach ($vnet in $virtualNetworks) {
+                # Add comprehensive null checking for VNet object
+                if (-not $vnet) {
+                    Write-AssessmentProgress "Skipping null VNet object"
+                    continue
+                }
+                
+                if (-not $vnet.Properties) {
+                    Write-AssessmentProgress "Skipping VNet with no Properties: $($vnet.Name)"
+                    continue
+                }
+                
+                if (-not $vnet.Properties.subnets) {
+                    Write-AssessmentProgress "Skipping VNet with no subnets: $($vnet.Name)"
+                    continue
+                }
+                
+                $subnets = $vnet.Properties.subnets
+                foreach ($subnet in $subnets) {
+                    # Add comprehensive null checking for subnet object
+                    if (-not $subnet) {
+                        Write-AssessmentProgress "Skipping null subnet object"
+                        continue
+                    }
+                    
+                    if (-not $subnet.name) {
+                        Write-AssessmentProgress "Skipping subnet with no name"
+                        continue
+                    }
+                    
+                    if ($subnet.name -eq "RouteServerSubnet") {
+                        $totalRouteServerSubnets++
+                        
+                        # Check if addressPrefix exists and is not null
+                        $addressPrefix = "Unknown"
+                        if ($subnet.properties -and [bool]($subnet.properties.PSObject.Properties['addressPrefix']) -and $subnet.properties.addressPrefix) {
+                            $addressPrefix = $subnet.properties.addressPrefix.ToString()
+                        }
+                        # Initialize defaults
+                        $prefixLength = 0
+                        $isCompliant = $false
+                        
+                        # Only process if we have a valid address prefix that contains a slash
+                        if ($addressPrefix -and $addressPrefix -ne "Unknown" -and $addressPrefix -is [string] -and $addressPrefix.Length -gt 0) {
+                            try {
+                                # Double check the string is valid before calling methods
+                                $addressPrefixStr = $addressPrefix.ToString().Trim()
+                                if ($addressPrefixStr -and $addressPrefixStr.IndexOf("/") -gt -1) {
+                                    $splitResult = $addressPrefixStr -split '/'
+                                    if ($splitResult -and $splitResult.Length -eq 2 -and $splitResult[1] -match '^\d+$') {
+                                        $prefixLength = [int]$splitResult[1]
+                                        $isCompliant = $prefixLength -le 27
+                                        if ($isCompliant) {
+                                            $compliantSubnets++
+                                        }
+                                    }
+                                }
+                            }
+                            catch {
+                                # If any parsing fails, keep defaults and log
+                                Write-AssessmentProgress "Failed to parse address prefix '$addressPrefix': $($_.Exception.Message)"
+                                $prefixLength = 0
+                                $isCompliant = $false
+                            }
+                        }                        $routeServerSubnets += @{
+                            VNetName      = if ($vnet -and $vnet.Name) { $vnet.Name.ToString() } else { "Unknown" }
+                            VNetId        = if ($vnet -and $vnet.Id) { $vnet.Id.ToString() } else { "Unknown" }
+                            SubnetName    = if ($subnet -and $subnet.name) { $subnet.name.ToString() } else { "RouteServerSubnet" }
+                            AddressPrefix = if ($addressPrefix) { $addressPrefix.ToString() } else { "Unknown" }
+                            PrefixLength  = $prefixLength
+                            IsCompliant   = $isCompliant
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($totalRouteServerSubnets -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No Route Server subnets found"
+        }
+        else {
+            $estimatedPercentageApplied = [math]::Round(($compliantSubnets / $totalRouteServerSubnets) * 100, 2)
+                
+            if ($compliantSubnets -eq $totalRouteServerSubnets) {
+                $status = [Status]::Implemented
+            }
+            elseif ($compliantSubnets -gt 0) {
+                $status = [Status]::PartiallyImplemented
+            }
+            else {
+                $status = [Status]::NotImplemented
+            }
+
+            $rawData = @{
+                "RouteServerSubnets"      = $routeServerSubnets
+                "TotalRouteServerSubnets" = $totalRouteServerSubnets
+                "CompliantSubnets"        = $compliantSubnets
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+function Test-QuestionD0109 {
+    [CmdletBinding()
+    ]
+    param (
+        [Parameter(ValueFromPipeline = $true)]
+        [object]$checklistItem
+    )
+
+    $status = [Status]::ManualVerificationRequired
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+        # This requires manual verification as it involves architectural decisions
+        # about multi-region hub-and-spoke topologies
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        
+        if (($virtualNetworks | Measure-Object).Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No virtual networks found"
+        }
+        else {
+            # Analyze VNet peerings to identify potential hub networks
+            $hubCandidates = @()
+            $regionGroups = $virtualNetworks | Group-Object -Property Location
+
+            foreach ($vnet in $virtualNetworks) {
+                $peerings = $vnet.Properties.virtualNetworkPeerings
+                if ($peerings -and ($peerings | Measure-Object).Count -gt 2) {
+                    # Networks with multiple peerings are likely hub candidates
+                    $hubCandidates += @{
+                        VNetName     = $vnet.Name
+                        VNetId       = $vnet.Id
+                        Location     = $vnet.Location
+                        PeeringCount = ($peerings | Measure-Object).Count
+                        Peerings     = $peerings
+                    }
+                }
+            }
+
+            $rawData = @{
+                "HubCandidates"              = $hubCandidates
+                "RegionCount"                = ($regionGroups | Measure-Object).Count
+                "RegionGroups"               = $regionGroups | ForEach-Object { 
+                    @{
+                        Region    = $_.Name
+                        VNetCount = $_.Count
+                    }
+                }
+                "ManualVerificationRequired" = "Review hub-and-spoke architecture across regions and verify global VNet peerings between hub VNets"
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+function Test-QuestionD0110 {
+    [CmdletBinding()
+    ]
+    param (
+        [Parameter(ValueFromPipeline = $true)]
+        [object]$checklistItem
+    )
+
+    $status = [Status]::ManualVerificationRequired
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+        # Check for Network Watcher and related monitoring resources
+        $networkWatchers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers' }
+        $connectionMonitors = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers/connectionMonitors' }
+        $trafficAnalytics = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkSecurityGroups' -and $_.Properties.flowLogs }
+
+        if (($networkWatchers | Measure-Object).Count -eq 0) {
+            $status = [Status]::NotImplemented
+            $rawData = "No Network Watcher resources found. Azure Monitor for Networks requires Network Watcher to be enabled."
+        }
+        else {
+            $rawData = @{
+                "NetworkWatchers"            = $networkWatchers | ForEach-Object {
+                    @{
+                        Name              = $_.Name
+                        Id                = $_.Id
+                        Location          = $_.Location
+                        ProvisioningState = $_.Properties.provisioningState
+                    }
+                }
+                "ConnectionMonitors"         = $connectionMonitors | Measure-Object | Select-Object -ExpandProperty Count
+                "TrafficAnalytics"           = $trafficAnalytics | Measure-Object | Select-Object -ExpandProperty Count
+                "ManualVerificationRequired" = "Verify Azure Monitor for Networks is configured and being used for end-to-end network monitoring"
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+function Test-QuestionD0111 {
+    [CmdletBinding()
+    ]
+    param (
+        [Parameter(ValueFromPipeline = $true)]
+        [object]$checklistItem
+    )
+
+    $status = [Status]::NotApplicable
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        
+        if (($virtualNetworks | Measure-Object).Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No virtual networks found"
+        }
+        else {
+            $vnetPeeringCounts = @()
+            $compliantVNets = 0
+            $totalVNets = 0
+
+            foreach ($vnet in $virtualNetworks) {
+                $peerings = $vnet.Properties.virtualNetworkPeerings
+                $peeringCount = if ($peerings) { ($peerings | Measure-Object).Count } else { 0 }
+                
+                # Check if VNet has high peering count (potential hub)
+                if ($peeringCount -gt 10) {
+                    # Only check VNets that might be hubs
+                    $totalVNets++
+                    $isCompliant = $peeringCount -lt 450  # Set threshold at 450 (below 500 limit)
+                    
+                    if ($isCompliant) {
+                        $compliantVNets++
+                    }
+
+                    $vnetPeeringCounts += @{
+                        VNetName       = $vnet.Name
+                        VNetId         = $vnet.Id
+                        Location       = $vnet.Location
+                        PeeringCount   = $peeringCount
+                        IsCompliant    = $isCompliant
+                        IsHubCandidate = $peeringCount -gt 10
+                    }
+                }
+            }
+
+            if ($totalVNets -eq 0) {
+                $status = [Status]::NotApplicable
+                $rawData = "No hub VNet candidates found (VNets with >10 peerings)"
+            }
+            else {
+                $estimatedPercentageApplied = [math]::Round(($compliantVNets / $totalVNets) * 100, 2)
+                
+                if ($compliantVNets -eq $totalVNets) {
+                    $status = [Status]::Implemented
+                }
+                elseif ($compliantVNets -gt 0) {
+                    $status = [Status]::PartiallyImplemented
+                }
+                else {
+                    $status = [Status]::NotImplemented
+                }
+
+                $rawData = @{
+                    "VNetPeeringCounts"    = $vnetPeeringCounts
+                    "TotalHubCandidates"   = $totalVNets
+                    "CompliantVNets"       = $compliantVNets
+                    "PeeringLimit"         = 500
+                    "RecommendedThreshold" = 450
+                }
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+function Test-QuestionD0112 {
+    [CmdletBinding()
+    ]
+    param (
+        [Parameter(ValueFromPipeline = $true)]
+        [object]$checklistItem
+    )
+
+    $status = [Status]::NotApplicable
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+        $routeTables = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/routeTables' }
+        
+        if (($routeTables | Measure-Object).Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No route tables found"
+        }
+        else {
+            $routeTableCounts = @()
+            $compliantRouteTables = 0
+            $totalRouteTables = ($routeTables | Measure-Object).Count
+
+            foreach ($routeTable in $routeTables) {
+                $routes = $routeTable.Properties.routes
+                $routeCount = if ($routes) { ($routes | Measure-Object).Count } else { 0 }
+                
+                $isCompliant = $routeCount -lt 360  # Recommended threshold below 400 limit
+                
+                if ($isCompliant) {
+                    $compliantRouteTables++
+                }
+
+                $routeTableCounts += @{
+                    RouteTableName = $routeTable.Name
+                    RouteTableId   = $routeTable.Id
+                    Location       = $routeTable.Location
+                    RouteCount     = $routeCount
+                    IsCompliant    = $isCompliant
+                }
+            }
+
+            $estimatedPercentageApplied = [math]::Round(($compliantRouteTables / $totalRouteTables) * 100, 2)
+            
+            if ($compliantRouteTables -eq $totalRouteTables) {
+                $status = [Status]::Implemented
+            }
+            elseif ($compliantRouteTables -gt 0) {
+                $status = [Status]::PartiallyImplemented
+            }
+            else {
+                $status = [Status]::NotImplemented
+            }
+
+            $rawData = @{
+                "RouteTableCounts"     = $routeTableCounts
+                "TotalRouteTables"     = $totalRouteTables
+                "CompliantRouteTables" = $compliantRouteTables
+                "RouteLimit"           = 400
+                "RecommendedThreshold" = 360
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+function Test-QuestionD0113 {
+    [CmdletBinding()
+    ]
+    param (
+        [Parameter(ValueFromPipeline = $true)]
+        [object]$checklistItem
+    )
+
+    $status = [Status]::NotApplicable
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        
+        if (($virtualNetworks | Measure-Object).Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No virtual networks found"
+        }
+        else {
+            $peeringConfigurations = @()
+            $compliantPeerings = 0
+            $totalPeerings = 0
+
+            foreach ($vnet in $virtualNetworks) {
+                $peerings = $vnet.Properties.virtualNetworkPeerings
+                if ($peerings) {
+                    foreach ($peering in $peerings) {
+                        $totalPeerings++
+                        $allowVirtualNetworkAccess = $peering.properties.allowVirtualNetworkAccess
+                        
+                        $isCompliant = $allowVirtualNetworkAccess -eq $true
+                        if ($isCompliant) {
+                            $compliantPeerings++
+                        }
+
+                        $peeringConfigurations += @{
+                            VNetName                  = $vnet.Name
+                            VNetId                    = $vnet.Id
+                            PeeringName               = $peering.name
+                            AllowVirtualNetworkAccess = $allowVirtualNetworkAccess
+                            RemoteVirtualNetwork      = $peering.properties.remoteVirtualNetwork.id
+                            IsCompliant               = $isCompliant
+                        }
+                    }
+                }
+            }
+
+            if ($totalPeerings -eq 0) {
+                $status = [Status]::NotApplicable
+                $rawData = "No VNet peerings found"
+            }
+            else {
+                $estimatedPercentageApplied = [math]::Round(($compliantPeerings / $totalPeerings) * 100, 2)
+                
+                if ($compliantPeerings -eq $totalPeerings) {
+                    $status = [Status]::Implemented
+                }
+                elseif ($compliantPeerings -gt 0) {
+                    $status = [Status]::PartiallyImplemented
+                }
+                else {
+                    $status = [Status]::NotImplemented
+                }
+
+                $rawData = @{
+                    "PeeringConfigurations" = $peeringConfigurations
+                    "TotalPeerings"         = $totalPeerings
+                    "CompliantPeerings"     = $compliantPeerings
+                }
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+function Test-QuestionD0114 {
+    [CmdletBinding()
+    ]
+    param (
+        [Parameter(ValueFromPipeline = $true)]
+        [object]$checklistItem
+    )
+
+    $status = [Status]::NotApplicable
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+        $loadBalancers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/loadBalancers' }
+        
+        if (($loadBalancers | Measure-Object).Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No load balancers found"
+        }
+        else {
+            $loadBalancerConfigurations = @()
+            $compliantLoadBalancers = 0
+            $totalLoadBalancers = ($loadBalancers | Measure-Object).Count
+
+            foreach ($lb in $loadBalancers) {
+                $skuName = $lb.sku.name
+                $isStandardSku = $skuName -eq "Standard"
+                
+                # Check zone redundancy for frontend IP configurations
+                $frontendConfigs = $lb.Properties.frontendIPConfigurations
+                $zoneRedundantConfigs = 0
+                $totalConfigs = 0
+                
+                if ($frontendConfigs) {
+                    foreach ($feConfig in $frontendConfigs) {
+                        $totalConfigs++
+                        
+                        # Check if it's zone redundant (has multiple zones or no zones specified for Standard LB)
+                        $zones = $feConfig.zones
+                        
+                        if ($isStandardSku) {
+                            if (!$zones -or ($zones -and ($zones | Measure-Object).Count -gt 1)) {
+                                $zoneRedundantConfigs++
+                            }
+                        }
+                    }
+                }
+                
+                $isCompliant = $isStandardSku -and ($totalConfigs -eq 0 -or $zoneRedundantConfigs -eq $totalConfigs)
+                if ($isCompliant) {
+                    $compliantLoadBalancers++
+                }
+
+                $loadBalancerConfigurations += @{
+                    LoadBalancerName     = $lb.Name
+                    LoadBalancerId       = $lb.Id
+                    Location             = $lb.Location
+                    SkuName              = $skuName
+                    IsStandardSku        = $isStandardSku
+                    TotalFrontendConfigs = $totalConfigs
+                    ZoneRedundantConfigs = $zoneRedundantConfigs
+                    IsCompliant          = $isCompliant
+                }
+            }
+
+            $estimatedPercentageApplied = [math]::Round(($compliantLoadBalancers / $totalLoadBalancers) * 100, 2)
+            
+            if ($compliantLoadBalancers -eq $totalLoadBalancers) {
+                $status = [Status]::Implemented
+            }
+            elseif ($compliantLoadBalancers -gt 0) {
+                $status = [Status]::PartiallyImplemented
+            }
+            else {
+                $status = [Status]::NotImplemented
+            }
+
+            $rawData = @{
+                "LoadBalancerConfigurations" = $loadBalancerConfigurations
+                "TotalLoadBalancers"         = $totalLoadBalancers
+                "CompliantLoadBalancers"     = $compliantLoadBalancers
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
+function Test-QuestionD0115 {
+    [CmdletBinding()
+    ]
+    param (
+        [Parameter(ValueFromPipeline = $true)]
+        [object]$checklistItem
+    )
+
+    $status = [Status]::NotApplicable
+    $estimatedPercentageApplied = 0
+    $rawData = $null
+
+    try {
+        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+
+        $loadBalancers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/loadBalancers' }
+        
+        if (($loadBalancers | Measure-Object).Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No load balancers found"
+        }
+        else {
+            $loadBalancerBackendPools = @()
+            $compliantLoadBalancers = 0
+            $totalLoadBalancers = ($loadBalancers | Measure-Object).Count
+
+            foreach ($lb in $loadBalancers) {
+                $backendPools = $lb.Properties.backendAddressPools
+                $hasValidBackendPools = $false
+                
+                if ($backendPools) {
+                    foreach ($pool in $backendPools) {
+                        $backendAddresses = $pool.properties.loadBalancerBackendAddresses
+                        $addressCount = if ($backendAddresses) { ($backendAddresses | Measure-Object).Count } else { 0 }
+                        
+                        if ($addressCount -ge 2) {
+                            $hasValidBackendPools = $true
+                        }
+                        
+                        $loadBalancerBackendPools += @{
+                            LoadBalancerName    = $lb.Name
+                            LoadBalancerId      = $lb.Id
+                            PoolName            = $pool.name
+                            BackendAddressCount = $addressCount
+                            IsCompliant         = $addressCount -ge 2
+                        }
+                    }
+                }
+                else {
+                    $loadBalancerBackendPools += @{
+                        LoadBalancerName    = $lb.Name
+                        LoadBalancerId      = $lb.Id
+                        PoolName            = "No backend pools"
+                        BackendAddressCount = 0
+                        IsCompliant         = $false
+                    }
+                }
+                
+                if ($hasValidBackendPools) {
+                    $compliantLoadBalancers++
+                }
+            }
+
+            $estimatedPercentageApplied = [math]::Round(($compliantLoadBalancers / $totalLoadBalancers) * 100, 2)
+            
+            if ($compliantLoadBalancers -eq $totalLoadBalancers) {
+                $status = [Status]::Implemented
+            }
+            elseif ($compliantLoadBalancers -gt 0) {
+                $status = [Status]::PartiallyImplemented
+            }
+            else {
+                $status = [Status]::NotImplemented
+            }
+
+            $rawData = @{
+                "LoadBalancerBackendPools" = $loadBalancerBackendPools
+                "TotalLoadBalancers"       = $totalLoadBalancers
+                "CompliantLoadBalancers"   = $compliantLoadBalancers
+                "MinimumBackendInstances"  = 2
+            }
+        }
+    }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+
+    return $result
+}
+
 function Test-QuestionD0201 {
     [cmdletbinding()]
     param(
@@ -612,24 +1325,27 @@ function Test-QuestionD0201 {
                 $estimatedPercentageApplied = ($macsecEnabledCount / $expressRouteDirectCircuits.Count) * 100
                 if ($estimatedPercentageApplied -eq 100) {
                     $status = [Status]::Implemented
-                } else {
+                }
+                else {
                     $status = [Status]::PartiallyImplemented
                 }
-            } else {
+            }
+            else {
                 $status = [Status]::NotImplemented
             }
             
             $rawData = @{
                 "ExpressRouteDirectCircuits" = $expressRouteDirectCircuits
-                "MacsecEnabledCount" = $macsecEnabledCount
-                "TotalCircuits" = $expressRouteDirectCircuits.Count
+                "MacsecEnabledCount"         = $macsecEnabledCount
+                "TotalCircuits"              = $expressRouteDirectCircuits.Count
             }
-        } else {
+        }
+        else {
             # No ExpressRoute Direct circuits found
             $status = [Status]::NotApplicable
             $rawData = @{
                 "ExpressRouteDirectCircuits" = @()
-                "Note" = "No ExpressRoute Direct circuits found - MACsec not applicable"
+                "Note"                       = "No ExpressRoute Direct circuits found - MACsec not applicable"
             }
         }
     }
@@ -700,668 +1416,6 @@ function Test-QuestionD0202 {
     return $result
 }
 
-# Hub and Spoke Functions for missing D01.08-D01.15
-
-function Test-QuestionD0108 {
-    [CmdletBinding()
-    ]
-    param (
-        [Parameter(ValueFromPipeline = $true)]
-        [object]$checklistItem
-    )
-
-    $status = [Status]::NotAvailable
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-        # Get all virtual networks with Route Server subnets
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
-        
-        if (($virtualNetworks | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
-            $rawData = "No virtual networks found"
-        }
-        else {
-            $routeServerSubnets = @()
-            $compliantSubnets = 0
-            $totalRouteServerSubnets = 0
-
-            foreach ($vnet in $virtualNetworks) {
-                $subnets = $vnet.Properties.subnets
-                if ($subnets) {
-                    foreach ($subnet in $subnets) {
-                        if ($subnet.name -eq "RouteServerSubnet") {
-                            $totalRouteServerSubnets++
-                            $addressPrefix = $subnet.properties.addressPrefix
-                            $prefixLength = [int]($addressPrefix -split '/')[1]
-                            
-                            $isCompliant = $prefixLength -le 27
-                            if ($isCompliant) {
-                                $compliantSubnets++
-                            }
-
-                            $routeServerSubnets += @{
-                                VNetName = $vnet.Name
-                                VNetId = $vnet.Id
-                                SubnetName = $subnet.name
-                                AddressPrefix = $addressPrefix
-                                PrefixLength = $prefixLength
-                                IsCompliant = $isCompliant
-                            }
-                        }
-                    }
-                }
-            }
-
-            if ($totalRouteServerSubnets -eq 0) {
-                $status = [Status]::NotAvailable
-                $rawData = "No Route Server subnets found"
-            }
-            else {
-                $estimatedPercentageApplied = [math]::Round(($compliantSubnets / $totalRouteServerSubnets) * 100, 2)
-                
-                if ($compliantSubnets -eq $totalRouteServerSubnets) {
-                    $status = [Status]::Passed
-                }
-                elseif ($compliantSubnets -gt 0) {
-                    $status = [Status]::Warning
-                }
-                else {
-                    $status = [Status]::Failed
-                }
-
-                $rawData = @{
-                    "RouteServerSubnets" = $routeServerSubnets
-                    "TotalRouteServerSubnets" = $totalRouteServerSubnets
-                    "CompliantSubnets" = $compliantSubnets
-                }
-            }
-        }
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-function Test-QuestionD0109 {
-    [CmdletBinding()
-    ]
-    param (
-        [Parameter(ValueFromPipeline = $true)]
-        [object]$checklistItem
-    )
-
-    $status = [Status]::Manual
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-        # This requires manual verification as it involves architectural decisions
-        # about multi-region hub-and-spoke topologies
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
-        
-        if (($virtualNetworks | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
-            $rawData = "No virtual networks found"
-        }
-        else {
-            # Analyze VNet peerings to identify potential hub networks
-            $hubCandidates = @()
-            $regionGroups = $virtualNetworks | Group-Object -Property Location
-
-            foreach ($vnet in $virtualNetworks) {
-                $peerings = $vnet.Properties.virtualNetworkPeerings
-                if ($peerings -and ($peerings | Measure-Object).Count -gt 2) {
-                    # Networks with multiple peerings are likely hub candidates
-                    $hubCandidates += @{
-                        VNetName = $vnet.Name
-                        VNetId = $vnet.Id
-                        Location = $vnet.Location
-                        PeeringCount = ($peerings | Measure-Object).Count
-                        Peerings = $peerings
-                    }
-                }
-            }
-
-            $rawData = @{
-                "HubCandidates" = $hubCandidates
-                "RegionCount" = ($regionGroups | Measure-Object).Count
-                "RegionGroups" = $regionGroups | ForEach-Object { 
-                    @{
-                        Region = $_.Name
-                        VNetCount = $_.Count
-                    }
-                }
-                "ManualVerificationRequired" = "Review hub-and-spoke architecture across regions and verify global VNet peerings between hub VNets"
-            }
-        }
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-function Test-QuestionD0110 {
-    [CmdletBinding()
-    ]
-    param (
-        [Parameter(ValueFromPipeline = $true)]
-        [object]$checklistItem
-    )
-
-    $status = [Status]::Manual
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-        # Check for Network Watcher and related monitoring resources
-        $networkWatchers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers' }
-        $connectionMonitors = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers/connectionMonitors' }
-        $trafficAnalytics = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkSecurityGroups' -and $_.Properties.flowLogs }
-
-        if (($networkWatchers | Measure-Object).Count -eq 0) {
-            $status = [Status]::Failed
-            $rawData = "No Network Watcher resources found. Azure Monitor for Networks requires Network Watcher to be enabled."
-        }
-        else {
-            $rawData = @{
-                "NetworkWatchers" = $networkWatchers | ForEach-Object {
-                    @{
-                        Name = $_.Name
-                        Id = $_.Id
-                        Location = $_.Location
-                        ProvisioningState = $_.Properties.provisioningState
-                    }
-                }
-                "ConnectionMonitors" = $connectionMonitors | Measure-Object | Select-Object -ExpandProperty Count
-                "ManualVerificationRequired" = "Verify Azure Monitor for Networks is configured and being used for end-to-end network monitoring"
-            }
-        }
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-function Test-QuestionD0111 {
-    [CmdletBinding()
-    ]
-    param (
-        [Parameter(ValueFromPipeline = $true)]
-        [object]$checklistItem
-    )
-
-    $status = [Status]::NotAvailable
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
-        
-        if (($virtualNetworks | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
-            $rawData = "No virtual networks found"
-        }
-        else {
-            $vnetPeeringCounts = @()
-            $compliantVNets = 0
-            $totalVNets = 0
-
-            foreach ($vnet in $virtualNetworks) {
-                $peerings = $vnet.Properties.virtualNetworkPeerings
-                $peeringCount = if ($peerings) { ($peerings | Measure-Object).Count } else { 0 }
-                
-                # Check if VNet has high peering count (potential hub)
-                if ($peeringCount -gt 10) {  # Only check VNets that might be hubs
-                    $totalVNets++
-                    $isCompliant = $peeringCount -lt 450  # Set threshold at 450 (below 500 limit)
-                    
-                    if ($isCompliant) {
-                        $compliantVNets++
-                    }
-
-                    $vnetPeeringCounts += @{
-                        VNetName = $vnet.Name
-                        VNetId = $vnet.Id
-                        Location = $vnet.Location
-                        PeeringCount = $peeringCount
-                        IsCompliant = $isCompliant
-                        IsHubCandidate = $peeringCount -gt 10
-                    }
-                }
-            }
-
-            if ($totalVNets -eq 0) {
-                $status = [Status]::NotAvailable
-                $rawData = "No hub VNet candidates found (VNets with >10 peerings)"
-            }
-            else {
-                $estimatedPercentageApplied = [math]::Round(($compliantVNets / $totalVNets) * 100, 2)
-                
-                if ($compliantVNets -eq $totalVNets) {
-                    $status = [Status]::Passed
-                }
-                elseif ($compliantVNets -gt 0) {
-                    $status = [Status]::Warning
-                }
-                else {
-                    $status = [Status]::Failed
-                }
-
-                $rawData = @{
-                    "VNetPeeringCounts" = $vnetPeeringCounts
-                    "TotalHubCandidates" = $totalVNets
-                    "CompliantVNets" = $compliantVNets
-                    "PeeringLimit" = 500
-                    "RecommendedThreshold" = 450
-                }
-            }
-        }
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-function Test-QuestionD0112 {
-    [CmdletBinding()
-    ]
-    param (
-        [Parameter(ValueFromPipeline = $true)]
-        [object]$checklistItem
-    )
-
-    $status = [Status]::NotAvailable
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-        $routeTables = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/routeTables' }
-        
-        if (($routeTables | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
-            $rawData = "No route tables found"
-        }
-        else {
-            $routeTableCounts = @()
-            $compliantRouteTables = 0
-            $totalRouteTables = ($routeTables | Measure-Object).Count
-
-            foreach ($routeTable in $routeTables) {
-                $routes = $routeTable.Properties.routes
-                $routeCount = if ($routes) { ($routes | Measure-Object).Count } else { 0 }
-                
-                $isCompliant = $routeCount -lt 360  # Recommended threshold below 400 limit
-                
-                if ($isCompliant) {
-                    $compliantRouteTables++
-                }
-
-                $routeTableCounts += @{
-                    RouteTableName = $routeTable.Name
-                    RouteTableId = $routeTable.Id
-                    Location = $routeTable.Location
-                    RouteCount = $routeCount
-                    IsCompliant = $isCompliant
-                }
-            }
-
-            $estimatedPercentageApplied = [math]::Round(($compliantRouteTables / $totalRouteTables) * 100, 2)
-            
-            if ($compliantRouteTables -eq $totalRouteTables) {
-                $status = [Status]::Passed
-            }
-            elseif ($compliantRouteTables -gt 0) {
-                $status = [Status]::Warning
-            }
-            else {
-                $status = [Status]::Failed
-            }
-
-            $rawData = @{
-                "RouteTableCounts" = $routeTableCounts
-                "TotalRouteTables" = $totalRouteTables
-                "CompliantRouteTables" = $compliantRouteTables
-                "RouteLimit" = 400
-                "RecommendedThreshold" = 360
-            }
-        }
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-function Test-QuestionD0113 {
-    [CmdletBinding()
-    ]
-    param (
-        [Parameter(ValueFromPipeline = $true)]
-        [object]$checklistItem
-    )
-
-    $status = [Status]::NotAvailable
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
-        
-        if (($virtualNetworks | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
-            $rawData = "No virtual networks found"
-        }
-        else {
-            $peeringConfigurations = @()
-            $compliantPeerings = 0
-            $totalPeerings = 0
-
-            foreach ($vnet in $virtualNetworks) {
-                $peerings = $vnet.Properties.virtualNetworkPeerings
-                if ($peerings) {
-                    foreach ($peering in $peerings) {
-                        $totalPeerings++
-                        $allowVirtualNetworkAccess = $peering.properties.allowVirtualNetworkAccess
-                        
-                        $isCompliant = $allowVirtualNetworkAccess -eq $true
-                        if ($isCompliant) {
-                            $compliantPeerings++
-                        }
-
-                        $peeringConfigurations += @{
-                            VNetName = $vnet.Name
-                            VNetId = $vnet.Id
-                            PeeringName = $peering.name
-                            AllowVirtualNetworkAccess = $allowVirtualNetworkAccess
-                            RemoteVirtualNetwork = $peering.properties.remoteVirtualNetwork.id
-                            IsCompliant = $isCompliant
-                        }
-                    }
-                }
-            }
-
-            if ($totalPeerings -eq 0) {
-                $status = [Status]::NotAvailable
-                $rawData = "No VNet peerings found"
-            }
-            else {
-                $estimatedPercentageApplied = [math]::Round(($compliantPeerings / $totalPeerings) * 100, 2)
-                
-                if ($compliantPeerings -eq $totalPeerings) {
-                    $status = [Status]::Passed
-                }
-                elseif ($compliantPeerings -gt 0) {
-                    $status = [Status]::Warning
-                }
-                else {
-                    $status = [Status]::Failed
-                }
-
-                $rawData = @{
-                    "PeeringConfigurations" = $peeringConfigurations
-                    "TotalPeerings" = $totalPeerings
-                    "CompliantPeerings" = $compliantPeerings
-                }
-            }
-        }
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-function Test-QuestionD0114 {
-    [CmdletBinding()
-    ]
-    param (
-        [Parameter(ValueFromPipeline = $true)]
-        [object]$checklistItem
-    )
-
-    $status = [Status]::NotAvailable
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-        $loadBalancers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/loadBalancers' }
-        
-        if (($loadBalancers | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
-            $rawData = "No load balancers found"
-        }
-        else {
-            $loadBalancerConfigurations = @()
-            $compliantLoadBalancers = 0
-            $totalLoadBalancers = ($loadBalancers | Measure-Object).Count
-
-            foreach ($lb in $loadBalancers) {
-                $skuName = $lb.sku.name
-                $isStandardSku = $skuName -eq "Standard"
-                
-                # Check zone redundancy for frontend IP configurations
-                $frontendConfigs = $lb.Properties.frontendIPConfigurations
-                $zoneRedundantConfigs = 0
-                $totalConfigs = 0
-                
-                if ($frontendConfigs) {
-                    foreach ($feConfig in $frontendConfigs) {
-                        $totalConfigs++
-                        
-                        # Check if it's zone redundant (has multiple zones or no zones specified for Standard LB)
-                        $zones = $feConfig.zones
-                        $isZoneRedundant = $false
-                        
-                        if ($isStandardSku) {
-                            if (!$zones -or ($zones -and ($zones | Measure-Object).Count -gt 1)) {
-                                $isZoneRedundant = $true
-                                $zoneRedundantConfigs++
-                            }
-                        }
-                    }
-                }
-                
-                $isCompliant = $isStandardSku -and ($totalConfigs -eq 0 -or $zoneRedundantConfigs -eq $totalConfigs)
-                if ($isCompliant) {
-                    $compliantLoadBalancers++
-                }
-
-                $loadBalancerConfigurations += @{
-                    LoadBalancerName = $lb.Name
-                    LoadBalancerId = $lb.Id
-                    Location = $lb.Location
-                    SkuName = $skuName
-                    IsStandardSku = $isStandardSku
-                    TotalFrontendConfigs = $totalConfigs
-                    ZoneRedundantConfigs = $zoneRedundantConfigs
-                    IsCompliant = $isCompliant
-                }
-            }
-
-            $estimatedPercentageApplied = [math]::Round(($compliantLoadBalancers / $totalLoadBalancers) * 100, 2)
-            
-            if ($compliantLoadBalancers -eq $totalLoadBalancers) {
-                $status = [Status]::Passed
-            }
-            elseif ($compliantLoadBalancers -gt 0) {
-                $status = [Status]::Warning
-            }
-            else {
-                $status = [Status]::Failed
-            }
-
-            $rawData = @{
-                "LoadBalancerConfigurations" = $loadBalancerConfigurations
-                "TotalLoadBalancers" = $totalLoadBalancers
-                "CompliantLoadBalancers" = $compliantLoadBalancers
-            }
-        }
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-function Test-QuestionD0115 {
-    [CmdletBinding()
-    ]
-    param (
-        [Parameter(ValueFromPipeline = $true)]
-        [object]$checklistItem
-    )
-
-    $status = [Status]::NotAvailable
-    $estimatedPercentageApplied = 0
-    $rawData = $null
-
-    try {
-        Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-
-        $loadBalancers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/loadBalancers' }
-        
-        if (($loadBalancers | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
-            $rawData = "No load balancers found"
-        }
-        else {
-            $loadBalancerBackendPools = @()
-            $compliantLoadBalancers = 0
-            $totalLoadBalancers = ($loadBalancers | Measure-Object).Count
-
-            foreach ($lb in $loadBalancers) {
-                $backendPools = $lb.Properties.backendAddressPools
-                $hasValidBackendPools = $false
-                
-                if ($backendPools) {
-                    foreach ($pool in $backendPools) {
-                        $backendAddresses = $pool.properties.loadBalancerBackendAddresses
-                        $addressCount = if ($backendAddresses) { ($backendAddresses | Measure-Object).Count } else { 0 }
-                        
-                        if ($addressCount -ge 2) {
-                            $hasValidBackendPools = $true
-                        }
-                        
-                        $loadBalancerBackendPools += @{
-                            LoadBalancerName = $lb.Name
-                            LoadBalancerId = $lb.Id
-                            PoolName = $pool.name
-                            BackendAddressCount = $addressCount
-                            IsCompliant = $addressCount -ge 2
-                        }
-                    }
-                }
-                else {
-                    $loadBalancerBackendPools += @{
-                        LoadBalancerName = $lb.Name
-                        LoadBalancerId = $lb.Id
-                        PoolName = "No backend pools"
-                        BackendAddressCount = 0
-                        IsCompliant = $false
-                    }
-                }
-                
-                if ($hasValidBackendPools) {
-                    $compliantLoadBalancers++
-                }
-            }
-
-            $estimatedPercentageApplied = [math]::Round(($compliantLoadBalancers / $totalLoadBalancers) * 100, 2)
-            
-            if ($compliantLoadBalancers -eq $totalLoadBalancers) {
-                $status = [Status]::Passed
-            }
-            elseif ($compliantLoadBalancers -gt 0) {
-                $status = [Status]::Warning
-            }
-            else {
-                $status = [Status]::Failed
-            }
-
-            $rawData = @{
-                "LoadBalancerBackendPools" = $loadBalancerBackendPools
-                "TotalLoadBalancers" = $totalLoadBalancers
-                "CompliantLoadBalancers" = $compliantLoadBalancers
-                "MinimumBackendInstances" = 2
-            }
-        }
-    }
-    catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = [Status]::Error
-        $estimatedPercentageApplied = 0
-        $rawData = $_.Exception.Message
-    }
-
-    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-
-    return $result
-}
-
-# IP Plan Functions for D03.01-D03.05
-
 function Test-QuestionD0301 {
     [CmdletBinding()
     ]
@@ -1370,7 +1424,7 @@ function Test-QuestionD0301 {
         [object]$checklistItem
     )
 
-    $status = [Status]::Manual
+    $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = $null
 
@@ -1380,7 +1434,7 @@ function Test-QuestionD0301 {
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
+            $status = [Status]::NotApplicable
             $rawData = "No virtual networks found"
         }
         else {
@@ -1393,9 +1447,9 @@ function Test-QuestionD0301 {
                 if ($addressPrefixes) {
                     foreach ($prefix in $addressPrefixes) {
                         $vnetAddressSpaces += @{
-                            VNetName = $vnet.Name
-                            VNetId = $vnet.Id
-                            Location = $vnet.Location
+                            VNetName      = $vnet.Name
+                            VNetId        = $vnet.Id
+                            Location      = $vnet.Location
                             AddressPrefix = $prefix
                         }
                     }
@@ -1411,10 +1465,10 @@ function Test-QuestionD0301 {
                     # Simple overlap detection - same prefix or very similar
                     if ($space1.AddressPrefix -eq $space2.AddressPrefix) {
                         $overlappingPairs += @{
-                            VNet1 = $space1.VNetName
-                            VNet1Location = $space1.Location
-                            VNet2 = $space2.VNetName
-                            VNet2Location = $space2.Location
+                            VNet1             = $space1.VNetName
+                            VNet1Location     = $space1.Location
+                            VNet2             = $space2.VNetName
+                            VNet2Location     = $space2.Location
                             OverlappingPrefix = $space1.AddressPrefix
                         }
                     }
@@ -1422,11 +1476,11 @@ function Test-QuestionD0301 {
             }
 
             $rawData = @{
-                "VNetAddressSpaces" = $vnetAddressSpaces
-                "PotentialOverlaps" = $overlappingPairs
+                "VNetAddressSpaces"          = $vnetAddressSpaces
+                "PotentialOverlaps"          = $overlappingPairs
                 "ManualVerificationRequired" = "Manual verification required to ensure no overlapping IP address spaces across Azure regions and on-premises locations"
-                "TotalVNets" = ($virtualNetworks | Measure-Object).Count
-                "TotalAddressSpaces" = $vnetAddressSpaces.Count
+                "TotalVNets"                 = ($virtualNetworks | Measure-Object).Count
+                "TotalAddressSpaces"         = $vnetAddressSpaces.Count
             }
         }
     }
@@ -1450,7 +1504,7 @@ function Test-QuestionD0302 {
         [object]$checklistItem
     )
 
-    $status = [Status]::NotAvailable
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $rawData = $null
 
@@ -1460,7 +1514,7 @@ function Test-QuestionD0302 {
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
+            $status = [Status]::NotApplicable
             $rawData = "No virtual networks found"
         }
         else {
@@ -1497,7 +1551,7 @@ function Test-QuestionD0302 {
                         
                         $prefixAnalysis += @{
                             AddressPrefix = $prefix
-                            IsRFC1918 = $isRFC1918
+                            IsRFC1918     = $isRFC1918
                         }
                     }
                     
@@ -1506,37 +1560,37 @@ function Test-QuestionD0302 {
                     }
                     
                     $vnetAddressAnalysis += @{
-                        VNetName = $vnet.Name
-                        VNetId = $vnet.Id
-                        Location = $vnet.Location
+                        VNetName       = $vnet.Name
+                        VNetId         = $vnet.Id
+                        Location       = $vnet.Location
                         PrefixAnalysis = $prefixAnalysis
-                        IsCompliant = $vnetCompliant
+                        IsCompliant    = $vnetCompliant
                     }
                 }
             }
 
             if ($totalVNets -eq 0) {
-                $status = [Status]::NotAvailable
+                $status = [Status]::NotApplicable
                 $rawData = "No VNet address prefixes found"
             }
             else {
                 $estimatedPercentageApplied = [math]::Round(($compliantVNets / ($vnetAddressAnalysis | Measure-Object).Count) * 100, 2)
                 
                 if ($compliantVNets -eq ($vnetAddressAnalysis | Measure-Object).Count) {
-                    $status = [Status]::Passed
+                    $status = [Status]::Implemented
                 }
                 elseif ($compliantVNets -gt 0) {
-                    $status = [Status]::Warning
+                    $status = [Status]::PartiallyImplemented
                 }
                 else {
-                    $status = [Status]::Failed
+                    $status = [Status]::NotImplemented
                 }
 
                 $rawData = @{
                     "VNetAddressAnalysis" = $vnetAddressAnalysis
-                    "TotalVNets" = ($vnetAddressAnalysis | Measure-Object).Count
-                    "CompliantVNets" = $compliantVNets
-                    "RFC1918Ranges" = @("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+                    "TotalVNets"          = ($vnetAddressAnalysis | Measure-Object).Count
+                    "CompliantVNets"      = $compliantVNets
+                    "RFC1918Ranges"       = @("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
                 }
             }
         }
@@ -1561,7 +1615,7 @@ function Test-QuestionD0303 {
         [object]$checklistItem
     )
 
-    $status = [Status]::NotAvailable
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $rawData = $null
 
@@ -1571,7 +1625,7 @@ function Test-QuestionD0303 {
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
+            $status = [Status]::NotApplicable
             $rawData = "No virtual networks found"
         }
         else {
@@ -1600,9 +1654,9 @@ function Test-QuestionD0303 {
                         }
                         
                         $prefixAnalysis += @{
-                            AddressPrefix = $prefix
-                            MaskBits = $maskBits
-                            AddressCount = [math]::Pow(2, (32 - $maskBits))
+                            AddressPrefix     = $prefix
+                            MaskBits          = $maskBits
+                            AddressCount      = [math]::Pow(2, (32 - $maskBits))
                             IsAppropriateSize = $isAppropriateSize
                         }
                     }
@@ -1612,36 +1666,36 @@ function Test-QuestionD0303 {
                     }
                     
                     $vnetSizeAnalysis += @{
-                        VNetName = $vnet.Name
-                        VNetId = $vnet.Id
-                        Location = $vnet.Location
+                        VNetName       = $vnet.Name
+                        VNetId         = $vnet.Id
+                        Location       = $vnet.Location
                         PrefixAnalysis = $prefixAnalysis
-                        IsCompliant = $vnetCompliant
+                        IsCompliant    = $vnetCompliant
                     }
                 }
             }
 
             if ($totalVNets -eq 0) {
-                $status = [Status]::NotAvailable
+                $status = [Status]::NotApplicable
                 $rawData = "No VNet address prefixes found"
             }
             else {
                 $estimatedPercentageApplied = [math]::Round(($compliantVNets / ($vnetSizeAnalysis | Measure-Object).Count) * 100, 2)
                 
                 if ($compliantVNets -eq ($vnetSizeAnalysis | Measure-Object).Count) {
-                    $status = [Status]::Passed
+                    $status = [Status]::Implemented
                 }
                 elseif ($compliantVNets -gt 0) {
-                    $status = [Status]::Warning
+                    $status = [Status]::PartiallyImplemented
                 }
                 else {
-                    $status = [Status]::Failed
+                    $status = [Status]::NotImplemented
                 }
 
                 $rawData = @{
-                    "VNetSizeAnalysis" = $vnetSizeAnalysis
-                    "TotalVNets" = ($vnetSizeAnalysis | Measure-Object).Count
-                    "CompliantVNets" = $compliantVNets
+                    "VNetSizeAnalysis"   = $vnetSizeAnalysis
+                    "TotalVNets"         = ($vnetSizeAnalysis | Measure-Object).Count
+                    "CompliantVNets"     = $compliantVNets
                     "RecommendedMinMask" = 17
                     "LargeSizeThreshold" = 16
                 }
@@ -1668,7 +1722,7 @@ function Test-QuestionD0304 {
         [object]$checklistItem
     )
 
-    $status = [Status]::Manual
+    $status = [Status]::ManualVerificationRequired
     $estimatedPercentageApplied = 0
     $rawData = $null
 
@@ -1678,7 +1732,7 @@ function Test-QuestionD0304 {
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
+            $status = [Status]::NotApplicable
             $rawData = "No virtual networks found"
         }
         else {
@@ -1701,8 +1755,8 @@ function Test-QuestionD0304 {
                     if ($addressPrefixes) {
                         foreach ($prefix in $addressPrefixes) {
                             $addressSpaces += @{
-                                VNetName = $vnet.Name
-                                VNetId = $vnet.Id
+                                VNetName      = $vnet.Name
+                                VNetId        = $vnet.Id
                                 AddressPrefix = $prefix
                             }
                         }
@@ -1710,17 +1764,17 @@ function Test-QuestionD0304 {
                 }
                 
                 $regionalAnalysis += @{
-                    Region = $region
-                    VNetCount = $vnetsInRegion.Count
+                    Region        = $region
+                    VNetCount     = $vnetsInRegion.Count
                     AddressSpaces = $addressSpaces
                 }
             }
 
             $rawData = @{
-                "RegionalAnalysis" = $regionalAnalysis
-                "TotalRegions" = $regionGroups.Count
+                "RegionalAnalysis"           = $regionalAnalysis
+                "TotalRegions"               = $regionGroups.Count
                 "ManualVerificationRequired" = "Manual verification required to ensure no overlapping IP address ranges between production and disaster recovery sites"
-                "Recommendations" = @(
+                "Recommendations"            = @(
                     "Review IP address allocation across regions",
                     "Ensure production and DR sites use different IP ranges",
                     "Consider Site Recovery networking requirements",
@@ -1749,7 +1803,7 @@ function Test-QuestionD0305 {
         [object]$checklistItem
     )
 
-    $status = [Status]::NotAvailable
+    $status = [Status]::NotApplicable
     $estimatedPercentageApplied = 0
     $rawData = $null
 
@@ -1759,7 +1813,7 @@ function Test-QuestionD0305 {
         $publicIPs = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/publicIPAddresses' }
         
         if (($publicIPs | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotAvailable
+            $status = [Status]::NotApplicable
             $rawData = "No public IP addresses found"
         }
         else {
@@ -1797,34 +1851,34 @@ function Test-QuestionD0305 {
                 }
 
                 $publicIPAnalysis += @{
-                    PublicIPName = $pip.Name
-                    PublicIPId = $pip.Id
-                    Location = $pip.Location
-                    SkuName = $skuName
-                    SkuTier = $skuTier
+                    PublicIPName      = $pip.Name
+                    PublicIPId        = $pip.Id
+                    Location          = $pip.Location
+                    SkuName           = $skuName
+                    SkuTier           = $skuTier
                     ZoneConfiguration = $zoneConfig
-                    IsStandardSku = $isStandardSku
-                    IsZoneRedundant = $isZoneRedundant
-                    IsCompliant = $isCompliant
+                    IsStandardSku     = $isStandardSku
+                    IsZoneRedundant   = $isZoneRedundant
+                    IsCompliant       = $isCompliant
                 }
             }
 
             $estimatedPercentageApplied = [math]::Round(($compliantPublicIPs / $totalPublicIPs) * 100, 2)
             
             if ($compliantPublicIPs -eq $totalPublicIPs) {
-                $status = [Status]::Passed
+                $status = [Status]::Implemented
             }
             elseif ($compliantPublicIPs -gt 0) {
-                $status = [Status]::Warning
+                $status = [Status]::PartiallyImplemented
             }
             else {
-                $status = [Status]::Failed
+                $status = [Status]::NotImplemented
             }
 
             $rawData = @{
-                "PublicIPAnalysis" = $publicIPAnalysis
-                "TotalPublicIPs" = $totalPublicIPs
-                "CompliantPublicIPs" = $compliantPublicIPs
+                "PublicIPAnalysis"         = $publicIPAnalysis
+                "TotalPublicIPs"           = $totalPublicIPs
+                "CompliantPublicIPs"       = $compliantPublicIPs
                 "RecommendedConfiguration" = "Standard SKU with zone-redundant deployment"
             }
         }
@@ -1840,3 +1894,5 @@ function Test-QuestionD0305 {
 
     return $result
 }
+
+

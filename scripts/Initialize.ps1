@@ -18,7 +18,7 @@ function Get-AzModules {
     
     # Required modules: Only Az meta-module and specific Graph modules
     $requiredModules = @(
-        'Az'  # Meta-module that includes all Az.* modules - only this needs to be installed
+        'Az', 'Az.ResourceGraph'
     )
     
     # Microsoft Graph modules (install individually as they're not part of Az)
@@ -180,7 +180,7 @@ function Initialize-Connect {
 
 function Import-RequiredModules {
     # Import Az modules
-    $azSubModules = @('Az.Accounts', 'Az.Resources', 'Az.Monitor', 'Az.Billing', 'Az.Network', 'Az.Storage', 'Az.Sql', 'Az.KeyVault', 'Az.Websites')
+    $azSubModules = @('Az.Accounts', 'Az.Resources', 'Az.Monitor', 'Az.Billing', 'Az.Network', 'Az.Storage', 'Az.Sql', 'Az.KeyVault', 'Az.Websites', 'Az.ResourceGraph')
     
     # Check which Az modules are already loaded to avoid unnecessary imports
     $azModulesToImport = @()
