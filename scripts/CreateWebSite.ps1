@@ -272,21 +272,28 @@ function GenerateCalculateCategoryStatusDataFunction {
 function calculateCategoryStatusData() {
   const categoryStatusCounts = {};
 
-  Object.keys(categoryMapping).forEach((category) => {
-    categoryStatusCounts[category] = {
-      NotVerified: 0,
-      Open: 0,
-      Closed: 0,
-      Total: 0,
-      Progress: 0,
-    };
-  });
-
+  // Only initialize categories that actually have data in jsonReportListData
   Object.entries(jsonReportListData).forEach(([categoryKey, items]) => {
     const categoryName = Object.keys(categoryMapping).find(
       (key) => categoryMapping[key] === categoryKey
     );
-    if (categoryName) {
+    if (categoryName && items && items.length > 0) {
+      categoryStatusCounts[categoryName] = {
+        NotVerified: 0,
+        Open: 0,
+        Closed: 0,
+        Total: 0,
+        Progress: 0,
+      };
+    }
+  });
+
+  // Process items for categories that have data
+  Object.entries(jsonReportListData).forEach(([categoryKey, items]) => {
+    const categoryName = Object.keys(categoryMapping).find(
+      (key) => categoryMapping[key] === categoryKey
+    );
+    if (categoryName && categoryStatusCounts[categoryName]) {
       items.forEach((item) => {
         switch (item.Status) {
           case "Implemented":

@@ -18,7 +18,9 @@ function Get-AzModules {
     
     # Required modules: Only Az meta-module and specific Graph modules
     $requiredModules = @(
-        'Az', 'Az.ResourceGraph'
+        'Az', 'Az.ResourceGraph', 'Az.Automation', 'Az.Consumption', 'Az.CostManagement',
+        'Az.RecoveryServices', 'Az.OperationalInsights', 'Az.ManagedServices', 'Az.Compute',
+        'Az.DataProtection'
     )
     
     # Microsoft Graph modules (install individually as they're not part of Az)
@@ -44,16 +46,31 @@ function Get-AzModules {
                 $missingModules | ForEach-Object {
                     Write-Output "Installing module: $_"
                     Install-Module -Name $_ -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
+                    
+                    # Verify installation
+                    $installedModule = Get-Module -ListAvailable -Name $_ -ErrorAction SilentlyContinue
+                    if ($installedModule) {
+                        Write-Output "  ✓ Module $_ installed successfully (version: $($installedModule.Version))"
+                    } else {
+                        Write-Warning "  ✗ Module $_ installation failed verification"
+                    }
                 }
-                Write-Output "Modules installed successfully"
+                Write-Output "Module installation completed"
             } catch {
                 Write-Error "Failed to install modules: $($_.Exception.Message)"
                 Write-Warning "Install manually: Install-Module -Name <ModuleName> -Scope CurrentUser -Force"
+                Write-Warning "Affected module: $_"
             }
         } 
         else {
             Write-Warning "Install-Module not available. Install modules manually in regular PowerShell"
+            Write-Warning "Required commands:"
+            $missingModules | ForEach-Object {
+                Write-Warning "  Install-Module -Name $_ -Scope CurrentUser -Force"
+            }
         }    
+    } else {
+        Write-Output "All required modules are already installed"
     }
     
     # More aggressive Graph module cleanup to prevent assembly conflicts
@@ -179,8 +196,13 @@ function Initialize-Connect {
 }
 
 function Import-RequiredModules {
-    # Import Az modules
-    $azSubModules = @('Az.Accounts', 'Az.Resources', 'Az.Monitor', 'Az.Billing', 'Az.Network', 'Az.Storage', 'Az.Sql', 'Az.KeyVault', 'Az.Websites', 'Az.ResourceGraph')
+    # Import Az modules - comprehensive list based on actual function usage
+    $azSubModules = @(
+        'Az.Accounts', 'Az.Resources', 'Az.Monitor', 'Az.Billing', 'Az.Network', 'Az.Storage', 
+        'Az.Sql', 'Az.KeyVault', 'Az.Websites', 'Az.ResourceGraph', 'Az.Automation',
+        'Az.Consumption', 'Az.CostManagement', 'Az.RecoveryServices', 'Az.OperationalInsights',
+        'Az.ManagedServices', 'Az.Compute', 'Az.DataProtection', 'Az.Profile'
+    )
     
     # Check which Az modules are already loaded to avoid unnecessary imports
     $azModulesToImport = @()
@@ -200,23 +222,33 @@ function Import-RequiredModules {
     }
     
     if ($azModulesToImport.Count -gt 0) {
-        try {
-            Write-Output "  Importing $($azModulesToImport.Count) Az modules: $($azModulesToImport -join ', ')"
-            Import-Module $azModulesToImport -Force -ErrorAction Stop
-            Write-Output "  Az modules imported successfully"
-        }
-        catch {
-            Write-Warning "Failed to import some Az modules: $($_.Exception.Message)"
-            # Try importing one by one to identify which ones fail
-            foreach ($module in $azModulesToImport) {
-                try {
-                    Import-Module $module -Force -ErrorAction Stop
-                    Write-Output "    ✓ $module imported"
-                }
-                catch {
-                    Write-Warning "    ✗ Failed to import $module : $($_.Exception.Message)"
+        Write-Output "  Importing $($azModulesToImport.Count) Az modules..."
+        $successCount = 0
+        $failureCount = 0
+        
+        # Import one by one to provide granular feedback
+        foreach ($module in $azModulesToImport) {
+            try {
+                Import-Module $module -Force -ErrorAction Stop
+                Write-Output "    ✓ $module imported successfully"
+                $successCount++
+            }
+            catch {
+                Write-Warning "    ✗ Failed to import $module : $($_.Exception.Message)"
+                $failureCount++
+                
+                # For critical modules, show more detailed guidance
+                if ($module -in @('Az.Accounts', 'Az.Resources', 'Az.ResourceGraph')) {
+                    Write-Warning "      → $module is critical for assessment functionality"
                 }
             }
+        }
+        
+        Write-Output "  Module import summary: $successCount successful, $failureCount failed"
+        
+        if ($failureCount -gt 0) {
+            Write-Warning "  Some modules failed to import. Assessment functionality may be limited."
+            Write-Warning "  Consider restarting PowerShell and running: Update-Module -Force"
         }
     } else {
         Write-Output "  All required Az modules already loaded - skipping import"
@@ -349,6 +381,42 @@ function New-ReportFolder {
 
 
 
+function Test-ModulesFunctionality {
+    Write-Output "Verifying module functionality..."
+    
+    $criticalCmdlets = @{
+        'Get-AzContext' = 'Az.Accounts'
+        'Get-AzResourceGroup' = 'Az.Resources'
+        'Search-AzGraph' = 'Az.ResourceGraph'
+        'Get-MgContext' = 'Microsoft.Graph.Authentication'
+    }
+    
+    $workingCmdlets = 0
+    $totalCmdlets = $criticalCmdlets.Count
+    
+    foreach ($cmdlet in $criticalCmdlets.Keys) {
+        $module = $criticalCmdlets[$cmdlet]
+        try {
+            $cmd = Get-Command $cmdlet -ErrorAction Stop
+            Write-Output "  ✓ $cmdlet is available from $module"
+            $workingCmdlets++
+        }
+        catch {
+            Write-Warning "  ✗ $cmdlet not available (expected from $module)"
+        }
+    }
+    
+    $functionalityPercentage = [math]::Round(($workingCmdlets / $totalCmdlets) * 100, 1)
+    Write-Output "Module functionality check: $workingCmdlets/$totalCmdlets cmdlets available ($functionalityPercentage%)"
+    
+    if ($functionalityPercentage -lt 75) {
+        Write-Warning "Less than 75% of critical cmdlets are available. Assessment may fail."
+        Write-Warning "Consider running: Install-Module Az -Force -AllowClobber"
+    }
+    
+    return $functionalityPercentage -ge 75
+}
+
 function Initialize-Environment {
     Write-Output "=== Azure Landing Zone Assessment Initialization ==="
     $startTime = Get-Date
@@ -356,35 +424,42 @@ function Initialize-Environment {
     # Check for potential conflicts early with clear guidance
     $hasConflicts = Test-ModuleConflicts
     
-    Write-Output "Step 1/7: Checking and installing modules..."
+    Write-Output "Step 1/8: Checking and installing modules..."
     Get-AzModules
     
-    Write-Output "Step 2/7: Loading checklist..."
+    Write-Output "Step 2/8: Loading checklist..."
     Set-GlobalChecklist
     
-    Write-Output "Step 3/7: Connecting to Azure and Graph..."
+    Write-Output "Step 3/8: Connecting to Azure and Graph..."
     Initialize-Connect
     
-    Write-Output "Step 4/7: Importing required modules..."
+    Write-Output "Step 4/8: Importing required modules..."
     Import-RequiredModules
     
-    Write-Output "Step 5/7: Collecting Azure data..."
+    Write-Output "Step 5/8: Verifying module functionality..."
+    $modulesWorking = Test-ModulesFunctionality
+    
+    Write-Output "Step 6/8: Collecting Azure data..."
     Collect-AzData
     
-    Write-Output "Step 6/7: Collecting Graph data..."
+    Write-Output "Step 7/8: Collecting Graph data..."
     Collect-GraphData
     
-    Write-Output "Step 7/7: Preparing reports..."
+    Write-Output "Step 8/8: Preparing reports..."
     New-ReportFolder
     
     $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
     Write-Output "=== Initialization completed in $duration seconds ==="
     
     # Final status summary
-    if ($global:GraphConnected) {
-        Write-Output "  Status: Full assessment with Azure + Graph data"
+    if ($global:GraphConnected -and $modulesWorking) {
+        Write-Output "  Status: Full assessment ready (Azure + Graph data, all modules functional)"
+    } elseif ($global:GraphConnected) {
+        Write-Output "  Status: Partial assessment ready (Azure + Graph data, some module issues)"
+    } elseif ($modulesWorking) {
+        Write-Output "  Status: Limited assessment ready (Azure data only, modules functional)"
     } else {
-        Write-Output "  Status: Limited assessment (Azure data only)"
+        Write-Output "  Status: Basic assessment only (limited functionality due to module issues)"
         if ($hasConflicts) {
             Write-Output "   → For complete assessment: restart PowerShell and try again"
         }
