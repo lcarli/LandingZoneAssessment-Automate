@@ -34,7 +34,7 @@
 
 ### PlatformAutomationandDevOps.ps1 — 11 stubs (11/13)
 
-- [ ] **#7** — Implementar checks: H01.01, H01.02, H01.03, H01.05, H01.07, H02.01–H02.04, H04.01+  
+- [x] **#7** — Implementar checks: H01.01, H01.02, H01.03, H01.05, H01.07, H02.01–H02.04, H04.01+  
   **Apenas 2/13 checks têm lógica real.** 85% são stubs.
 
 ### ResourceOrganization.ps1 — 8 stubs (8/19)
