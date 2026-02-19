@@ -68,7 +68,7 @@
 - [x] **#14** — Eliminar N+1 queries no Governance — `Governance.ps1`  
   `Get-AzRoleAssignment` por MG; `Get-AzConsumptionBudget` por subscription.
 
-- [ ] **#15** — Eliminar N+1 queries no Billing — `AzureBillingandMicrosoftEntraIDTenants.ps1`  
+- [x] **#15** — Eliminar N+1 queries no Billing — `AzureBillingandMicrosoftEntraIDTenants.ps1`  
   REST API por subscription (A03.05, A04.03).
 
 - [ ] **#16** — Eliminar N+1 queries no Security — `Security.ps1`  

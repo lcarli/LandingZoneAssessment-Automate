@@ -999,36 +999,39 @@ function Test-QuestionA0305 {
         $totalSubscriptions = $subscriptions.Count
         $devTestSubscriptions = 0
 
+        if ($totalSubscriptions -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = "No subscriptions found."
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
         # List of Dev/Test quota IDs for Enterprise Agreement
         $devTestOfferIds = @(
             "MS-AZR-0148P", # Enterprise Dev/Test
             "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
-        )          
+        )
+
+        # Get the access token ONCE before the loop (N+1 fix)
+        $accessTokenResult = Get-AzAccessToken
+        if ($accessTokenResult.Token -is [SecureString]) {
+            $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
+            )
+        } else {
+            $plainAccessToken = $accessTokenResult.Token
+        }
+        $headers = @{
+            Authorization = "Bearer $plainAccessToken"
+            'Content-Type' = 'application/json'
+        }
+
         foreach ($subscription in $subscriptions) {
             try {
-                # Get subscription details via REST API to get the OfferType
                 $subscriptionId = $subscription.Id
-            
-                # Get the access token - handling both old and new Az module versions
-                $accessTokenResult = Get-AzAccessToken
-                if ($accessTokenResult.Token -is [SecureString]) {
-                    # New Az module version - Token is SecureString
-                    $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
-                    )
-                } else {
-                    # Old Az module version - Token is String
-                    $plainAccessToken = $accessTokenResult.Token
-                }
-            
                 $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2022-12-01"
-                $headers = @{
-                    Authorization = "Bearer $plainAccessToken"
-                    'Content-Type' = 'application/json'
-                }
-            
-                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue                
-            
+                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue
+
                 if ($response -and $response.properties -and $response.properties.subscriptionPolicies) {
                     $quotaId = $response.properties.subscriptionPolicies.quotaId
                     if ($devTestOfferIds -contains $quotaId) {
@@ -1038,7 +1041,6 @@ function Test-QuestionA0305 {
             }
             catch {
                 Write-Verbose "Failed to retrieve subscription details for $subscriptionId : $($_.Exception.Message)"
-                # Continue with next subscription - don't fail the entire assessment
             }
         }
         
@@ -1280,33 +1282,37 @@ function Test-QuestionA0403 {
         $totalSubscriptions = $subscriptions.Count
         $devTestSubscriptions = 0
 
+        if ($totalSubscriptions -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = "No subscriptions found."
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
         # List of Dev/Test quota IDs for Microsoft Customer Agreement
         $devTestQuotaIds = @(
             "MS-AZR-0148P", # Enterprise Dev/Test
             "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
-        )          
+        )
+
+        # Get the access token ONCE before the loop (N+1 fix)
+        $accessTokenResult = Get-AzAccessToken
+        if ($accessTokenResult.Token -is [SecureString]) {
+            $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
+            )
+        } else {
+            $plainAccessToken = $accessTokenResult.Token
+        }
+        $headers = @{
+            Authorization = "Bearer $plainAccessToken"
+            'Content-Type' = 'application/json'
+        }
+
         foreach ($subscription in $subscriptions) {
             try {
-                # Get subscription details via REST API to get the OfferType
                 $subscriptionId = $subscription.Id
-                
-                # Get the access token - handling both old and new Az module versions
-                $accessTokenResult = Get-AzAccessToken
-                if ($accessTokenResult.Token -is [SecureString]) {
-                    # New Az module version - Token is SecureString
-                    $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
-                    )
-                } else {
-                    # Old Az module version - Token is String
-                    $plainAccessToken = $accessTokenResult.Token
-                }
-                
                 $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2022-12-01"
-                $headers = @{
-                    Authorization = "Bearer $plainAccessToken"
-                    'Content-Type' = 'application/json'
-                }
                 $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue
 
                 if ($response -and $response.properties -and $response.properties.subscriptionPolicies) {
@@ -1317,8 +1323,7 @@ function Test-QuestionA0403 {
                 }
             }
             catch {
-                Write-Verbose "Could not retrieve subscription details for $subscriptionId`: $($_.Exception.Message)"
-                # Continue with next subscription - don't fail the entire assessment
+                Write-Verbose "Could not retrieve subscription details for $subscriptionId : $($_.Exception.Message)"
             }
         }
 
