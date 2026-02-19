@@ -71,7 +71,7 @@
 - [x] **#15** — Eliminar N+1 queries no Billing — `AzureBillingandMicrosoftEntraIDTenants.ps1`  
   REST API por subscription (A03.05, A04.03).
 
-- [ ] **#16** — Eliminar N+1 queries no Security — `Security.ps1`  
+- [x] **#16** — Eliminar N+1 queries no Security — `Security.ps1`  
   `Set-AzContext` por Key Vault (G02.04).
 
 ---

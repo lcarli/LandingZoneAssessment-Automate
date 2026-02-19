@@ -375,15 +375,21 @@ function Test-QuestionG0204 {
             $rawData = "No Azure Key Vaults are configured in the current subscriptions."
             $estimatedPercentageApplied = 0
         } else {
+            # Track current subscription to avoid redundant Set-AzContext calls (N+1 fix)
+            $currentSubId = $null
+
             # Check Key Vault configuration for certificates, secrets, keys, and tags
             $vaultStatus = $keyVaults | ForEach-Object {
                 $vault = $_
                 
-                # Ensure we're in the correct subscription context for this Key Vault
-                try {
-                    Set-AzContext -Subscription $vault.SubscriptionId -Tenant $global:TenantId | Out-Null
-                } catch {
-                    Write-AssessmentWarning "Failed to set context for subscription $($vault.SubscriptionId): $($_.Exception.Message)"
+                # Only switch context if subscription changed
+                if ($vault.SubscriptionId -ne $currentSubId) {
+                    try {
+                        Set-AzContext -Subscription $vault.SubscriptionId -Tenant $global:TenantId | Out-Null
+                        $currentSubId = $vault.SubscriptionId
+                    } catch {
+                        Write-AssessmentWarning "Failed to set context for subscription $($vault.SubscriptionId): $($_.Exception.Message)"
+                    }
                 }
                 
                 [PSCustomObject]@{
@@ -459,11 +465,17 @@ function Test-QuestionG0205 {
             $automatedCertificates = 0
             $automationDetails = @()
             
+            # Track current subscription to avoid redundant Set-AzContext calls (N+1 fix)
+            $currentSubId = $null
+
             # Loop through each Key Vault to check certificates
             foreach ($keyVault in $keyVaults) {
                 try {
-                    # Set the context to the subscription containing the Key Vault with explicit tenant
-                    Set-AzContext -Subscription $keyVault.SubscriptionId -Tenant $global:TenantId | Out-Null
+                    # Only switch context if subscription changed
+                    if ($keyVault.SubscriptionId -ne $currentSubId) {
+                        Set-AzContext -Subscription $keyVault.SubscriptionId -Tenant $global:TenantId | Out-Null
+                        $currentSubId = $keyVault.SubscriptionId
+                    }
                     
                     # Get all certificates in the Key Vault using cached context
                     # The global data should already be in the correct subscription context
@@ -593,9 +605,15 @@ function Test-QuestionG0206 {
             $keysWithRotation = 0
             $rotationDetails = @()
 
+            # Track current subscription to avoid redundant Set-AzContext calls (N+1 fix)
+            $currentSubId = $null
+
             foreach ($kv in $keyVaults) {
                 try {
-                    Set-AzContext -Subscription $kv.SubscriptionId -Tenant $global:TenantId | Out-Null
+                    if ($kv.SubscriptionId -ne $currentSubId) {
+                        Set-AzContext -Subscription $kv.SubscriptionId -Tenant $global:TenantId | Out-Null
+                        $currentSubId = $kv.SubscriptionId
+                    }
                     $keys = Invoke-AzCmdletSafely -ScriptBlock {
                         Get-AzKeyVaultKey -VaultName $kv.Name -ErrorAction SilentlyContinue
                     } -CmdletName "Get-AzKeyVaultKey" -ModuleName "Az.KeyVault" -FallbackValue @()
@@ -752,9 +770,15 @@ function Test-QuestionG0208 {
             $vaultsWithDiagnostics = 0
             $diagnosticDetails = @()
 
+            # Track current subscription to avoid redundant Set-AzContext calls (N+1 fix)
+            $currentSubId = $null
+
             foreach ($kv in $keyVaults) {
                 try {
-                    Set-AzContext -Subscription $kv.SubscriptionId -Tenant $global:TenantId | Out-Null
+                    if ($kv.SubscriptionId -ne $currentSubId) {
+                        Set-AzContext -Subscription $kv.SubscriptionId -Tenant $global:TenantId | Out-Null
+                        $currentSubId = $kv.SubscriptionId
+                    }
                     $diagSettings = Invoke-AzCmdletSafely -ScriptBlock {
                         Get-AzDiagnosticSetting -ResourceId $kv.ResourceId -ErrorAction SilentlyContinue
                     } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue @()
@@ -1104,9 +1128,15 @@ function Test-QuestionG0302 {
             $subsWithExport = 0
             $exportDetails = @()
 
+            # Track current subscription to avoid redundant Set-AzContext calls (N+1 fix)
+            $currentSubId = $null
+
             foreach ($sub in $subscriptions) {
                 try {
-                    Set-AzContext -Subscription $sub.Id -Tenant $global:TenantId | Out-Null
+                    if ($sub.Id -ne $currentSubId) {
+                        Set-AzContext -Subscription $sub.Id -Tenant $global:TenantId | Out-Null
+                        $currentSubId = $sub.Id
+                    }
                     $diagSettings = Invoke-AzCmdletSafely -ScriptBlock {
                         Get-AzDiagnosticSetting -ResourceId "/subscriptions/$($sub.Id)" -ErrorAction SilentlyContinue
                     } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue @()
@@ -1820,9 +1850,15 @@ function Test-QuestionG0402 {
             $compliantAccounts = 0
             $accountDetails = @()
 
+            # Track current subscription to avoid redundant Set-AzContext calls (N+1 fix)
+            $currentSubId = $null
+
             foreach ($sa in $storageAccounts) {
                 try {
-                    Set-AzContext -Subscription $sa.SubscriptionId -Tenant $global:TenantId | Out-Null
+                    if ($sa.SubscriptionId -ne $currentSubId) {
+                        Set-AzContext -Subscription $sa.SubscriptionId -Tenant $global:TenantId | Out-Null
+                        $currentSubId = $sa.SubscriptionId
+                    }
                     $saDetail = Invoke-AzCmdletSafely -ScriptBlock {
                         Get-AzStorageAccount -ResourceGroupName $sa.ResourceGroupName -Name $sa.Name -ErrorAction SilentlyContinue
                     } -CmdletName "Get-AzStorageAccount" -ModuleName "Az.Storage"
