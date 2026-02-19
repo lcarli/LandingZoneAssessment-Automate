@@ -11,7 +11,7 @@
 - [x] **#1** — Corrigir `$status = $status` nos catch blocks — `Management.ps1`  
   Self-assignment silencioso — deveria ser `[Status]::Error`. Erros nunca são reportados.
 
-- [ ] **#2** — Corrigir `Write-Warning -ForegroundColor` — `Security.ps1`  
+- [x] **#2** — Corrigir `Write-Warning -ForegroundColor` — `Security.ps1`  
   `-ForegroundColor` não é parâmetro válido de `Write-Warning`. Vai dar erro em runtime.
 
 - [ ] **#3** — Corrigir lógica quebrada no C03.01 — `ResourceOrganization.ps1`  

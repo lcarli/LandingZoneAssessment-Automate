@@ -521,7 +521,7 @@ function Test-QuestionG0205 {
                     }
                 }
                 catch {
-                    Write-Warning "Error accessing certificates in Key Vault $($keyVault.Name): $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Warning "Error accessing certificates in Key Vault $($keyVault.Name): $($_.Exception.Message)"
                 }
             }
             
