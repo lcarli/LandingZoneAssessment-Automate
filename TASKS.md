@@ -62,7 +62,7 @@
 - [x] **#12** — Eliminar N+1 queries no Management — `Management.ps1`  
   `Get-AzDiagnosticSetting` e `Get-AzMetricAlertRuleV2` chamados por recurso; `Get-AzPolicyAssignment` por VM.
 
-- [ ] **#13** — Eliminar N+1 queries no IAM (MFA check) — `IdentityandAccessManagement.ps1`  
+- [x] **#13** — Eliminar N+1 queries no IAM (MFA check) — `IdentityandAccessManagement.ps1`  
   MFA status consultado por usuário via Graph API.
 
 - [ ] **#14** — Eliminar N+1 queries no Governance — `Governance.ps1`  

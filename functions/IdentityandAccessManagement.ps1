@@ -597,7 +597,9 @@ function Test-QuestionB0305 {
                 }
             }
 
-            $uniqueUsers = $uniqueUsers | Sort-Object -Unique            # Check Graph connectivity before processing users
+            $uniqueUsers = $uniqueUsers | Sort-Object -Unique
+
+            # Check Graph connectivity before processing users
             if ($global:GraphConnected -eq $false) {
                 Write-Warning "Microsoft Graph is not connected. Cannot assess MFA configuration."
                 $status = [Status]::Unknown
@@ -607,44 +609,71 @@ function Test-QuestionB0305 {
                 return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
             }
 
-            foreach ($userId in $uniqueUsers) {
-                $isMFAEnabled = $false                  
-                try {
-                    # Check if the required module is loaded to avoid auto-loading conflicts
-                    if (Get-Module -Name "Microsoft.Graph.Users" -ErrorAction SilentlyContinue) {
-                        $mfaMethods = Get-MgUserAuthenticationMethod -UserId $userId -ErrorAction SilentlyContinue
+            # --- N+1 optimization: check tenant-level MFA enforcement first ---
+
+            # 1) Security Defaults — if enabled, MFA is enforced for all users
+            $securityDefaults = $null
+            if ($global:GraphData -and $global:GraphData.SecurityDefaultsPolicy) {
+                $securityDefaults = $global:GraphData.SecurityDefaultsPolicy
+            }
+            if ($securityDefaults -and $securityDefaults.IsEnabled -eq $true) {
+                $usersWithMFA = $uniqueUsers.Count
+            }
+
+            # 2) Conditional Access policies — check if any policy enforces MFA for all users
+            if ($usersWithMFA -eq 0 -and $global:GraphData -and $global:GraphData.ConditionalAccessPolicies) {
+                $conditionalAccessPolicies = $global:GraphData.ConditionalAccessPolicies
+                $allUsersMFAPolicy = $conditionalAccessPolicies | Where-Object {
+                    $includesAll = $_.Conditions.Users.IncludeUsers -contains "All"
+                    $requiresMFA = $_.GrantControls.BuiltInControls -contains "mfa"
+                    $isEnabled = $_.State -eq "enabled"
+                    $includesAll -and $requiresMFA -and $isEnabled
+                }
+                if ($allUsersMFAPolicy) {
+                    $usersWithMFA = $uniqueUsers.Count
+                }
+            }
+
+            # 3) Only if tenant-level MFA is not enforced, check per-user (unavoidable N+1)
+            if ($usersWithMFA -eq 0) {
+                $conditionalAccessPolicies = $null
+                if ($global:GraphData -and $global:GraphData.ConditionalAccessPolicies) {
+                    $conditionalAccessPolicies = $global:GraphData.ConditionalAccessPolicies
+                }
+
+                foreach ($userId in $uniqueUsers) {
+                    $isMFAEnabled = $false
+                    try {
+                        if (Get-Module -Name "Microsoft.Graph.Users" -ErrorAction SilentlyContinue) {
+                            $mfaMethods = Get-MgUserAuthenticationMethod -UserId $userId -ErrorAction SilentlyContinue
+                        }
+                        else {
+                            $mfaMethods = $null
+                        }
+
+                        if ($mfaMethods -and $mfaMethods.Count -gt 0) {
+                            $isMFAEnabled = $true
+                        }
                     }
-                    else {
-                        $mfaMethods = $null
+                    catch {
+                        Write-Verbose "Failed to get MFA methods for user: $userId"
                     }
 
-                    if ($mfaMethods -and $mfaMethods.Count -gt 0) {
-                        $isMFAEnabled = $true
-                    }
-                }
-                catch {
-                    Write-Verbose "Failed to get MFA methods for user: $userId"
-                }if (-not $isMFAEnabled) {
-                    # Use cached conditional access policies
-                    if ($global:GraphConnected -and $global:GraphData -and $global:GraphData.ConditionalAccessPolicies) {
-                        $conditionalAccessPolicies = $global:GraphData.ConditionalAccessPolicies
-                    }
-                    else {
-                        $conditionalAccessPolicies = $null
-                    }
-                    
-                    if ($conditionalAccessPolicies) {
+                    if (-not $isMFAEnabled -and $conditionalAccessPolicies) {
                         foreach ($policy in $conditionalAccessPolicies) {
-                            if (($policy.Conditions.Users.IncludeUsers -contains $userId) -and ($policy.GrantControls.BuiltInControls -contains "mfa")) {
+                            $matchesUser = ($policy.Conditions.Users.IncludeUsers -contains $userId) -or ($policy.Conditions.Users.IncludeUsers -contains "All")
+                            $requiresMFA = $policy.GrantControls.BuiltInControls -contains "mfa"
+                            $isEnabled = $policy.State -eq "enabled"
+                            if ($matchesUser -and $requiresMFA -and $isEnabled) {
                                 $isMFAEnabled = $true
                                 break
                             }
                         }
                     }
-                }
 
-                if ($isMFAEnabled) {
-                    $usersWithMFA++
+                    if ($isMFAEnabled) {
+                        $usersWithMFA++
+                    }
                 }
             }
 
