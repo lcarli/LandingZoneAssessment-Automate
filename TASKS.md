@@ -93,7 +93,7 @@
 - [x] **#21** — Corrigir `switch` statement confuso no weight — `SharedFunctions.ps1`  
   `$weight = 1;break;` dentro de expression funciona mas é confuso.
 
-- [ ] **#22** — Remover código comentado (A03.03) — `AzureBillingandMicrosoftEntraIDTenants.ps1`  
+- [x] **#22** — Remover código comentado (A03.03) — `AzureBillingandMicrosoftEntraIDTenants.ps1`  
   Grande bloco de código comentado.
 
 ---

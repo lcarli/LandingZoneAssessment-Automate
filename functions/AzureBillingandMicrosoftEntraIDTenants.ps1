@@ -714,8 +714,6 @@ function Test-QuestionA0303 {
 
     $status = [Status]::NotImplemented
     $estimatedPercentageApplied = 0
-    $weight = 1
-    $score = 0
     $rawData = $null
     try {
         # Assign a budget for each department and account, and establish an alert associated with the budget
@@ -738,14 +736,9 @@ function Test-QuestionA0303 {
                         $departmentScope = "/providers/Microsoft.Billing/billingAccounts/$($billingAccount.Name)/billingProfiles/$($department.Name)"
                         $budgets = $null                          
                         try {
-                            # Department-level budgets are complex and require different API endpoints
-                            # Skipping for now to focus on subscription-level budgets
-                            # Department-level budget checks require complex EA enrollment API calls
-                            # if (Get-Command Get-AzConsumptionBudget -ErrorAction SilentlyContinue) {
-                            #     $budgets = Get-AzConsumptionBudget -Scope $departmentScope -ErrorAction SilentlyContinue
-                            # } else {
-                            #     Write-Verbose "Get-AzConsumptionBudget cmdlet not available. Skipping department budget check for scope $departmentScope"
-                            # }
+                            # Department-level budgets require complex EA enrollment API calls
+                            # that differ from standard subscription-level budget APIs.
+                            # Currently only subscription-level budgets are checked.
                         }
                         catch {
                             Write-Verbose "Could not retrieve department budgets for scope $departmentScope"
@@ -776,14 +769,9 @@ function Test-QuestionA0303 {
                             $accountScope = "/providers/Microsoft.Billing/billingAccounts/$($billingAccount.Name)/billingProfiles/$($profile.Name)/invoiceSections/$($section.Name)"
                             $budgets = $null                              
                             try {
-                                # Account-level budgets are complex and require different API endpoints
-                                # Skipping for now to focus on subscription-level budgets
-                                # Account-level budget checks require complex EA enrollment API calls
-                                # if (Get-Command Get-AzConsumptionBudget -ErrorAction SilentlyContinue) {
-                                #     $budgets = Get-AzConsumptionBudget -Scope $accountScope -ErrorAction SilentlyContinue
-                                # } else {
-                                #     Write-Verbose "Get-AzConsumptionBudget cmdlet not available. Skipping account budget check for scope $accountScope"
-                                # }
+                                # Account-level budgets require complex EA enrollment API calls
+                                # that differ from standard subscription-level budget APIs.
+                                # Currently only subscription-level budgets are checked.
                             }
                             catch {
                                 Write-Verbose "Could not retrieve account budgets for scope $accountScope"
@@ -849,7 +837,6 @@ function Test-QuestionA0303 {
             $estimatedPercentageApplied = 0
         }
 
-        $score = ($weight * $estimatedPercentageApplied) / 100
         $rawData = @{
             DepartmentBudgets    = $departmentBudgets
             AccountBudgets       = $accountBudgets
@@ -863,7 +850,6 @@ function Test-QuestionA0303 {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
         $estimatedPercentageApplied = 0
-        $score = 0
         $rawData = $_.Exception.Message
     }
 
