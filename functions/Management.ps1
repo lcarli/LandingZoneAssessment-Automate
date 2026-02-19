@@ -1088,20 +1088,88 @@ function Test-QuestionF0113 {
     )
 
     Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
-    
-    # Since this question involves organizational practices and policies,
-    # it cannot be fully automated or analyzed purely via code.
 
-    $status = [Status]::ManualVerificationRequired
+    $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = "This requires a manual review of organizational policies and configurations."
+    $rawData = $null
 
     try {
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied 0 -checklistItem $checklistItem -rawData $_.Exception.Message
+        # Check for Log Analytics workspaces
+        $subscriptions = $global:AzData.Subscriptions
+
+        if ($subscriptions.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No subscriptions found"
+        }
+        else {
+            $allWorkspaces = @()
+            foreach ($subscription in $subscriptions) {
+                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzOperationalInsightsWorkspace -ErrorAction Stop
+                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get Log Analytics workspaces"
+                $allWorkspaces += $workspaces
+            }
+
+            $hasWorkspaces = $allWorkspaces.Count -gt 0
+
+            # Check for diagnostic settings resources (microsoft.insights/diagnosticSettings)
+            $diagnosticSettingsResources = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.insights/diagnosticSettings' })
+
+            # Check for solutions deployed on workspaces (e.g., insight solutions)
+            $solutions = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.OperationsManagement/solutions' })
+
+            # Check for data collection rules (DCR) pointing to workspaces
+            $dataCollectionRules = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Insights/dataCollectionRules' })
+
+            if (-not $hasWorkspaces) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    "WorkspacesFound"     = 0
+                    "Detail"              = "No Log Analytics workspaces found. Azure Monitor Logs requires at least one workspace."
+                }
+            }
+            else {
+                # Score: workspace exists (1), diagnostic settings configured (1), solutions or DCRs present (1)
+                $score = 0
+                $maxScore = 3
+
+                $score++ # workspaces exist
+                if ($diagnosticSettingsResources.Count -gt 0) { $score++ }
+                if ($solutions.Count -gt 0 -or $dataCollectionRules.Count -gt 0) { $score++ }
+
+                if ($score -eq $maxScore) {
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                }
+                elseif ($score -gt 0) {
+                    $status = [Status]::PartiallyImplemented
+                    $estimatedPercentageApplied = [math]::Round(($score / $maxScore) * 100)
+                }
+                else {
+                    $status = [Status]::NotImplemented
+                    $estimatedPercentageApplied = 0
+                }
+
+                $rawData = @{
+                    "WorkspacesFound"             = $allWorkspaces.Count
+                    "Workspaces"                  = $allWorkspaces | ForEach-Object { @{ Name = $_.Name; ResourceGroupName = $_.ResourceGroupName; Location = $_.Location; Sku = $_.Sku } }
+                    "DiagnosticSettingsCount"      = $diagnosticSettingsResources.Count
+                    "SolutionsCount"              = $solutions.Count
+                    "DataCollectionRulesCount"    = $dataCollectionRules.Count
+                    "MonitoringScore"             = "$score/$maxScore"
+                }
+            }
+        }
     }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 
     return $result
 }
@@ -1267,19 +1335,79 @@ function Test-QuestionF0116 {
 
     Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-    # Since this question involves a decision-making process ("WHEN necessary"),
-    # it cannot be fully automated or analyzed purely via code.
-
-    $status = [Status]::ManualVerificationRequired
+    $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = "This requires a review of governance and organizational policies to determine necessity."
+    $rawData = $null
 
     try {
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
-    } catch {
-        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied 0 -checklistItem $checklistItem -rawData $_.Exception.Message
+        $subscriptions = $global:AzData.Subscriptions
+
+        if ($subscriptions.Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No subscriptions found"
+        }
+        else {
+            # Check for data collection rules (DCR) - modern monitoring approach
+            $dataCollectionRules = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Insights/dataCollectionRules' })
+
+            # Check for alert rules (metric, log, activity log)
+            $metricAlerts = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Insights/metricAlerts' })
+            $scheduledQueryRules = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Insights/scheduledQueryRules' })
+            $activityLogAlerts = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Insights/activityLogAlerts' })
+            $totalAlertRules = $metricAlerts.Count + $scheduledQueryRules.Count + $activityLogAlerts.Count
+
+            # Check for action groups (notification targets)
+            $actionGroups = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.insights/actionGroups' })
+
+            # Check for diagnostic settings
+            $diagnosticSettings = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.insights/diagnosticSettings' })
+
+            # Scoring: 4 components
+            # 1. Data collection rules exist
+            # 2. Alert rules configured
+            # 3. Action groups configured
+            # 4. Diagnostic settings configured
+            $score = 0
+            $maxScore = 4
+
+            if ($dataCollectionRules.Count -gt 0) { $score++ }
+            if ($totalAlertRules -gt 0) { $score++ }
+            if ($actionGroups.Count -gt 0) { $score++ }
+            if ($diagnosticSettings.Count -gt 0) { $score++ }
+
+            if ($score -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            }
+            elseif ($score -eq $maxScore) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            }
+            else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = [math]::Round(($score / $maxScore) * 100)
+            }
+
+            $rawData = @{
+                "DataCollectionRulesCount" = $dataCollectionRules.Count
+                "MetricAlertsCount"        = $metricAlerts.Count
+                "ScheduledQueryRulesCount"  = $scheduledQueryRules.Count
+                "ActivityLogAlertsCount"    = $activityLogAlerts.Count
+                "TotalAlertRules"          = $totalAlertRules
+                "ActionGroupsCount"        = $actionGroups.Count
+                "DiagnosticSettingsCount"   = $diagnosticSettings.Count
+                "MonitoringScore"          = "$score/$maxScore"
+            }
+        }
     }
+    catch {
+        Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
+        $status = [Status]::Error
+        $estimatedPercentageApplied = 0
+        $rawData = $_.Exception.Message
+    }
+
+    $result = Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 
     return $result
 }

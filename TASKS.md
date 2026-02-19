@@ -53,7 +53,7 @@
 
 ### Management.ps1 — 2 stubs
 
-- [ ] **#11** — Implementar checks: F01.13, F01.16
+- [x] **#11** — Implementar checks: F01.13, F01.16
 
 ---
 
