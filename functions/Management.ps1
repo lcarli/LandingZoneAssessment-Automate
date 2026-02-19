@@ -972,36 +972,45 @@ function Test-QuestionF0111 {
             $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
         }
 
-        foreach ($resource in $resources) {
-            $totalServices++
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction SilentlyContinue
+        $totalServices = ($resources | Measure-Object).Count
 
-            if ($diagnosticSettings) {
-                $hasServiceHealth = $diagnosticSettings.Logs | Where-Object {
-                    $_.Category -eq "ServiceHealth" -and $_.Enabled -eq $true
-                }
+        if ($totalServices -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = "No monitorable resources found"
+        } else {
+            foreach ($resource in $resources) {
+                $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop
+                } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
 
-                if ($hasServiceHealth) {
-                    $servicesWithHealthMonitoring++
+                if ($diagnosticSettings) {
+                    $hasServiceHealth = $diagnosticSettings.Logs | Where-Object {
+                        $_.Category -eq "ServiceHealth" -and $_.Enabled -eq $true
+                    }
+
+                    if ($hasServiceHealth) {
+                        $servicesWithHealthMonitoring++
+                    }
                 }
             }
-        }
 
-        if ($servicesWithHealthMonitoring -eq $totalServices) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($servicesWithHealthMonitoring -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($servicesWithHealthMonitoring / $totalServices) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
+            if ($servicesWithHealthMonitoring -eq $totalServices) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($servicesWithHealthMonitoring -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($servicesWithHealthMonitoring / $totalServices) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            }
 
-        $rawData = @{
-            TotalServices                    = $totalServices
-            ServicesWithHealthMonitoring     = $servicesWithHealthMonitoring
+            $rawData = @{
+                TotalServices                    = $totalServices
+                ServicesWithHealthMonitoring     = $servicesWithHealthMonitoring
+            }
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -1036,39 +1045,57 @@ function Test-QuestionF0112 {
             $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
         }
 
-        foreach ($resource in $resources) {
-            $totalResources++
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction SilentlyContinue
+        $totalResources = ($resources | Measure-Object).Count
 
-            if ($diagnosticSettings) {
-                $hasLogsAndMetrics = $diagnosticSettings.Logs | Where-Object {
-                    $_.Category -in @("AuditLogs", "Administrative", "Security", "Performance") -and $_.Enabled -eq $true
-                }
+        if ($totalResources -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = "No monitorable resources found"
+        } else {
+            # Batch fetch all metric alert rules per resource group (avoid N+1)
+            $allAlertRules = @()
+            $resourceGroups = @($resources | ForEach-Object { $_.ResourceGroupName } | Sort-Object -Unique)
+            foreach ($rg in $resourceGroups) {
+                $rgAlerts = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzMetricAlertRuleV2 -ResourceGroupName $rg -ErrorAction Stop
+                } -CmdletName "Get-AzMetricAlertRuleV2" -ModuleName "Az.Monitor" -FallbackValue @() -WarningMessage "Could not get alert rules for RG $rg"
+                $allAlertRules += $rgAlerts
+            }
 
-                $hasAlerts = (Get-AzMetricAlertRuleV2 -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue |
-                              Where-Object { $_.TargetResourceId -eq $resource.Id })
+            foreach ($resource in $resources) {
+                $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop
+                } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
 
-                if ($hasLogsAndMetrics -and $hasAlerts) {
-                    $resourcesWithMonitoring++
+                if ($diagnosticSettings) {
+                    $hasLogsAndMetrics = $diagnosticSettings.Logs | Where-Object {
+                        $_.Category -in @("AuditLogs", "Administrative", "Security", "Performance") -and $_.Enabled -eq $true
+                    }
+
+                    $hasAlerts = @($allAlertRules | Where-Object { $_.TargetResourceId -eq $resource.Id })
+
+                    if ($hasLogsAndMetrics -and $hasAlerts.Count -gt 0) {
+                        $resourcesWithMonitoring++
+                    }
                 }
             }
-        }
 
-        if ($resourcesWithMonitoring -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithMonitoring -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithMonitoring / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
-        }
+            if ($resourcesWithMonitoring -eq $totalResources) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($resourcesWithMonitoring -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($resourcesWithMonitoring / $totalResources) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            }
 
-        $rawData = @{
-            TotalResources              = $totalResources
-            ResourcesWithMonitoring     = $resourcesWithMonitoring
+            $rawData = @{
+                TotalResources              = $totalResources
+                ResourcesWithMonitoring     = $resourcesWithMonitoring
+            }
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
@@ -1285,31 +1312,40 @@ function Test-QuestionF0115 {
             $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
         }
 
-        foreach ($resource in $resources) {
-            $totalResources++
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction SilentlyContinue
+        $totalResources = ($resources | Measure-Object).Count
 
-            if ($diagnosticSettings) {
-                $logsConfigured = $diagnosticSettings.Logs | Where-Object {
-                    $_.Enabled -eq $true
-                }
+        if ($totalResources -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = "No monitorable resources found"
+        } else {
+            foreach ($resource in $resources) {
+                $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop
+                } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
 
-                if ($logsConfigured) {
-                    $resourcesWithMonitorLogs++
+                if ($diagnosticSettings) {
+                    $logsConfigured = $diagnosticSettings.Logs | Where-Object {
+                        $_.Enabled -eq $true
+                    }
+
+                    if ($logsConfigured) {
+                        $resourcesWithMonitorLogs++
+                    }
                 }
             }
-        }
 
-        if ($resourcesWithMonitorLogs -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithMonitorLogs -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithMonitorLogs / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            if ($resourcesWithMonitorLogs -eq $totalResources) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($resourcesWithMonitorLogs -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($resourcesWithMonitorLogs / $totalResources) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            }
         }
 
         $rawData = @{
@@ -1435,26 +1471,42 @@ function Test-QuestionF0117 {
             $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
         }
 
-        foreach ($resource in $resources) {
-            $totalResources++
-            $alerts = Get-AzMetricAlertRuleV2 -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue |
-                      Where-Object { $_.TargetResourceId -eq $resource.Id }
+        $totalResources = ($resources | Measure-Object).Count
 
-            if ($alerts) {
-                $resourcesWithAlerts++
-            }
-        }
-
-        if ($resourcesWithAlerts -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithAlerts -eq 0) {
-            $status = [Status]::NotImplemented
+        if ($totalResources -eq 0) {
+            $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 0
+            $rawData = "No monitorable resources found"
         } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithAlerts / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            # Batch fetch all metric alert rules per resource group (avoid N+1)
+            $allAlertRules = @()
+            $resourceGroups = @($resources | ForEach-Object { $_.ResourceGroupName } | Sort-Object -Unique)
+            foreach ($rg in $resourceGroups) {
+                $rgAlerts = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzMetricAlertRuleV2 -ResourceGroupName $rg -ErrorAction Stop
+                } -CmdletName "Get-AzMetricAlertRuleV2" -ModuleName "Az.Monitor" -FallbackValue @() -WarningMessage "Could not get alert rules for RG $rg"
+                $allAlertRules += $rgAlerts
+            }
+
+            foreach ($resource in $resources) {
+                $alerts = @($allAlertRules | Where-Object { $_.TargetResourceId -eq $resource.Id })
+
+                if ($alerts.Count -gt 0) {
+                    $resourcesWithAlerts++
+                }
+            }
+
+            if ($resourcesWithAlerts -eq $totalResources) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($resourcesWithAlerts -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($resourcesWithAlerts / $totalResources) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            }
         }
 
         $rawData = @{
@@ -1494,34 +1546,52 @@ function Test-QuestionF0118 {
             $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
         }
 
-        foreach ($resource in $resources) {
-            $totalResources++
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction SilentlyContinue
+        $totalResources = ($resources | Measure-Object).Count
 
-            if ($diagnosticSettings) {
-                $logsConfigured = $diagnosticSettings.Logs | Where-Object {
-                    $_.Enabled -eq $true
-                }
+        if ($totalResources -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = "No monitorable resources found"
+        } else {
+            # Batch fetch all metric alert rules per resource group (avoid N+1)
+            $allAlertRules = @()
+            $resourceGroups = @($resources | ForEach-Object { $_.ResourceGroupName } | Sort-Object -Unique)
+            foreach ($rg in $resourceGroups) {
+                $rgAlerts = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzMetricAlertRuleV2 -ResourceGroupName $rg -ErrorAction Stop
+                } -CmdletName "Get-AzMetricAlertRuleV2" -ModuleName "Az.Monitor" -FallbackValue @() -WarningMessage "Could not get alert rules for RG $rg"
+                $allAlertRules += $rgAlerts
+            }
 
-                $alerts = Get-AzMetricAlertRuleV2 -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue |
-                          Where-Object { $_.TargetResourceId -eq $resource.Id }
+            foreach ($resource in $resources) {
+                $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
+                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop
+                } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
 
-                if ($logsConfigured -and $alerts) {
-                    $resourcesWithMonitoring++
+                if ($diagnosticSettings) {
+                    $logsConfigured = $diagnosticSettings.Logs | Where-Object {
+                        $_.Enabled -eq $true
+                    }
+
+                    $alerts = @($allAlertRules | Where-Object { $_.TargetResourceId -eq $resource.Id })
+
+                    if ($logsConfigured -and $alerts.Count -gt 0) {
+                        $resourcesWithMonitoring++
+                    }
                 }
             }
-        }
 
-        if ($resourcesWithMonitoring -eq $totalResources) {
-            $status = [Status]::Implemented
-            $estimatedPercentageApplied = 100
-        } elseif ($resourcesWithMonitoring -eq 0) {
-            $status = [Status]::NotImplemented
-            $estimatedPercentageApplied = 0
-        } else {
-            $status = [Status]::PartiallyImplemented
-            $estimatedPercentageApplied = ($resourcesWithMonitoring / $totalResources) * 100
-            $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            if ($resourcesWithMonitoring -eq $totalResources) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            } elseif ($resourcesWithMonitoring -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            } else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = ($resourcesWithMonitoring / $totalResources) * 100
+                $estimatedPercentageApplied = [Math]::Round($estimatedPercentageApplied, 2)
+            }
         }
 
         $rawData = @{
@@ -1716,14 +1786,30 @@ function Test-QuestionF0301 {
             $_.ResourceType -in $vmResourceTypes
         }
 
+        $totalVMs = ($vms | Measure-Object).Count
+        if ($totalVMs -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = @{ TotalVMs = 0; CompliantVMs = 0 }
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
+        # Use pre-loaded policies instead of Get-AzPolicyAssignment per VM (N+1 fix)
+        $guestConfigPolicies = @()
+        if ($global:AzData.Policies) {
+            $guestConfigPolicies = $global:AzData.Policies | Where-Object {
+                $_.Properties.DisplayName -like "*Guest Configuration*"
+            }
+        }
+
         foreach ($vm in $vms) {
-            $totalVMs++
+            # Check if any guest config policy scope covers this VM
+            $vmScope = $vm.Id
+            $matchingPolicies = $guestConfigPolicies | Where-Object {
+                $vmScope -like "$($_.Properties.Scope)*"
+            }
 
-            # Check if guest policies are applied via Azure Policy
-            $policies = Get-AzPolicyAssignment -Scope $vm.Id -ErrorAction SilentlyContinue |
-                        Where-Object { $_.Properties.DisplayName -like "*Guest Configuration*" }
-
-            if ($policies) {
+            if ($matchingPolicies) {
                 $compliantVMs++
             }
         }
@@ -1780,20 +1866,47 @@ function Test-QuestionF0302 {
             $_.ResourceType -in $vmResourceTypes
         }
 
+        $totalVMs = ($vms | Measure-Object).Count
+        if ($totalVMs -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = @{ TotalVMs = 0; VMsCompliantWithPolicy = 0; VMsWithUpdateManagement = 0 }
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
+        # Use pre-loaded policies instead of Get-AzPolicyAssignment per VM (N+1 fix)
+        $driftPolicies = @()
+        if ($global:AzData.Policies) {
+            $driftPolicies = $global:AzData.Policies | Where-Object {
+                $_.Properties.DisplayName -like "*Security Configuration*" -or $_.Properties.DisplayName -like "*Configuration Drift*"
+            }
+        }
+
+        # Batch fetch automation accounts per unique RG (N+1 fix)
+        $uniqueRGs = $vms | Select-Object -ExpandProperty ResourceGroupName -Unique
+        $allAutomationAccounts = @()
+        foreach ($rg in $uniqueRGs) {
+            $rgAccounts = Invoke-AzCmdletSafely -CmdletName "Get-AzAutomationAccount" -Parameters @{ ResourceGroupName = $rg } -ErrorAction SilentlyContinue
+            if ($rgAccounts) {
+                $allAutomationAccounts += $rgAccounts
+            }
+        }
+
         foreach ($vm in $vms) {
-            $totalVMs++
+            # Check for drift/security config policy using pre-loaded data
+            $vmScope = $vm.Id
+            $matchingPolicies = $driftPolicies | Where-Object {
+                $vmScope -like "$($_.Properties.Scope)*"
+            }
 
-            # Check for guest configuration policy
-            $policies = Get-AzPolicyAssignment -Scope $vm.Id -ErrorAction SilentlyContinue |
-                        Where-Object { $_.Properties.DisplayName -like "*Security Configuration*" -or $_.Properties.DisplayName -like "*Configuration Drift*" }
-
-            if ($policies) {
+            if ($matchingPolicies) {
                 $vmsCompliantWithPolicy++
             }
 
-            # Check for Update Management
-            $updateManagement = Get-AzAutomationAccount -ResourceGroupName $vm.ResourceGroupName -ErrorAction SilentlyContinue |
-                                Where-Object { $_.Name -like "*Update Management*" }
+            # Check for Update Management in same RG
+            $updateManagement = $allAutomationAccounts | Where-Object {
+                $_.ResourceGroupName -eq $vm.ResourceGroupName -and $_.Name -like "*Update Management*"
+            }
 
             if ($updateManagement) {
                 $vmsWithUpdateManagement++
@@ -1993,14 +2106,22 @@ function Test-QuestionF0601 {
             $_.ResourceType -in $wafResourceTypes
         }
 
+        $totalWAFServices = ($wafServices | Measure-Object).Count
+        if ($totalWAFServices -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = @{ TotalWAFServices = 0; ServicesWithDiagnostics = 0 }
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
         foreach ($service in $wafServices) {
-            $totalWAFServices++
+            # Wrap in Invoke-AzCmdletSafely to handle errors gracefully
+            $diagnosticSettings = Invoke-AzCmdletSafely -CmdletName "Get-AzDiagnosticSetting" -Parameters @{ ResourceId = $service.Id } -ErrorAction SilentlyContinue
+            $matchingDiag = $diagnosticSettings | Where-Object {
+                $_.Logs.Category -contains "ApplicationGatewayAccessLog" -or $_.Logs.Category -contains "FrontDoorAccessLog"
+            }
 
-            # Check for diagnostic settings
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $service.Id -ErrorAction SilentlyContinue |
-                                  Where-Object { $_.Logs.Category -contains "ApplicationGatewayAccessLog" -or $_.Logs.Category -contains "FrontDoorAccessLog" }
-
-            if ($diagnosticSettings) {
+            if ($matchingDiag) {
                 $servicesWithDiagnostics++
             }
         }
@@ -2059,16 +2180,22 @@ function Test-QuestionF0602 {
             $_.ResourceType -in $wafResourceTypes
         }
 
+        $totalWAFServices = ($wafServices | Measure-Object).Count
+        if ($totalWAFServices -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = @{ TotalWAFServices = 0; ServicesWithSentinelIntegration = 0 }
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
         foreach ($service in $wafServices) {
-            $totalWAFServices++
+            # Wrap in Invoke-AzCmdletSafely to handle errors gracefully
+            $diagnosticSettings = Invoke-AzCmdletSafely -CmdletName "Get-AzDiagnosticSetting" -Parameters @{ ResourceId = $service.Id } -ErrorAction SilentlyContinue
+            $matchingDiag = $diagnosticSettings | Where-Object {
+                $null -ne $_.WorkspaceId -and $_.WorkspaceId -match "Microsoft Sentinel"
+            }
 
-            # Check for diagnostic settings sending logs to Microsoft Sentinel
-            $diagnosticSettings = Get-AzDiagnosticSetting -ResourceId $service.Id -ErrorAction SilentlyContinue |
-                                  Where-Object {
-                                      $null -ne $_.WorkspaceId -and $_.WorkspaceId -match "Microsoft Sentinel"
-                                  }
-
-            if ($diagnosticSettings) {
+            if ($matchingDiag) {
                 $servicesWithSentinelIntegration++
             }
         }
