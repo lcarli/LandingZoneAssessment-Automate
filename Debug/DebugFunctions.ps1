@@ -27,13 +27,35 @@ param (
 . "$PSScriptRoot/../functions/ResourceOrganization.ps1"
 . "$PSScriptRoot/../functions/Security.ps1"
 . "$PSScriptRoot/../functions/PlatformAutomationandDevOps.ps1"
-. "$PSScriptRoot/../scripts/Initialize.ps1"
 . "$PSScriptRoot/../shared/ErrorHandling.ps1"
+. "$PSScriptRoot/../shared/Enums.ps1"
+. "$PSScriptRoot/../shared/SharedFunctions.ps1"
 
-
-# Execute Initialize.ps1 to set up the environment
+# Try to load Initialize.ps1 and run Initialize-Environment
+# If it fails (e.g., PS 5.1 parse issues), load checklist directly
 Write-Host "Initializing environment..."
-Initialize-Environment
+try {
+    . "$PSScriptRoot/../scripts/Initialize.ps1"
+    Initialize-Environment
+}
+catch {
+    Write-Warning "Initialize-Environment failed: $($_.Exception.Message)"
+    Write-Host "Loading checklist directly as fallback..."
+    
+    # Load checklist directly
+    $checklistPath = Join-Path $PSScriptRoot "../shared/alz_checklist.en.json"
+    if (Test-Path $checklistPath) {
+        $global:Checklist = Get-Content -Path $checklistPath -Raw | ConvertFrom-Json
+        Write-Host "Checklist loaded: $($global:Checklist.items.Count) items" -ForegroundColor Green
+    } else {
+        Write-Host "ERROR: Checklist file not found at $checklistPath" -ForegroundColor Red
+        exit 1
+    }
+    
+    # Initialize empty global data if not present
+    if (-not $global:AzData) { $global:AzData = @{} }
+    if (-not $global:GraphData) { $global:GraphData = @{} }
+}
 
 # Function to handle the function execution
 function Test-Custom {

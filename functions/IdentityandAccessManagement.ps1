@@ -932,16 +932,8 @@ function Test-QuestionB0307 {
                         Message             = "Cannot assess PIM due to insufficient Microsoft Graph permissions."
                     }
                     
-                    # Calculate score and return early
-                    $score = ($weight * $estimatedPercentageApplied) / 100
-                    
-                    return @{
-                        Status                     = $status
-                        EstimatedPercentageApplied = $estimatedPercentageApplied
-                        Score                      = $score
-                        Weight                     = $weight
-                        RawData                    = $rawData
-                    }
+                    # Return early with standardized result object
+                    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
                 }
             }
 
@@ -1002,7 +994,6 @@ function Test-QuestionB0307 {
             Error        = $_.Exception.Message
             ErrorDetails = "Failed to assess PIM configuration using new PIM v3 APIs"
         }
-        $rawData = $_.Exception.Message
     }
 
     # Return result object using Set-EvaluationResultObject
