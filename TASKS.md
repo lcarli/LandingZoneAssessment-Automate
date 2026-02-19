@@ -44,7 +44,7 @@
 
 ### Governance.ps1 — 7 stubs (7/14)
 
-- [ ] **#9** — Implementar checks: E01.07, E01.09, E01.10, E01.11, E01.12, E01.13  
+- [x] **#9** — Implementar checks: E01.07, E01.09, E01.10, E01.11, E01.12, E01.13  
   Checks de soberania/regulatório.
 
 ### NetworkTopologyandConnectivity.ps1 — ~5 stubs

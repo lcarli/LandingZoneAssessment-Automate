@@ -419,14 +419,70 @@ function Test-QuestionE0107 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to evaluate if custom policies can be replaced with built-in policies to minimize operational overhead."
+    $rawData = $null
 
     try {
         # Question: Use built-in policies where possible to minimize operational overhead.
         # Reference: https://learn.microsoft.com/azure/governance/policy/samples/
 
-        # No automated logic is implemented here
-        $status = [Status]::ManualVerificationRequired
+        if ($global:AzData -and $global:AzData.Policies -and $global:AzData.Policies.Count -gt 0) {
+            $policyAssignments = @($global:AzData.Policies)
+
+            # Categorize policies as built-in vs custom based on PolicyDefinitionId patterns
+            $builtInPolicies = @()
+            $customPolicies = @()
+            foreach ($pa in $policyAssignments) {
+                $defId = $pa.Properties.PolicyDefinitionId
+                if ($defId) {
+                    $isBuiltIn = ($defId -imatch '/providers/Microsoft.Authorization/policyDefinitions/') -and
+                                 ($defId -notmatch '/subscriptions/') -and
+                                 ($defId -notmatch '/managementGroups/')
+                    if ($isBuiltIn) {
+                        $builtInPolicies += $pa
+                    }
+                    $isCustom = ($defId -imatch '/subscriptions/') -or ($defId -imatch '/managementGroups/')
+                    if ($isCustom) {
+                        $customPolicies += $pa
+                    }
+                }
+            }
+
+            $totalAssignments = $policyAssignments.Count
+            $builtInCount = $builtInPolicies.Count
+            $customCount = $customPolicies.Count
+            $builtInPercentage = if ($totalAssignments -gt 0) { [Math]::Round(($builtInCount / $totalAssignments) * 100, 2) } else { 0 }
+
+            $customPolicySample = @($customPolicies | Select-Object -First 10 -Property @{
+                Name = 'PolicyName'; Expression = { $_.Name }
+            }, @{
+                Name = 'DefinitionId'; Expression = { $_.Properties.PolicyDefinitionId }
+            }, @{
+                Name = 'Scope'; Expression = { $_.Properties.Scope }
+            })
+
+            if ($builtInPercentage -ge 80) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = [int]$builtInPercentage
+            } elseif ($builtInPercentage -ge 50) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = [int]$builtInPercentage
+            } else {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = [int]$builtInPercentage
+            }
+
+            $rawData = @{
+                TotalPolicyAssignments = $totalAssignments
+                BuiltInPolicies = $builtInCount
+                CustomPolicies = $customCount
+                BuiltInPercentage = "$builtInPercentage%"
+                CustomPolicySample = $customPolicySample
+                Note = "Built-in policies: $builtInCount of $totalAssignments assignments ($builtInPercentage%). Custom policies: $customCount."
+            }
+        } else {
+            $status = [Status]::NotImplemented
+            $rawData = "No policy assignments found to analyze built-in vs custom ratio."
+        }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
@@ -520,14 +576,69 @@ function Test-QuestionE0109 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to determine if the number of Azure Policy assignments at the root management group scope is appropriately limited to avoid excessive use of exclusions."
+    $rawData = $null
 
     try {
         # Question: Limit the number of Azure Policy assignments made at the root management group scope to avoid managing through exclusions at inherited scopes.
         # Reference: https://learn.microsoft.com/azure/governance/policy/overview
 
-        # No automated logic is implemented here
-        $status = [Status]::ManualVerificationRequired
+        if ($global:AzData -and $global:AzData.Policies -and $global:AzData.ManagementGroups) {
+            $tenantId = $global:AzData.Tenant.Id
+
+            # Identify root management group
+            $rootMG = $global:AzData.ManagementGroups | Where-Object {
+                $_.Name -eq $tenantId -or
+                $_.Id -imatch "/managementGroups/$tenantId`$" -or
+                ($_.Properties.Details.Parent -eq $null)
+            } | Select-Object -First 1
+
+            if ($rootMG) {
+                $rootMGId = $rootMG.Id
+
+                # Count policy assignments scoped to the root MG
+                $rootPolicyAssignments = @($global:AzData.Policies | Where-Object {
+                    $_.Properties.Scope -eq $rootMGId -or
+                    $_.Properties.Scope -imatch "/managementGroups/$tenantId`$"
+                })
+
+                # Count assignments with exclusions (NotScopes)
+                $assignmentsWithExclusions = @($rootPolicyAssignments | Where-Object {
+                    $_.Properties.NotScopes -and $_.Properties.NotScopes.Count -gt 0
+                })
+
+                $rootAssignmentCount = $rootPolicyAssignments.Count
+                $exclusionCount = $assignmentsWithExclusions.Count
+
+                # Best practice: keep root MG assignments minimal (threshold: 20)
+                $threshold = 20
+
+                if ($rootAssignmentCount -le $threshold -and $exclusionCount -eq 0) {
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                } elseif ($rootAssignmentCount -le $threshold -and $exclusionCount -gt 0) {
+                    $status = [Status]::PartiallyImplemented
+                    $estimatedPercentageApplied = 70
+                } elseif ($rootAssignmentCount -gt $threshold) {
+                    $status = [Status]::NotImplemented
+                    $estimatedPercentageApplied = [Math]::Max(0, 100 - (($rootAssignmentCount - $threshold) * 3))
+                }
+
+                $rawData = @{
+                    RootManagementGroupId = $rootMGId
+                    RootPolicyAssignmentCount = $rootAssignmentCount
+                    AssignmentsWithExclusions = $exclusionCount
+                    Threshold = $threshold
+                    RootAssignmentNames = @($rootPolicyAssignments | Select-Object -First 20 -Property Name, @{ Name='Scope'; Expression = { $_.Properties.Scope } })
+                    Note = "Root MG has $rootAssignmentCount policy assignments (threshold: $threshold). $exclusionCount assignments use exclusions."
+                }
+            } else {
+                $status = [Status]::ManualVerificationRequired
+                $rawData = "Unable to identify root management group for policy assignment analysis."
+            }
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $rawData = "Unable to retrieve policy or management group data."
+        }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
@@ -549,14 +660,68 @@ function Test-QuestionE0110 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to determine if Azure Policies are deployed to enforce data sovereignty requirements, based on existing regulatory and organizational needs."
+    $rawData = $null
 
     try {
         # Question: If any data sovereignty requirements exist, Azure Policies should be deployed to enforce them.
-        # Reference: https://learn.microsoft.com/azure/governance/policy/overview
+        # Reference: https://learn.microsoft.com/industry/release-plan/2023wave2/cloud-sovereignty/enable-data-sovereignty-policy-baseline
 
-        # No automated logic is implemented here
-        $status = [Status]::ManualVerificationRequired
+        if ($global:AzData -and $global:AzData.Policies -and $global:AzData.Policies.Count -gt 0) {
+            $policyAssignments = @($global:AzData.Policies)
+
+            # Check for data sovereignty / allowed locations policies
+            $sovereigntyPatterns = @(
+                'allowedLocations',
+                'allowed-locations',
+                'location',
+                'sovereignty',
+                'data.residency',
+                'dataResidency',
+                'geo-restriction',
+                'allowed-resource-types'
+            )
+
+            $sovereigntyPolicies = @($policyAssignments | Where-Object {
+                $defId = $_.Properties.PolicyDefinitionId
+                $displayName = $_.Properties.DisplayName
+                $matchFound = $false
+                foreach ($pattern in $sovereigntyPatterns) {
+                    if ($defId -imatch $pattern -or $displayName -imatch $pattern) {
+                        $matchFound = $true
+                        break
+                    }
+                }
+                $matchFound
+            })
+
+            if ($sovereigntyPolicies.Count -gt 0) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = [Math]::Min(100, $sovereigntyPolicies.Count * 25)
+                $rawData = @{
+                    SovereigntyPoliciesFound = $sovereigntyPolicies.Count
+                    Policies = @($sovereigntyPolicies | Select-Object -Property Name, @{
+                        Name = 'DisplayName'; Expression = { $_.Properties.DisplayName }
+                    }, @{
+                        Name = 'DefinitionId'; Expression = { $_.Properties.PolicyDefinitionId }
+                    }, @{
+                        Name = 'Scope'; Expression = { $_.Properties.Scope }
+                    })
+                    Note = "Found $($sovereigntyPolicies.Count) data sovereignty/location restriction policies."
+                }
+            } else {
+                # No sovereignty policies found - could mean no requirements or not implemented
+                $status = [Status]::ManualVerificationRequired
+                $estimatedPercentageApplied = 0
+                $rawData = @{
+                    TotalPolicies = $policyAssignments.Count
+                    SovereigntyPoliciesFound = 0
+                    Note = "No data sovereignty or location restriction policies found. If data sovereignty is not required, this may be acceptable. Manual verification needed."
+                }
+            }
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $rawData = "No policy assignments found. Unable to assess data sovereignty enforcement."
+        }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
@@ -578,14 +743,62 @@ function Test-QuestionE0111 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to ensure that the sovereignty policy baseline is deployed and assigned at the correct management group level for Sovereign Landing Zone."
+    $rawData = $null
 
     try {
         # Question: For Sovereign Landing Zone, deploy sovereignty policy baseline and assign at correct management group level.
-        # Reference: https://learn.microsoft.com/industry/sovereignty/policy-portfolio-baseline
+        # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/sovereign-landing-zone
 
-        # No automated logic is implemented here
-        $status = [Status]::ManualVerificationRequired
+        if ($global:AzData -and $global:AzData.Policies -and $global:AzData.Policies.Count -gt 0) {
+            $policyAssignments = @($global:AzData.Policies)
+
+            # Look for sovereignty baseline policy initiatives
+            $sovereigntyBaseline = @($policyAssignments | Where-Object {
+                $defId = $_.Properties.PolicyDefinitionId
+                $displayName = $_.Properties.DisplayName
+                $matchDef = $defId -imatch 'sovereignty|slzPolicyBaseline|sovereign'
+                $matchName = $displayName -imatch 'sovereign|sovereignty baseline'
+                $matchDef -or $matchName
+            })
+
+            # Check if assigned at MG level
+            $mgLevelAssignments = @($sovereigntyBaseline | Where-Object {
+                $_.Properties.Scope -imatch '/managementGroups/'
+            })
+
+            if ($sovereigntyBaseline.Count -gt 0 -and $mgLevelAssignments.Count -gt 0) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    SovereigntyBaselinePolicies = $sovereigntyBaseline.Count
+                    MGLevelAssignments = $mgLevelAssignments.Count
+                    Policies = @($sovereigntyBaseline | Select-Object -Property Name, @{
+                        Name = 'DisplayName'; Expression = { $_.Properties.DisplayName }
+                    }, @{
+                        Name = 'Scope'; Expression = { $_.Properties.Scope }
+                    })
+                    Note = "Sovereignty baseline deployed: $($sovereigntyBaseline.Count) policies, $($mgLevelAssignments.Count) at MG level."
+                }
+            } elseif ($sovereigntyBaseline.Count -gt 0) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = 50
+                $rawData = @{
+                    SovereigntyBaselinePolicies = $sovereigntyBaseline.Count
+                    MGLevelAssignments = 0
+                    Note = "Sovereignty baseline policies found but not assigned at management group level."
+                }
+            } else {
+                # No sovereignty policies - may not be a Sovereign Landing Zone
+                $status = [Status]::ManualVerificationRequired
+                $rawData = @{
+                    TotalPolicies = $policyAssignments.Count
+                    Note = "No sovereignty baseline policies detected. If this is not a Sovereign Landing Zone, this check may not apply."
+                }
+            }
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $rawData = "No policy assignments found. Unable to assess sovereignty baseline deployment."
+        }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
@@ -607,14 +820,58 @@ function Test-QuestionE0112 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to document Sovereign Control objectives to policy mapping for Sovereign Landing Zone."
+    $rawData = $null
 
     try {
         # Question: For Sovereign Landing Zone, document Sovereign Control objectives to policy mapping.
         # Reference: https://learn.microsoft.com/industry/sovereignty/policy-portfolio-baseline
 
-        # No automated logic is implemented here
-        $status = [Status]::ManualVerificationRequired
+        if ($global:AzData -and $global:AzData.Policies -and $global:AzData.Policies.Count -gt 0) {
+            $policyAssignments = @($global:AzData.Policies)
+
+            # Check for sovereignty-related policy initiatives that map to control objectives
+            $sovereigntyPolicies = @($policyAssignments | Where-Object {
+                $defId = $_.Properties.PolicyDefinitionId
+                $displayName = $_.Properties.DisplayName
+                $matchDef = $defId -imatch 'sovereign|compliance|regulatory|control'
+                $matchName = $displayName -imatch 'sovereign|compliance|regulatory|control.objective'
+                $matchDef -or $matchName
+            })
+
+            # Check for regulatory compliance initiatives
+            $complianceInitiatives = @($policyAssignments | Where-Object {
+                $defId = $_.Properties.PolicyDefinitionId
+                $displayName = $_.Properties.DisplayName
+                $isInitiative = $defId -imatch '/policySetDefinitions/'
+                $matchDef = $defId -imatch 'regulatory|compliance|nist|iso|cis|pci|hipaa|fedramp|sovereign'
+                $matchName = $displayName -imatch 'regulatory|compliance|nist|iso|cis|pci|hipaa|fedramp|sovereign'
+                $isInitiative -and ($matchDef -or $matchName)
+            })
+
+            $totalIndicators = $sovereigntyPolicies.Count + $complianceInitiatives.Count
+
+            if ($totalIndicators -gt 0) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = [Math]::Min(70, $totalIndicators * 15)
+                $rawData = @{
+                    SovereigntyPolicies = $sovereigntyPolicies.Count
+                    ComplianceInitiatives = $complianceInitiatives.Count
+                    Initiatives = @($complianceInitiatives | Select-Object -Property Name, @{
+                        Name = 'DisplayName'; Expression = { $_.Properties.DisplayName }
+                    })
+                    Note = "Found $totalIndicators sovereignty/compliance policy indicators. Manual verification needed to confirm documented control-to-policy mapping."
+                }
+            } else {
+                $status = [Status]::ManualVerificationRequired
+                $rawData = @{
+                    TotalPolicies = $policyAssignments.Count
+                    Note = "No sovereignty or regulatory compliance policies detected. If this is not a Sovereign Landing Zone, this check may not apply. Manual verification required."
+                }
+            }
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $rawData = "No policy assignments found. Unable to assess sovereign control-to-policy mapping."
+        }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
@@ -636,14 +893,56 @@ function Test-QuestionE0113 {
     
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
-    $rawData = "This question requires manual verification to ensure a process is in place for the management of 'Sovereign Control objectives to policy mapping' for Sovereign Landing Zone."
+    $rawData = $null
 
     try {
-        # Question: For Sovereign Landing Zone, ensure process is in place for management of 'Sovereign Control objectives to policy mapping'.
+        # Question: For Sovereign Landing Zone, ensure process is in place for management of Sovereign Control objectives to policy mapping.
         # Reference: https://learn.microsoft.com/industry/sovereignty/policy-portfolio-baseline#sovereignty-baseline-policy-initiatives
 
-        # No automated logic is implemented here
-        $status = [Status]::ManualVerificationRequired
+        if ($global:AzData -and $global:AzData.Policies -and $global:AzData.Policies.Count -gt 0) {
+            $policyAssignments = @($global:AzData.Policies)
+
+            # Look for sovereignty baseline policies as evidence of SLZ process
+            $sovereigntyPolicies = @($policyAssignments | Where-Object {
+                $matchDef = $_.Properties.PolicyDefinitionId -imatch 'sovereign'
+                $matchName = $_.Properties.DisplayName -imatch 'sovereign'
+                $matchDef -or $matchName
+            })
+
+            # Look for policy remediation tasks as evidence of ongoing management process
+            $remediationIndicators = @($policyAssignments | Where-Object {
+                $isEnforced = $_.Properties.EnforcementMode -eq 'Default'
+                $matchDef = $_.Properties.PolicyDefinitionId -imatch 'sovereign|compliance|regulatory'
+                $matchName = $_.Properties.DisplayName -imatch 'sovereign|compliance|regulatory'
+                $isEnforced -and ($matchDef -or $matchName)
+            })
+
+            if ($sovereigntyPolicies.Count -gt 0 -and $remediationIndicators.Count -gt 0) {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = 50
+                $rawData = @{
+                    SovereigntyPolicies = $sovereigntyPolicies.Count
+                    EnforcedPolicies = $remediationIndicators.Count
+                    Note = "Sovereignty policies found with enforcement enabled, suggesting an active management process. Full process verification requires manual review."
+                }
+            } elseif ($sovereigntyPolicies.Count -gt 0) {
+                $status = [Status]::ManualVerificationRequired
+                $estimatedPercentageApplied = 20
+                $rawData = @{
+                    SovereigntyPolicies = $sovereigntyPolicies.Count
+                    Note = "Sovereignty policies found but enforcement status unclear. Manual verification needed to confirm management process is in place."
+                }
+            } else {
+                $status = [Status]::ManualVerificationRequired
+                $rawData = @{
+                    TotalPolicies = $policyAssignments.Count
+                    Note = "No sovereignty policies detected. If this is not a Sovereign Landing Zone, this check may not apply."
+                }
+            }
+        } else {
+            $status = [Status]::ManualVerificationRequired
+            $rawData = "No policy assignments found. Unable to assess sovereign control management process."
+        }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
         $status = [Status]::Error
