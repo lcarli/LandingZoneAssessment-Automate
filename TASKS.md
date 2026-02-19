@@ -29,7 +29,7 @@
 
 ### Security.ps1 — 20 `NotDeveloped` + 1 `ManualVerificationRequired` (21/31)
 
-- [ ] **#6** — Implementar checks: G02.06, G02.07, G02.08, G02.09, G02.10, G02.12, G02.13, G03.01–G03.12, G04.02, G05.01, G06.01, G06.02  
+- [x] **#6** — Implementar checks: G02.06, G02.07, G02.08, G02.09, G02.10, G02.12, G02.13, G03.01–G03.12, G04.02, G05.01, G06.01, G06.02  
   **Apenas 10/31 checks funcionam.** Pior cobertura junto com DevOps.
 
 ### PlatformAutomationandDevOps.ps1 — 11 stubs (11/13)
