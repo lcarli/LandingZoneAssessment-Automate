@@ -657,8 +657,9 @@ function populateExceptionsTable() {
         const headersX = [
           "Question ID",
           "Question Text",
-          "Status Report",
+          "Original Status",
           "New Status",
+          "Justification",
         ];
         headersX.forEach((headerText) => {
           const th = document.createElement("th");
@@ -667,17 +668,16 @@ function populateExceptionsTable() {
         });
         contentRowGroupX.appendChild(contentHeaderRowX);
 
-
-
         exceptionsData.exceptions
                 .filter(exception => exception.Category === category)
                 .forEach(exception => {
                   const tr = document.createElement("tr");
-                  tr.innerHTML = `
+                  tr.innerHTML =
                         "<td>" + exception.QuestionID + "</td>" +
                         "<td>" + exception.QuestionText + "</td>" +
                         "<td>" + exception.StatusReport + "</td>" +
-                        "<td>" + exception.NewStatus + "</td>";
+                        "<td>" + exception.NewStatus + "</td>" +
+                        "<td>" + (exception.Justification || "") + "</td>";
                   contentRowGroupX.appendChild(tr);
         });
         exceptionsContainer.appendChild(contentRowGroupX);
@@ -928,6 +928,7 @@ function Replace-ErrorLogDataPlaceholder {
 }
 
 function Apply-ExceptionsToReport {
+  [CmdletBinding()]
   param (
       [string]$ReportJsonPath,
       [string]$ExceptionsJsonPath
@@ -951,33 +952,83 @@ function Apply-ExceptionsToReport {
       Write-Warning "Exceptions file not found at $ExceptionsJsonPath - proceeding without exceptions"
   }
 
+  $validStatuses = @('Implemented', 'PartiallyImplemented', 'NotImplemented', 'NotApplicable', 'ManualVerificationRequired', 'Unknown')
+
+  # Validate exception entries before processing
+  $validExceptions = @()
+  foreach ($exc in $exceptionsData.exceptions) {
+      $excProps = $exc.PSObject.Properties.Name
+      $excId = if ($excProps -contains 'id') { $exc.id } else { $null }
+      $excGuid = if ($excProps -contains 'guid') { $exc.guid } else { $null }
+      $excNewStatus = if ($excProps -contains 'newStatus') { $exc.newStatus } else { $null }
+
+      $hasId = ($null -ne $excId -and $excId -ne '')
+      $hasGuid = ($null -ne $excGuid -and $excGuid -ne '')
+      if (-not $hasId -and -not $hasGuid) {
+          Write-Warning "Exception skipped: missing both 'id' and 'guid'. At least one is required."
+          continue
+      }
+      if ($null -eq $excNewStatus -or $excNewStatus -eq '') {
+          $identifier = if ($hasId) { $excId } else { $excGuid }
+          Write-Warning "Exception skipped for '$identifier': missing 'newStatus' field."
+          continue
+      }
+      if ($validStatuses -notcontains $excNewStatus) {
+          $identifier = if ($hasId) { $excId } else { $excGuid }
+          Write-Warning "Exception skipped for '$identifier': invalid newStatus '$excNewStatus'. Valid values: $($validStatuses -join ', ')"
+          continue
+      }
+      $validExceptions += $exc
+  }
+
   $categories = @('Billing', 'IAM', 'ResourceOrganization', 'Network', 'Governance', 'Security', 'DevOps', 'Management')
   $exceptionsApplied = @()
 
   foreach ($category in $categories) {
       if ($reportData.$category -is [System.Collections.IEnumerable]) {
           foreach ($item in $reportData.$category) {
-              $exception = $exceptionsData.exceptions | Where-Object { $_.id -eq $item.RawSource.id }
-              if ($exception) {
+              # Match by guid first (more stable), then fall back to id
+              $exception = $null
+              $itemGuid = $item.RawSource.guid
+              $itemId = $item.RawSource.id
+
+              foreach ($exc in $validExceptions) {
+                  $excProps = $exc.PSObject.Properties.Name
+                  $excGuid = if ($excProps -contains 'guid') { $exc.guid } else { $null }
+                  $excId = if ($excProps -contains 'id') { $exc.id } else { $null }
+                  $matchByGuid = ($null -ne $excGuid -and $excGuid -ne '' -and $excGuid -eq $itemGuid)
+                  $matchById = ($null -ne $excId -and $excId -ne '' -and $excId -eq $itemId)
+                  if ($matchByGuid -or $matchById) {
+                      $exception = $exc
+                      break
+                  }
+              }
+
+              if ($null -ne $exception) {
                   if ($exception.newStatus -ne $item.Status) {
+                      $excProps = $exception.PSObject.Properties.Name
+                      $justification = if ($excProps -contains 'justification') { $exception.justification } else { '' }
                       $exceptionsApplied += [PSCustomObject]@{
-                          Category         = $item.RawSource.category  
+                          Category         = $item.RawSource.category
                           QuestionID       = $item.RawSource.id
+                          QuestionGUID     = $item.RawSource.guid
                           QuestionText     = $item.RawSource.text
                           StatusReport     = $item.Status
-                          NewStatus        = $exception.status
+                          NewStatus        = $exception.newStatus
+                          Justification    = $justification
                       }
 
                       # Update the status in the report
                       $item.Status = $exception.newStatus
-                      Write-Output "Exception applied for $($item.RawSource.id) in category $category"
+                      Write-Host "Exception applied for $($item.RawSource.id) ($($item.RawSource.guid)): $($exceptionsApplied[-1].StatusReport) -> $($exception.newStatus)"
                   }
-
-                  # Update the status in exceptions for tracking
-                  $exception.status = $item.Status
               }
           }
       }
+  }
+
+  if ($validExceptions.Count -gt 0) {
+      Write-Host "Exceptions processed: $($validExceptions.Count) valid entries, $($exceptionsApplied.Count) applied."
   }
 
   return @{

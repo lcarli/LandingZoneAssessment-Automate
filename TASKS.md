@@ -119,7 +119,7 @@
 - [ ] **#27** — Adicionar suporte a múltiplos idiomas do checklist  
   Estrutura já suporta (`alz_checklist.en.json`) mas não há outros idiomas.
 
-- [ ] **#28** — Melhorar o `exceptions.json`  
+- [x] **#28** — Melhorar o `exceptions.json`  
   Apenas um exemplo comentado. Documentar e permitir override por `guid` além de `id`.
 
 - [x] **#29** — Corrigir `DebugFunctions.ps1`  

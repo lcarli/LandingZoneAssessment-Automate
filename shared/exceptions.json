@@ -1,10 +1,25 @@
 {
-  "exceptions": [
-    //SAMPLE EXCEPTION
-      // {
-      //   "id": "B03.04",
-      //   "text": "Enforce Microsoft Entra ID Conditional Access policies for any user with rights to Azure environments.",
-      //   "status": "Implemented"
-      // }
-  ]
+  "_comment": "Manual overrides for assessment results. Each entry must have 'newStatus' and at least one of 'id' or 'guid'. Valid newStatus values: Implemented, PartiallyImplemented, NotImplemented, NotApplicable, ManualVerificationRequired, Unknown.",
+  "_examples": [
+    {
+      "_note": "Override by checklist ID (e.g. 'B03.04')",
+      "id": "B03.04",
+      "newStatus": "Implemented",
+      "justification": "Conditional Access policies enforced via federated IdP"
+    },
+    {
+      "_note": "Override by checklist GUID (more stable across checklist versions)",
+      "guid": "70c15989-c726-42c7-b0d3-24b7375b9201",
+      "newStatus": "NotApplicable",
+      "justification": "Single-tenant environment; multi-tenant not required"
+    },
+    {
+      "_note": "Override using both id and guid (guid takes priority for matching)",
+      "id": "E01.01",
+      "guid": "abc12345-6789-0abc-def0-123456789abc",
+      "newStatus": "Implemented",
+      "justification": "Third-party policy management tool covers this requirement"
+    }
+  ],
+  "exceptions": []
 }

@@ -230,28 +230,32 @@ The assessment supports manual overrides through the `shared/exceptions.json` fi
 
 ### 📝 Adding Exceptions
 
-Edit `shared/exceptions.json` to override specific assessment results:
+Edit `shared/exceptions.json` to override specific assessment results. Each exception must have `newStatus` and at least one of `id` or `guid`:
 
 ```json
 {
   "exceptions": [
     {
       "id": "E01.01",
-      "text": "Leverage Azure Policy strategically...",
-      "status": "NotImplemented",
       "newStatus": "Implemented",
-      "reason": "Organization uses third-party policy management tool"
+      "justification": "Organization uses third-party policy management tool"
     },
     {
-      "id": "IAM.03",
-      "text": "Enforce MFA for privileged users...",
-      "status": "NotImplemented", 
+      "guid": "70c15989-c726-42c7-b0d3-24b7375b9201",
       "newStatus": "NotApplicable",
-      "reason": "MFA enforced through federated identity provider"
+      "justification": "Single-tenant environment; multi-tenant not required"
+    },
+    {
+      "id": "B03.04",
+      "guid": "abc12345-6789-0abc-def0-123456789abc",
+      "newStatus": "Implemented",
+      "justification": "MFA enforced through federated identity provider"
     }
   ]
 }
 ```
+
+> **Tip:** Matching by `guid` is more stable across checklist versions. The `guid` never changes, while `id` may shift if items are reordered.
 
 ### 🏷️ Available Status Values
 
@@ -270,10 +274,11 @@ The modern architecture uses standardized status enums:
 ### 🔄 How Exceptions Work
 
 1. **Assessment Execution**: Initial automated evaluation runs
-2. **Exception Processing**: Script compares results with `exceptions.json`
-3. **Status Override**: Matching items get updated status
-4. **Dashboard Integration**: Exceptions table shows original vs. overridden status
-5. **Audit Trail**: All changes are logged for transparency
+2. **Validation**: Exception entries are validated (must have `newStatus` + `id` or `guid`; invalid entries are skipped with warnings)
+3. **Matching**: Items are matched by `guid` first (stable), then by `id` as fallback
+4. **Status Override**: Matching items get updated status
+5. **Dashboard Integration**: Exceptions table shows original vs. overridden status with justification
+6. **Audit Trail**: All changes are logged for transparency
 ---
 
 ## 📊 Interactive Dashboard
