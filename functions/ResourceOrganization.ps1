@@ -914,6 +914,8 @@ function Test-QuestionC0213 {
         $identityMGFound = $false
         $identitySubscriptions = @()
         $domainControllerVMs = @()
+        $adExtensions = @()
+        $hasExtensionEvidence = $false
 
         if ($global:AzData -and $global:AzData.ManagementGroups) {
             # Look for an Identity management group
@@ -926,47 +928,71 @@ function Test-QuestionC0213 {
         }
 
         if ($global:AzData -and $global:AzData.Resources) {
-            # Check for domain controller indicators: VMs with DC-related names or extensions
-            $domainControllerVMs = @($global:AzData.Resources | Where-Object {
-                ($_.ResourceType -eq "Microsoft.Compute/virtualMachines" -and
-                 $_.Name -imatch 'dc|domain|adds|addc|ad-|ad[0-9]') -or
-                ($_.ResourceType -eq "Microsoft.AAD/domainServices")
+            # Check for domain controller indicators using multiple signals to reduce false positives
+            # 1. Azure AD Domain Services (definitive match)
+            $aadDomainServices = @($global:AzData.Resources | Where-Object {
+                $_.ResourceType -eq "Microsoft.AAD/domainServices"
             } | Select-Object -Property Name, ResourceGroupName, Location, ResourceType)
+
+            # 2. VMs with specific DC naming patterns (tighter regex to avoid false positives like "podcast", "datacenter")
+            $dcNamedVMs = @($global:AzData.Resources | Where-Object {
+                $_.ResourceType -eq "Microsoft.Compute/virtualMachines" -and
+                $_.Name -imatch '^dc[-_]|^dc\d|[-_]dc[-_]|[-_]dc$|^adds[-_]|^addc[-_]|^addc\d|domain[-_]?controller'
+            } | Select-Object -Property Name, ResourceGroupName, Location, ResourceType)
+
+            # 3. VMs with AD-related extensions (strong signal)
+            $adExtensions = @($global:AzData.Resources | Where-Object {
+                $_.ResourceType -eq "Microsoft.Compute/virtualMachines/extensions" -and
+                $_.Name -imatch 'ADDomainExtension|JsonADDomainExtension|DSC|ActiveDirectory'
+            } | Select-Object -Property Name, ResourceGroupName, ResourceType)
+
+            # Combine all evidence
+            $domainControllerVMs = @($aadDomainServices) + @($dcNamedVMs)
+            $hasExtensionEvidence = $adExtensions.Count -gt 0
         }
 
         # Determine status based on findings
-        if ($domainControllerVMs.Count -eq 0 -and -not $identityMGFound) {
+        $detectionMethod = "Heuristic (naming patterns, Azure AD Domain Services, VM extensions)"
+
+        if ($domainControllerVMs.Count -eq 0 -and -not $identityMGFound -and -not $hasExtensionEvidence) {
             # No domain controllers and no identity MG - might not need one
             $status = [Status]::ManualVerificationRequired
             $rawData = @{
                 IdentityMGFound = $identityMGFound
                 DomainControllerVMs = $domainControllerVMs
-                Note = "No domain controllers or AD Domain Services found. If identity servers are not needed, this check may not apply. Manual verification required."
+                ADExtensions = $adExtensions
+                DetectionMethod = $detectionMethod
+                Note = "No domain controllers or AD Domain Services found. If identity servers are not needed, this check may not apply. Detection is heuristic-based; manual verification recommended."
             }
-        } elseif ($identityMGFound -and $domainControllerVMs.Count -gt 0) {
+        } elseif ($identityMGFound -and ($domainControllerVMs.Count -gt 0 -or $hasExtensionEvidence)) {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 80
             $rawData = @{
                 IdentityMGFound = $identityMGFound
                 IdentityMGNames = @($identityMGs | ForEach-Object { if ($_.DisplayName) { $_.DisplayName } else { $_.Name } })
                 DomainControllerVMs = $domainControllerVMs
-                Note = "Identity management group found with domain controller resources present."
+                ADExtensions = $adExtensions
+                DetectionMethod = $detectionMethod
+                Note = "Identity management group found with domain controller resources or AD extensions present. Detection is heuristic-based; verify manually."
             }
-        } elseif ($domainControllerVMs.Count -gt 0 -and -not $identityMGFound) {
+        } elseif (($domainControllerVMs.Count -gt 0 -or $hasExtensionEvidence) -and -not $identityMGFound) {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 20
             $rawData = @{
                 IdentityMGFound = $identityMGFound
                 DomainControllerVMs = $domainControllerVMs
-                Note = "Domain controllers found but no dedicated Identity management group exists. Consider creating an Identity MG with dedicated subscriptions."
+                ADExtensions = $adExtensions
+                DetectionMethod = $detectionMethod
+                Note = "Domain controllers found but no dedicated Identity management group exists. Consider creating an Identity MG with dedicated subscriptions. Detection is heuristic-based; verify manually."
             }
-        } elseif ($identityMGFound -and $domainControllerVMs.Count -eq 0) {
+        } elseif ($identityMGFound -and $domainControllerVMs.Count -eq 0 -and -not $hasExtensionEvidence) {
             $status = [Status]::PartiallyImplemented
             $estimatedPercentageApplied = 50
             $rawData = @{
                 IdentityMGFound = $identityMGFound
                 IdentityMGNames = @($identityMGs | ForEach-Object { if ($_.DisplayName) { $_.DisplayName } else { $_.Name } })
-                Note = "Identity management group found but no domain controller VMs detected in current scope."
+                DetectionMethod = $detectionMethod
+                Note = "Identity management group found but no domain controller VMs detected in current scope. Detection is heuristic-based; verify manually."
             }
         }
     } catch {

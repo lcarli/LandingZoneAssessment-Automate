@@ -78,13 +78,13 @@
 
 ## 🔧 QUALIDADE DE CÓDIGO
 
-- [ ] **#17** — Corrigir rawData copy-paste errado — `PlatformAutomationandDevOps.ps1`  
-  H01.04 diz "IaC tool usage" mas pergunta é sobre version control.
+- [x] **#17** — Corrigir rawData copy-paste errado — `PlatformAutomationandDevOps.ps1`  
+  H01.04 diz "IaC tool usage" mas pergunta é sobre version control. *(Já corrigido na Task #7)*
 
-- [ ] **#18** — Corrigir rawData copy-paste errado — `ResourceOrganization.ps1`  
-  C02.13 diz "cost management" mas pergunta é sobre identity services.
+- [x] **#18** — Corrigir rawData copy-paste errado — `ResourceOrganization.ps1`  
+  C02.13 diz "cost management" mas pergunta é sobre identity services. *(Já corrigido na Task #8)*
 
-- [ ] **#19** — Melhorar heurísticas frágeis (naming-based) — Diversos  
+- [x] **#19** — Melhorar heurísticas frágeis (naming-based) — Diversos  
   DCs, break-glass accounts, Entra Connect detectados só por nome de VM — falso-positivos/negativos.
 
 - [ ] **#20** — Padronizar filtro `$_.Type` vs `$_.ResourceType` — `NetworkTopologyandConnectivity.ps1`  

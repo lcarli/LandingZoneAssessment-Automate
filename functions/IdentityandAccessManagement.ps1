@@ -1667,15 +1667,58 @@ function Test-QuestionB0315 {
             return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
         }
 
-        # Look for potential emergency access accounts
-        $emergencyAccounts = $users | Where-Object {
+        # Look for potential emergency access accounts by naming convention
+        $emergencyAccounts = @($users | Where-Object {
             $_.DisplayName -like "*emergency*" -or 
             $_.DisplayName -like "*break*glass*" -or 
             $_.DisplayName -like "*breakglass*" -or
+            $_.DisplayName -like "*bg-*" -or
+            $_.DisplayName -like "*bg_*" -or
             $_.UserPrincipalName -like "*emergency*" -or
             $_.UserPrincipalName -like "*break*glass*" -or
-            $_.UserPrincipalName -like "*breakglass*"
+            $_.UserPrincipalName -like "*breakglass*" -or
+            $_.UserPrincipalName -like "*bg-*" -or
+            $_.UserPrincipalName -like "*bg_*"
+        })
+
+        # Also check Conditional Access policies for excluded users (common pattern: break-glass accounts are excluded from all CA policies)
+        $caExcludedUserIds = @()
+        if ($global:GraphData -and $global:GraphData.ConditionalAccessPolicies) {
+            $enabledCAPolicies = @($global:GraphData.ConditionalAccessPolicies | Where-Object {
+                $_.State -eq 'enabled' -or $_.State -eq 'enabledForReportingButNotEnforced'
+            })
+            if ($enabledCAPolicies.Count -gt 0) {
+                # Find user IDs excluded from ALL enabled CA policies
+                $allExcludedUsers = @{}
+                foreach ($cap in $enabledCAPolicies) {
+                    $excluded = $cap.Conditions.Users.ExcludeUsers
+                    if ($excluded) {
+                        foreach ($uid in $excluded) {
+                            if (-not $allExcludedUsers.ContainsKey($uid)) {
+                                $allExcludedUsers[$uid] = 0
+                            }
+                            $allExcludedUsers[$uid]++
+                        }
+                    }
+                }
+                # Users excluded from ALL enabled CA policies are strong break-glass candidates
+                $caExcludedUserIds = @($allExcludedUsers.GetEnumerator() | Where-Object { $_.Value -eq $enabledCAPolicies.Count } | ForEach-Object { $_.Key })
+            }
         }
+
+        # Merge: add CA-excluded users not already found by naming
+        $emergencyAccountIds = @($emergencyAccounts | ForEach-Object { $_.Id })
+        $additionalCandidates = @()
+        foreach ($uid in $caExcludedUserIds) {
+            if ($uid -notin $emergencyAccountIds) {
+                $candidateUser = $users | Where-Object { $_.Id -eq $uid } | Select-Object -First 1
+                if ($candidateUser) {
+                    $additionalCandidates += $candidateUser
+                }
+            }
+        }
+
+        $allCandidates = @($emergencyAccounts) + @($additionalCandidates)
 
         # Get Global Admin role assignments
         $globalAdminRole = $global:GraphData.RoleDefinitions | Where-Object { 
@@ -1684,38 +1727,45 @@ function Test-QuestionB0315 {
 
         $globalAdminAssignments = @()
         if ($globalAdminRole -and $global:GraphData.RoleAssignments) {
-            $globalAdminAssignments = $global:GraphData.RoleAssignments | Where-Object { 
+            $globalAdminAssignments = @($global:GraphData.RoleAssignments | Where-Object { 
                 $_.RoleDefinitionId -eq $globalAdminRole.Id 
-            }
+            })
         }
 
-        if ($emergencyAccounts.Count -eq 0) {
+        if ($allCandidates.Count -eq 0) {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 0
             $rawData = @{
                 EmergencyAccounts = 0
                 GlobalAdminAccounts = $globalAdminAssignments.Count
-                Message = "No emergency access (break-glass) accounts found. Consider implementing emergency access accounts to prevent tenant lockout."
+                DetectionMethod = "Heuristic (naming convention + CA policy exclusions)"
+                Message = "No emergency access (break-glass) accounts found by naming convention or CA exclusion pattern. Consider implementing emergency access accounts to prevent tenant lockout. Detection is heuristic-based; manual verification recommended."
             }
         }
-        elseif ($emergencyAccounts.Count -eq 1) {
+        elseif ($allCandidates.Count -eq 1) {
             $status = [Status]::PartiallyImplemented
             $estimatedPercentageApplied = 50
             $rawData = @{
-                EmergencyAccounts = $emergencyAccounts.Count
+                EmergencyAccounts = $allCandidates.Count
+                NameMatchCount = $emergencyAccounts.Count
+                CAExclusionMatchCount = $additionalCandidates.Count
                 GlobalAdminAccounts = $globalAdminAssignments.Count
-                Message = "One emergency access account found. Microsoft recommends having at least two emergency access accounts."
-                EmergencyAccountNames = $emergencyAccounts.DisplayName
+                DetectionMethod = "Heuristic (naming convention + CA policy exclusions)"
+                Message = "One emergency access account candidate found. Microsoft recommends at least two. Detection is heuristic-based; verify manually."
+                EmergencyAccountNames = @($allCandidates | ForEach-Object { $_.DisplayName })
             }
         }
         else {
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
             $rawData = @{
-                EmergencyAccounts = $emergencyAccounts.Count
+                EmergencyAccounts = $allCandidates.Count
+                NameMatchCount = $emergencyAccounts.Count
+                CAExclusionMatchCount = $additionalCandidates.Count
                 GlobalAdminAccounts = $globalAdminAssignments.Count
-                Message = "Multiple emergency access accounts found. Ensure they use strong authentication methods like FIDO2 or certificate-based authentication."
-                EmergencyAccountNames = $emergencyAccounts.DisplayName
+                DetectionMethod = "Heuristic (naming convention + CA policy exclusions)"
+                Message = "Multiple emergency access account candidates found. Ensure they use strong authentication methods like FIDO2 or certificate-based authentication. Detection is heuristic-based; verify manually."
+                EmergencyAccountNames = @($allCandidates | ForEach-Object { $_.DisplayName })
             }
         }
     }
@@ -1747,37 +1797,61 @@ function Test-QuestionB0316 {
         # Reference: https://learn.microsoft.com/azure/active-directory/hybrid/how-to-connect-sync-staging-server
 
         # Look for VMs that might be running Entra Connect (formerly Azure AD Connect)
-        $entraConnectServers = $global:AzData.Resources | Where-Object {
+        # Use targeted patterns to reduce false positives (e.g., generic "connect" or "sync" matches too broadly)
+        $entraConnectServers = @($global:AzData.Resources | Where-Object {
             $_.ResourceType -eq "Microsoft.Compute/virtualMachines" -and (
-                $_.Name -like "*connect*" -or 
-                $_.Name -like "*sync*" -or 
-                $_.Name -like "*aad*" -or
-                $_.Name -like "*entra*"
+                $_.Name -imatch 'aadconnect|aadc|entraconnect|adsync|adconnect' -or
+                $_.Name -imatch '^aad-|^aad\d|^entra-|^entra\d'
             )
-        }
+        })
 
-        if ($entraConnectServers.Count -eq 0) {
-            $status = [Status]::NotApplicable
-            $estimatedPercentageApplied = 100
-            $rawData = "No Entra Connect servers found in this environment."
+        # Also check for Azure AD Connect Health agents (VM extensions)
+        $aadConnectExtensions = @($global:AzData.Resources | Where-Object {
+            $_.ResourceType -eq "Microsoft.Compute/virtualMachines/extensions" -and
+            $_.Name -imatch 'AADConnect|ADSync|MicrosoftMonitoringAgent'
+        })
+
+        # Combine evidence — extract VM names from extensions
+        $extensionVMNames = @($aadConnectExtensions | ForEach-Object {
+            $parts = $_.Name -split '/'
+            if ($parts.Count -ge 1) { $parts[0] }
+        } | Select-Object -Unique)
+
+        # Merge with name-based matches (avoid duplicates)
+        $allCandidateNames = @($entraConnectServers | ForEach-Object { $_.Name }) + $extensionVMNames | Select-Object -Unique
+        $totalFound = $allCandidateNames.Count
+
+        if ($totalFound -eq 0) {
+            $status = [Status]::ManualVerificationRequired
+            $estimatedPercentageApplied = 0
+            $rawData = @{
+                DetectionMethod = "Heuristic (name patterns + VM extensions)"
+                Note = "No Entra Connect servers detected by naming convention or VM extensions. If hybrid identity is not used, this may not apply. Detection is heuristic-based; manual verification recommended."
+            }
         }
-        elseif ($entraConnectServers.Count -eq 1) {
+        elseif ($totalFound -eq 1) {
             $status = [Status]::NotImplemented
             $estimatedPercentageApplied = 25
             $rawData = @{
-                EntraConnectServers = $entraConnectServers.Count
-                ServerNames = $entraConnectServers.Name
-                Message = "Only one Entra Connect server found. Consider deploying a staging server for high availability."
+                EntraConnectServers = $totalFound
+                ServerNames = $allCandidateNames
+                NameMatchCount = $entraConnectServers.Count
+                ExtensionMatchCount = $aadConnectExtensions.Count
+                DetectionMethod = "Heuristic (name patterns + VM extensions)"
+                Message = "Only one potential Entra Connect server found. Consider deploying a staging server for high availability. Detection is heuristic-based; verify manually."
             }
         }
         else {
-            # Multiple servers found - assume staging server is configured
+            # Multiple servers found - likely staging server is configured
             $status = [Status]::Implemented
             $estimatedPercentageApplied = 100
             $rawData = @{
-                EntraConnectServers = $entraConnectServers.Count
-                ServerNames = $entraConnectServers.Name
-                Message = "Multiple Entra Connect servers found, suggesting staging server configuration for high availability."
+                EntraConnectServers = $totalFound
+                ServerNames = $allCandidateNames
+                NameMatchCount = $entraConnectServers.Count
+                ExtensionMatchCount = $aadConnectExtensions.Count
+                DetectionMethod = "Heuristic (name patterns + VM extensions)"
+                Message = "Multiple potential Entra Connect servers found, suggesting staging server configuration. Detection is heuristic-based; verify manually."
             }
         }
     }
