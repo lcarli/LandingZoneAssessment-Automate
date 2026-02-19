@@ -522,15 +522,28 @@ function Test-QuestionE0108 {
             $rawData = "No role assignments found in the environment."
             $estimatedPercentageApplied = 0
         } else {
-            # Check for Resource Policy Contributor in Management Groups and Subscriptions
-            $mgAssignments = $managementGroups | ForEach-Object {
-                Get-AzRoleAssignment -Scope $_.Id | Where-Object {
-                    $_.RoleDefinitionName -eq "Resource Policy Contributor"
+            # Filter from already-fetched role assignments in memory (N+1 fix)
+            $policyContributorAssignments = $roleAssignments | Where-Object {
+                $_.RoleDefinitionName -eq "Resource Policy Contributor"
+            }
+
+            $mgAssignments = @()
+            foreach ($mg in $managementGroups) {
+                $mgMatch = $policyContributorAssignments | Where-Object {
+                    $_.Scope -eq $mg.Id
                 }
-            }            
-            $subscriptionAssignments = $subscriptions | ForEach-Object {
-                $roleAssignments | Where-Object { 
-                    $_.Scope -eq "/subscriptions/$($_.Id)" -and $_.RoleDefinitionName -eq "Resource Policy Contributor" 
+                if ($mgMatch) {
+                    $mgAssignments += $mgMatch
+                }
+            }
+
+            $subscriptionAssignments = @()
+            foreach ($sub in $subscriptions) {
+                $subMatch = $policyContributorAssignments | Where-Object {
+                    $_.Scope -eq "/subscriptions/$($sub.Id)"
+                }
+                if ($subMatch) {
+                    $subscriptionAssignments += $subMatch
                 }
             }
 
@@ -977,13 +990,20 @@ function Test-QuestionE0202 {
         $totalSubscriptions = $subscriptions.Count
         $subscriptionsWithBudgetAlerts = 0
 
+        if ($totalSubscriptions -eq 0) {
+            $status = [Status]::NotApplicable
+            $estimatedPercentageApplied = 0
+            $rawData = "No subscriptions found."
+            return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
+        }
+
         foreach ($subscription in $subscriptions) {
-            Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId
+            Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId -ErrorAction SilentlyContinue | Out-Null
 
             # Get all budgets for the subscription
-            $budgets = Get-AzConsumptionBudget
+            $budgets = Invoke-AzCmdletSafely -CmdletName "Get-AzConsumptionBudget" -Parameters @{} -ErrorAction SilentlyContinue
 
-            if ($budgets.Count -eq 0) {
+            if (-not $budgets -or ($budgets | Measure-Object).Count -eq 0) {
                 Write-Warning "No budgets found for subscription: $($subscription.Name)"
                 continue
             }

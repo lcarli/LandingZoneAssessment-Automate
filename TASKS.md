@@ -65,7 +65,7 @@
 - [x] **#13** — Eliminar N+1 queries no IAM (MFA check) — `IdentityandAccessManagement.ps1`  
   MFA status consultado por usuário via Graph API.
 
-- [ ] **#14** — Eliminar N+1 queries no Governance — `Governance.ps1`  
+- [x] **#14** — Eliminar N+1 queries no Governance — `Governance.ps1`  
   `Get-AzRoleAssignment` por MG; `Get-AzConsumptionBudget` por subscription.
 
 - [ ] **#15** — Eliminar N+1 queries no Billing — `AzureBillingandMicrosoftEntraIDTenants.ps1`  
