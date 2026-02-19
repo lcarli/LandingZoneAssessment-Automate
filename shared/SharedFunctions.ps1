@@ -41,11 +41,11 @@ function Set-EvaluationResultObject {
     )
 
     $weight = switch ($checklistItem.severity) {
-        'Low' { $weight = 1;break; }
-        'Medium' { $weight = 3;break; }
-        'High' { $weight = 5;break; }
-        'Important' { $weight = 7;break; }
-        Default { break; }
+        'Low'       { 1 }
+        'Medium'    { 3 }
+        'High'      { 5 }
+        'Important' { 7 }
+        Default     { 0 }
     }
     
     $resultObject = [PSCustomObject]@{
