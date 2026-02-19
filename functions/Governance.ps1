@@ -434,13 +434,16 @@ function Test-QuestionE0107 {
             foreach ($pa in $policyAssignments) {
                 $defId = $pa.Properties.PolicyDefinitionId
                 if ($defId) {
-                    $isBuiltIn = ($defId -imatch '/providers/Microsoft.Authorization/policyDefinitions/') -and
-                                 ($defId -notmatch '/subscriptions/') -and
-                                 ($defId -notmatch '/managementGroups/')
+                    $matchProvider = $defId -imatch '/providers/Microsoft.Authorization/policyDefinitions/'
+                    $notSub = $defId -notmatch '/subscriptions/'
+                    $notMG = $defId -notmatch '/managementGroups/'
+                    $isBuiltIn = $matchProvider -and $notSub -and $notMG
                     if ($isBuiltIn) {
                         $builtInPolicies += $pa
                     }
-                    $isCustom = ($defId -imatch '/subscriptions/') -or ($defId -imatch '/managementGroups/')
+                    $matchSub = $defId -imatch '/subscriptions/'
+                    $matchMG = $defId -imatch '/managementGroups/'
+                    $isCustom = $matchSub -or $matchMG
                     if ($isCustom) {
                         $customPolicies += $pa
                     }
@@ -589,7 +592,7 @@ function Test-QuestionE0109 {
             $rootMG = $global:AzData.ManagementGroups | Where-Object {
                 $_.Name -eq $tenantId -or
                 $_.Id -imatch "/managementGroups/$tenantId`$" -or
-                ($_.Properties.Details.Parent -eq $null)
+                ($null -eq $_.Properties.Details.Parent)
             } | Select-Object -First 1
 
             if ($rootMG) {
