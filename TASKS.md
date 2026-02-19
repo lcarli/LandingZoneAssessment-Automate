@@ -39,7 +39,7 @@
 
 ### ResourceOrganization.ps1 — 8 stubs (8/19)
 
-- [ ] **#8** — Implementar checks: C01.01, C02.07, C02.08, C02.09, C02.12, C02.13, C02.14, C03.03  
+- [x] **#8** — Implementar checks: C01.01, C02.07, C02.08, C02.09, C02.12, C02.13, C02.14, C03.03  
   42% são stubs.
 
 ### Governance.ps1 — 7 stubs (7/14)
