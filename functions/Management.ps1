@@ -268,7 +268,7 @@ function Test-QuestionF0102 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -393,7 +393,7 @@ function Test-QuestionF0103 {
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -472,7 +472,7 @@ function Test-QuestionF0104 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -572,7 +572,7 @@ function Test-QuestionF0105 {
     }
     catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
     }
 
@@ -676,7 +676,7 @@ function Test-QuestionF0106 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -772,7 +772,7 @@ function Test-QuestionF0107 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -825,7 +825,7 @@ function Test-QuestionF0108 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -884,7 +884,7 @@ function Test-QuestionF0109 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -941,7 +941,7 @@ function Test-QuestionF0110 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1005,7 +1005,7 @@ function Test-QuestionF0111 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1072,7 +1072,7 @@ function Test-QuestionF0112 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1186,7 +1186,7 @@ function Test-QuestionF0114 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1250,7 +1250,7 @@ function Test-QuestionF0115 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1335,7 +1335,7 @@ function Test-QuestionF0117 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1402,7 +1402,7 @@ function Test-QuestionF0118 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
@@ -1457,7 +1457,7 @@ function Test-QuestionF0201 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1555,7 +1555,7 @@ function Test-QuestionF0202 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1618,7 +1618,7 @@ function Test-QuestionF0301 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1691,7 +1691,7 @@ function Test-QuestionF0302 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1754,7 +1754,7 @@ function Test-QuestionF0401 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1831,7 +1831,7 @@ function Test-QuestionF0402 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
@@ -1895,7 +1895,7 @@ function Test-QuestionF0601 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }
@@ -1963,7 +1963,7 @@ function Test-QuestionF0602 {
         }
     } catch {
         Write-ErrorLog -QuestionID $checklistItem.id -QuestionText $checklistItem.text -FunctionName $MyInvocation.MyCommand -ErrorMessage $_.Exception.Message
-        $status = $status
+        $status = [Status]::Error
         $estimatedPercentageApplied = 0
         $rawData = $_.Exception.Message
     }

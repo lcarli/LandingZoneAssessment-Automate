@@ -39,17 +39,25 @@ function Test-Custom {
     )
 
     try {
-        # For testing specific questions, we need to create a mock checklist item
+        # For testing specific questions, we need to find the correct checklist item
         if ($functionName -like "Test-Question*") {
-            # Create a sample checklist item for the test
-            $checklistItem = [PSCustomObject]@{
-                id = "E01.06"
-                text = "Use Azure Policy to control which services users can provision at the subscription/management group level."
-                category = "Governance"
+            # Extract question ID from function name (e.g., Test-QuestionF0102 -> F01.02)
+            $idRaw = $functionName -replace 'Test-Question', ''
+            $questionId = "$($idRaw.Substring(0,3)).$($idRaw.Substring(3))"
+            
+            # Look up the checklist item from the global checklist
+            $checklistItem = $global:Checklist.items | Where-Object { $_.id -eq $questionId } | Select-Object -First 1
+            
+            if (-not $checklistItem) {
+                Write-Host "Checklist item not found for ID: $questionId (function: $functionName)" -ForegroundColor Red
+                Write-Host "Available IDs starting with '$($idRaw.Substring(0,3))':"
+                $global:Checklist.items | Where-Object { $_.id -like "$($idRaw.Substring(0,3))*" } | ForEach-Object { Write-Host "  $($_.id) - $($_.text)" }
+                return
             }
             
             Write-Host "`nTesting function: $functionName"
-            Write-Host "Mock checklist item: $($checklistItem.id) - $($checklistItem.text)"
+            Write-Host "Checklist item: $($checklistItem.id) - $($checklistItem.text)"
+            Write-Host "Category: $($checklistItem.category) | Severity: $($checklistItem.severity)"
             Write-Host ""
             
             # Execute the function with the checklist item
