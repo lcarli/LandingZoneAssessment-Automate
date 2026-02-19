@@ -251,3 +251,105 @@ function Write-AssessmentHeader {
     )
     Write-Host $Message -ForegroundColor Magenta
 }
+
+function Test-ConfigValidation {
+    <#
+    .SYNOPSIS
+        Validates the config.json structure, required fields, and value formats.
+    .DESCRIPTION
+        Checks for required properties, validates TenantId as a GUID, validates
+        ContractType against the enum, validates DesignAreas structure, and
+        validates the checklist file exists.
+    .PARAMETER Config
+        The parsed config object from config.json.
+    .PARAMETER ConfigPath
+        The path to the config.json file (used to resolve relative paths).
+    .OUTPUTS
+        PSCustomObject with IsValid (bool), Errors (string[]), and Warnings (string[]).
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Config,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ConfigPath
+    )
+
+    $errors = @()
+    $warnings = @()
+    $guidRegex = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    $validContractTypes = @('EnterpriseAgreement', 'MicrosoftCustomerAgreement', 'CloudSolutionProvider', 'MicrosoftEntraIDTenants')
+    $validDesignAreas = @('Billing', 'IAM', 'ResourceOrganization', 'Network', 'Governance', 'Security', 'DevOps', 'Management')
+
+    # --- Required fields ---
+    # TenantId
+    if ($null -eq $Config.PSObject.Properties['TenantId'] -or [string]::IsNullOrWhiteSpace($Config.TenantId)) {
+        $errors += "TenantId is required and cannot be empty."
+    }
+    elseif ($Config.TenantId -notmatch $guidRegex) {
+        $errors += "TenantId '$($Config.TenantId)' is not a valid GUID format (expected: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)."
+    }
+
+    # ContractType
+    if ($null -eq $Config.PSObject.Properties['ContractType'] -or [string]::IsNullOrWhiteSpace($Config.ContractType)) {
+        $errors += "ContractType is required and cannot be empty."
+    }
+    elseif ($Config.ContractType -notin $validContractTypes) {
+        $errors += "ContractType '$($Config.ContractType)' is not valid. Valid options: $($validContractTypes -join ', ')."
+    }
+
+    # AlzChecklist
+    if ($null -eq $Config.PSObject.Properties['AlzChecklist'] -or [string]::IsNullOrWhiteSpace($Config.AlzChecklist)) {
+        $errors += "AlzChecklist is required and cannot be empty."
+    }
+    else {
+        $configDir = Split-Path -Parent (Resolve-Path $ConfigPath -ErrorAction SilentlyContinue)
+        if ($null -ne $configDir) {
+            $checklistFullPath = Join-Path $configDir $Config.AlzChecklist
+            if (-not (Test-Path $checklistFullPath)) {
+                $errors += "Checklist file '$($Config.AlzChecklist)' not found at: $checklistFullPath"
+            }
+        }
+    }
+
+    # DesignAreas
+    if ($null -eq $Config.PSObject.Properties['DesignAreas'] -or $null -eq $Config.DesignAreas) {
+        $errors += "DesignAreas object is required."
+    }
+    else {
+        foreach ($area in $validDesignAreas) {
+            if ($null -eq $Config.DesignAreas.PSObject.Properties[$area]) {
+                $errors += "DesignAreas is missing required key: '$area'."
+            }
+            elseif ($Config.DesignAreas.$area -isnot [bool]) {
+                $errors += "DesignAreas.$area must be a boolean (true/false), got: '$($Config.DesignAreas.$area)'."
+            }
+        }
+
+        # Check no design areas are enabled
+        $enabledCount = ($validDesignAreas | Where-Object { $Config.DesignAreas.$_ -eq $true }).Count
+        if ($enabledCount -eq 0) {
+            $warnings += "No design areas are enabled. The assessment will not evaluate any area."
+        }
+    }
+
+    # --- Optional fields with validation ---
+    # DefaultSubscriptionId (optional but validate GUID if provided)
+    if ($null -ne $Config.PSObject.Properties['DefaultSubscriptionId'] -and -not [string]::IsNullOrWhiteSpace($Config.DefaultSubscriptionId)) {
+        if ($Config.DefaultSubscriptionId -notmatch $guidRegex) {
+            $warnings += "DefaultSubscriptionId '$($Config.DefaultSubscriptionId)' is not a valid GUID format."
+        }
+    }
+
+    # DefaultRegion (optional, warn if missing)
+    if ($null -eq $Config.PSObject.Properties['DefaultRegion'] -or [string]::IsNullOrWhiteSpace($Config.DefaultRegion)) {
+        $warnings += "DefaultRegion is not set. Defaulting to 'eastus2'."
+    }
+
+    return [PSCustomObject]@{
+        IsValid  = ($errors.Count -eq 0)
+        Errors   = $errors
+        Warnings = $warnings
+    }
+}

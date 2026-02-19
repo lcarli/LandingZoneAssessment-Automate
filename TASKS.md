@@ -128,7 +128,7 @@
 - [ ] **#30** — Corrigir `CompareChecklist.ps1`  
   `$changedInCategory` sempre = 0; só detecta `Test-Question*` (ignora checks ARG do Network); caminhos hardcoded.
 
-- [ ] **#31** — Adicionar validação do `config.json` na inicialização  
+- [x] **#31** — Adicionar validação do `config.json` na inicialização  
   Não valida campos obrigatórios, formatos, ou se o TenantId é um GUID válido.
 
 - [ ] **#32** — Gerar resumo executivo no relatório  

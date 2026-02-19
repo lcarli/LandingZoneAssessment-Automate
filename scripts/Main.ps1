@@ -44,6 +44,23 @@ catch {
     throw "Configuration loading failed"
 }
 
+# Validate configuration
+$validation = Test-ConfigValidation -Config $config -ConfigPath $configPath
+if ($validation.Warnings.Count -gt 0) {
+    foreach ($w in $validation.Warnings) {
+        Write-Warning "Config: $w"
+    }
+}
+if (-not $validation.IsValid) {
+    Write-Output ""
+    Write-Output "Configuration validation FAILED:"
+    foreach ($e in $validation.Errors) {
+        Write-Output "  ERROR: $e"
+    }
+    throw "Configuration validation failed. Please fix the errors in $configPath"
+}
+Write-Output "Configuration validation passed"
+
 # Initialize environment
 Write-Output ""
 Write-Output "=================================================================================="
