@@ -19,6 +19,67 @@
 . "$PSScriptRoot/../shared/ErrorHandling.ps1"
 . "$PSScriptRoot/../shared/SharedFunctions.ps1"
 
+#region Helper Functions
+
+function ConvertTo-IPInteger {
+    <#
+    .SYNOPSIS
+        Converts an IPv4 address string to a long integer for CIDR overlap calculations.
+    #>
+    param([string]$IPAddress)
+    $octets = $IPAddress.Split('.')
+    $result = [long]$octets[0] * 16777216
+    $result = $result + [long]$octets[1] * 65536
+    $result = $result + [long]$octets[2] * 256
+    $result = $result + [long]$octets[3]
+    return $result
+}
+
+function Test-CIDROverlap {
+    <#
+    .SYNOPSIS
+        Tests whether two CIDR ranges overlap.
+    .DESCRIPTION
+        Parses two CIDR notations, computes their integer ranges,
+        and returns $true if they intersect.
+    #>
+    param(
+        [string]$CIDR1,
+        [string]$CIDR2
+    )
+
+    $parts1 = $CIDR1.Split('/')
+    $parts2 = $CIDR2.Split('/')
+
+    $ip1Int = ConvertTo-IPInteger $parts1[0]
+    $prefix1 = [int]$parts1[1]
+
+    $ip2Int = ConvertTo-IPInteger $parts2[0]
+    $prefix2 = [int]$parts2[1]
+
+    # Number of addresses in each range
+    $size1 = [long][Math]::Pow(2, (32 - $prefix1))
+    $size2 = [long][Math]::Pow(2, (32 - $prefix2))
+
+    # Calculate network mask as long integer
+    $mask1 = [long]([Math]::Pow(2, 32) - $size1)
+    $mask2 = [long]([Math]::Pow(2, 32) - $size2)
+
+    # Network start addresses (apply mask)
+    $net1Start = [long]($ip1Int -band $mask1)
+    $net1End = $net1Start + $size1 - 1
+
+    $net2Start = [long]($ip2Int -band $mask2)
+    $net2End = $net2Start + $size2 - 1
+
+    # Ranges overlap if they intersect
+    $startOk = $net1Start -le $net2End
+    $endOk = $net2Start -le $net1End
+    return ($startOk -and $endOk)
+}
+
+#endregion Helper Functions
+
 function Invoke-NetworkTopologyandConnectivityAssessment {
     [CmdletBinding()]
     param (
@@ -734,8 +795,6 @@ function Test-QuestionD0109 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        # This requires manual verification as it involves architectural decisions
-        # about multi-region hub-and-spoke topologies
         $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
@@ -743,34 +802,130 @@ function Test-QuestionD0109 {
             $rawData = "No virtual networks found"
         }
         else {
-            # Analyze VNet peerings to identify potential hub networks
+            # Identify hub candidates: VNets with 3+ peerings
             $hubCandidates = @()
-            $regionGroups = $virtualNetworks | Group-Object -Property Location
-
             foreach ($vnet in $virtualNetworks) {
                 $peerings = $vnet.Properties.virtualNetworkPeerings
-                if ($peerings -and ($peerings | Measure-Object).Count -gt 2) {
-                    # Networks with multiple peerings are likely hub candidates
+                $peeringCount = ($peerings | Measure-Object).Count
+                if ($peerings -and $peeringCount -gt 2) {
                     $hubCandidates += @{
                         VNetName     = $vnet.Name
                         VNetId       = $vnet.Id
                         Location     = $vnet.Location
-                        PeeringCount = ($peerings | Measure-Object).Count
+                        PeeringCount = $peeringCount
                         Peerings     = $peerings
                     }
                 }
             }
 
-            $rawData = @{
-                "HubCandidates"              = $hubCandidates
-                "RegionCount"                = ($regionGroups | Measure-Object).Count
-                "RegionGroups"               = $regionGroups | ForEach-Object { 
-                    @{
-                        Region    = $_.Name
-                        VNetCount = $_.Count
+            $regionGroups = $virtualNetworks | Group-Object -Property Location
+
+            if ($hubCandidates.Count -eq 0) {
+                # No clear hub candidates - single flat topology
+                $status = [Status]::ManualVerificationRequired
+                $rawData = @{
+                    "HubCandidates" = @()
+                    "RegionCount"   = ($regionGroups | Measure-Object).Count
+                    "Detail"        = "No hub candidates detected (VNets with 3+ peerings). Verify if hub-spoke topology is intended."
+                }
+            }
+            else {
+                # Group hub candidates by region
+                $hubRegions = $hubCandidates | ForEach-Object { $_.Location } | Sort-Object -Unique
+
+                if ($hubRegions.Count -le 1) {
+                    # Single-region hub - multi-region check not applicable or not implemented
+                    $status = [Status]::ManualVerificationRequired
+                    $estimatedPercentageApplied = 0
+                    $rawData = @{
+                        "HubCandidates" = $hubCandidates
+                        "HubRegions"    = $hubRegions
+                        "Detail"        = "All hub candidates are in a single region ($($hubRegions[0])). Multi-region hub-spoke may not be needed."
                     }
                 }
-                "ManualVerificationRequired" = "Review hub-and-spoke architecture across regions and verify global VNet peerings between hub VNets"
+                else {
+                    # Multiple hub regions detected - check for global peerings between hubs
+                    $hubIds = $hubCandidates | ForEach-Object { $_.VNetId }
+                    $globalPeeringsFound = @()
+                    $missingGlobalPeerings = @()
+
+                    foreach ($hub in $hubCandidates) {
+                        $peerings = $hub.Peerings
+                        foreach ($peering in $peerings) {
+                            $remoteId = $peering.Properties.remoteVirtualNetwork.id
+                            $isRemoteHub = $hubIds -contains $remoteId
+                            if ($isRemoteHub) {
+                                $remoteHub = $hubCandidates | Where-Object { $_.VNetId -eq $remoteId }
+                                $remoteLocation = $null
+                                if ($remoteHub) { $remoteLocation = $remoteHub[0].Location }
+                                $isDifferentRegion = $remoteLocation -and ($remoteLocation -ne $hub.Location)
+                                if ($isDifferentRegion) {
+                                    $allowGateway = $peering.Properties.allowGatewayTransit -eq $true
+                                    $useRemoteGw = $peering.Properties.useRemoteVirtualNetworkGateway -eq $true
+                                    $globalPeeringsFound += @{
+                                        FromHub          = $hub.VNetName
+                                        FromRegion       = $hub.Location
+                                        ToHub            = $remoteHub[0].VNetName
+                                        ToRegion         = $remoteLocation
+                                        PeeringState     = $peering.Properties.peeringState
+                                        AllowGateway     = $allowGateway
+                                        UseRemoteGateway = $useRemoteGw
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    # Check for missing hub-to-hub peerings across regions
+                    for ($i = 0; $i -lt $hubCandidates.Count; $i++) {
+                        for ($j = $i + 1; $j -lt $hubCandidates.Count; $j++) {
+                            $h1 = $hubCandidates[$i]
+                            $h2 = $hubCandidates[$j]
+                            if ($h1.Location -ne $h2.Location) {
+                                $hasPeering = $false
+                                foreach ($gp in $globalPeeringsFound) {
+                                    $matchFwd = ($gp.FromHub -eq $h1.VNetName) -and ($gp.ToHub -eq $h2.VNetName)
+                                    $matchRev = ($gp.FromHub -eq $h2.VNetName) -and ($gp.ToHub -eq $h1.VNetName)
+                                    if ($matchFwd -or $matchRev) {
+                                        $hasPeering = $true
+                                        break
+                                    }
+                                }
+                                if (-not $hasPeering) {
+                                    $missingGlobalPeerings += @{
+                                        Hub1       = $h1.VNetName
+                                        Hub1Region = $h1.Location
+                                        Hub2       = $h2.VNetName
+                                        Hub2Region = $h2.Location
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if ($missingGlobalPeerings.Count -eq 0 -and $globalPeeringsFound.Count -gt 0) {
+                        $status = [Status]::Implemented
+                        $estimatedPercentageApplied = 100
+                    }
+                    elseif ($globalPeeringsFound.Count -gt 0 -and $missingGlobalPeerings.Count -gt 0) {
+                        $status = [Status]::PartiallyImplemented
+                        $totalPairs = $globalPeeringsFound.Count + $missingGlobalPeerings.Count
+                        if ($totalPairs -gt 0) {
+                            $estimatedPercentageApplied = [math]::Round(($globalPeeringsFound.Count / $totalPairs) * 100)
+                        }
+                    }
+                    else {
+                        $status = [Status]::NotImplemented
+                        $estimatedPercentageApplied = 0
+                    }
+
+                    $rawData = @{
+                        "HubCandidates"        = $hubCandidates | ForEach-Object { @{ VNetName = $_.VNetName; Location = $_.Location; PeeringCount = $_.PeeringCount } }
+                        "HubRegions"           = $hubRegions
+                        "GlobalPeeringsFound"  = $globalPeeringsFound
+                        "MissingGlobalPeerings" = $missingGlobalPeerings
+                    }
+                }
             }
         }
     }
@@ -801,28 +956,80 @@ function Test-QuestionD0110 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        # Check for Network Watcher and related monitoring resources
-        $networkWatchers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers' }
-        $connectionMonitors = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers/connectionMonitors' }
-        $trafficAnalytics = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkSecurityGroups' -and $_.Properties.flowLogs }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
 
-        if (($networkWatchers | Measure-Object).Count -eq 0) {
-            $status = [Status]::NotImplemented
-            $rawData = "No Network Watcher resources found. Azure Monitor for Networks requires Network Watcher to be enabled."
+        if (($virtualNetworks | Measure-Object).Count -eq 0) {
+            $status = [Status]::NotApplicable
+            $rawData = "No virtual networks found"
         }
         else {
+            # Regions that have VNets deployed
+            $vnetRegions = @($virtualNetworks | ForEach-Object { $_.Location } | Sort-Object -Unique)
+
+            # Check for Network Watcher and related monitoring resources
+            $networkWatchers = @($global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers' })
+            $connectionMonitors = @($global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers/connectionMonitors' })
+            $flowLogs = @($global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers/flowLogs' })
+
+            # Count NSGs with flow logs enabled via properties
+            $nsgs = @($global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkSecurityGroups' })
+            $nsgsWithFlowLogs = @()
+            foreach ($nsg in $nsgs) {
+                if ($nsg.Properties.flowLogs) {
+                    $nsgsWithFlowLogs += $nsg
+                }
+            }
+
+            # Evaluate coverage
+            $watcherRegions = @($networkWatchers | ForEach-Object { $_.Location } | Sort-Object -Unique)
+            $regionsWithoutWatcher = @()
+            foreach ($r in $vnetRegions) {
+                if ($watcherRegions -notcontains $r) {
+                    $regionsWithoutWatcher += $r
+                }
+            }
+
+            $hasWatchers = $networkWatchers.Count -gt 0
+            $hasConnectionMonitors = $connectionMonitors.Count -gt 0
+            $hasFlowLogs = ($flowLogs.Count -gt 0) -or ($nsgsWithFlowLogs.Count -gt 0)
+            $allRegionsCovered = $regionsWithoutWatcher.Count -eq 0
+
+            # Scoring: 3 components - watchers in all regions, connection monitors, flow logs
+            $score = 0
+            $maxScore = 3
+            if ($hasWatchers -and $allRegionsCovered) { $score++ }
+            if ($hasConnectionMonitors) { $score++ }
+            if ($hasFlowLogs) { $score++ }
+
+            if ($score -eq 0) {
+                $status = [Status]::NotImplemented
+                $estimatedPercentageApplied = 0
+            }
+            elseif ($score -eq $maxScore) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+            }
+            else {
+                $status = [Status]::PartiallyImplemented
+                $estimatedPercentageApplied = [math]::Round(($score / $maxScore) * 100)
+            }
+
             $rawData = @{
-                "NetworkWatchers"            = $networkWatchers | ForEach-Object {
+                "NetworkWatchers"         = $networkWatchers | ForEach-Object {
                     @{
                         Name              = $_.Name
-                        Id                = $_.Id
                         Location          = $_.Location
                         ProvisioningState = $_.Properties.provisioningState
                     }
                 }
-                "ConnectionMonitors"         = $connectionMonitors | Measure-Object | Select-Object -ExpandProperty Count
-                "TrafficAnalytics"           = $trafficAnalytics | Measure-Object | Select-Object -ExpandProperty Count
-                "ManualVerificationRequired" = "Verify Azure Monitor for Networks is configured and being used for end-to-end network monitoring"
+                "WatcherRegions"          = $watcherRegions
+                "VNetRegions"             = $vnetRegions
+                "RegionsWithoutWatcher"   = $regionsWithoutWatcher
+                "ConnectionMonitorsCount" = $connectionMonitors.Count
+                "FlowLogsCount"           = $flowLogs.Count
+                "NSGsWithFlowLogs"        = $nsgsWithFlowLogs.Count
+                "TotalNSGs"               = $nsgs.Count
+                "MonitoringScore"         = "$score/$maxScore"
             }
         }
     }
@@ -1456,31 +1663,60 @@ function Test-QuestionD0301 {
                 }
             }
 
-            # Check for potential overlaps (this is a simplified check)
-            for ($i = 0; $i -lt $vnetAddressSpaces.Count; $i++) {
-                for ($j = $i + 1; $j -lt $vnetAddressSpaces.Count; $j++) {
-                    $space1 = $vnetAddressSpaces[$i]
-                    $space2 = $vnetAddressSpaces[$j]
-                    
-                    # Simple overlap detection - same prefix or very similar
-                    if ($space1.AddressPrefix -eq $space2.AddressPrefix) {
-                        $overlappingPairs += @{
-                            VNet1             = $space1.VNetName
-                            VNet1Location     = $space1.Location
-                            VNet2             = $space2.VNetName
-                            VNet2Location     = $space2.Location
-                            OverlappingPrefix = $space1.AddressPrefix
+            if ($vnetAddressSpaces.Count -le 1) {
+                $status = [Status]::Implemented
+                $estimatedPercentageApplied = 100
+                $rawData = @{
+                    "VNetAddressSpaces" = $vnetAddressSpaces
+                    "TotalVNets"        = ($virtualNetworks | Measure-Object).Count
+                    "Detail"            = "Only one address space found - no overlap possible"
+                }
+            }
+            else {
+                # Check for CIDR overlaps between all pairs
+                for ($i = 0; $i -lt $vnetAddressSpaces.Count; $i++) {
+                    for ($j = $i + 1; $j -lt $vnetAddressSpaces.Count; $j++) {
+                        $space1 = $vnetAddressSpaces[$i]
+                        $space2 = $vnetAddressSpaces[$j]
+
+                        # Skip if same VNet (multiple address spaces within a VNet is allowed)
+                        if ($space1.VNetId -eq $space2.VNetId) { continue }
+
+                        try {
+                            $isOverlap = Test-CIDROverlap -CIDR1 $space1.AddressPrefix -CIDR2 $space2.AddressPrefix
+                            if ($isOverlap) {
+                                $overlappingPairs += @{
+                                    VNet1         = $space1.VNetName
+                                    VNet1Location = $space1.Location
+                                    VNet1Prefix   = $space1.AddressPrefix
+                                    VNet2         = $space2.VNetName
+                                    VNet2Location = $space2.Location
+                                    VNet2Prefix   = $space2.AddressPrefix
+                                }
+                            }
+                        }
+                        catch {
+                            # If CIDR parsing fails, skip this pair
                         }
                     }
                 }
-            }
 
-            $rawData = @{
-                "VNetAddressSpaces"          = $vnetAddressSpaces
-                "PotentialOverlaps"          = $overlappingPairs
-                "ManualVerificationRequired" = "Manual verification required to ensure no overlapping IP address spaces across Azure regions and on-premises locations"
-                "TotalVNets"                 = ($virtualNetworks | Measure-Object).Count
-                "TotalAddressSpaces"         = $vnetAddressSpaces.Count
+                if ($overlappingPairs.Count -eq 0) {
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                }
+                else {
+                    $status = [Status]::NotImplemented
+                    $estimatedPercentageApplied = 0
+                }
+
+                $rawData = @{
+                    "VNetAddressSpaces" = $vnetAddressSpaces
+                    "OverlappingPairs"  = $overlappingPairs
+                    "TotalVNets"        = ($virtualNetworks | Measure-Object).Count
+                    "TotalAddressSpaces" = $vnetAddressSpaces.Count
+                    "OverlapCount"      = $overlappingPairs.Count
+                }
             }
         }
     }
@@ -1738,48 +1974,91 @@ function Test-QuestionD0304 {
         else {
             # Group VNets by region to identify potential prod/DR pairs
             $regionGroups = $virtualNetworks | Group-Object -Property Location
-            $vnetsByRegion = @{
-            }
 
-            foreach ($group in $regionGroups) {
-                $vnetsByRegion[$group.Name] = $group.Group
+            if (($regionGroups | Measure-Object).Count -le 1) {
+                # Single region - DR across regions not detectable
+                $status = [Status]::ManualVerificationRequired
+                $rawData = @{
+                    "TotalRegions" = 1
+                    "Detail"       = "All VNets are in a single region. Cannot assess cross-region prod/DR IP overlap."
+                }
             }
-
-            $regionalAnalysis = @()
-            foreach ($region in $vnetsByRegion.Keys) {
-                $vnetsInRegion = $vnetsByRegion[$region]
-                $addressSpaces = @()
-                
-                foreach ($vnet in $vnetsInRegion) {
+            else {
+                # Collect address spaces per VNet
+                $vnetAddressSpaces = @()
+                foreach ($vnet in $virtualNetworks) {
                     $addressPrefixes = $vnet.Properties.addressSpace.addressPrefixes
                     if ($addressPrefixes) {
                         foreach ($prefix in $addressPrefixes) {
-                            $addressSpaces += @{
+                            $vnetAddressSpaces += @{
                                 VNetName      = $vnet.Name
                                 VNetId        = $vnet.Id
+                                Location      = $vnet.Location
                                 AddressPrefix = $prefix
                             }
                         }
                     }
                 }
-                
-                $regionalAnalysis += @{
-                    Region        = $region
-                    VNetCount     = $vnetsInRegion.Count
-                    AddressSpaces = $addressSpaces
-                }
-            }
 
-            $rawData = @{
-                "RegionalAnalysis"           = $regionalAnalysis
-                "TotalRegions"               = $regionGroups.Count
-                "ManualVerificationRequired" = "Manual verification required to ensure no overlapping IP address ranges between production and disaster recovery sites"
-                "Recommendations"            = @(
-                    "Review IP address allocation across regions",
-                    "Ensure production and DR sites use different IP ranges",
-                    "Consider Site Recovery networking requirements",
-                    "Document IP allocation strategy"
-                )
+                # Check for CIDR overlaps between VNets in DIFFERENT regions
+                $crossRegionOverlaps = @()
+                for ($i = 0; $i -lt $vnetAddressSpaces.Count; $i++) {
+                    for ($j = $i + 1; $j -lt $vnetAddressSpaces.Count; $j++) {
+                        $space1 = $vnetAddressSpaces[$i]
+                        $space2 = $vnetAddressSpaces[$j]
+
+                        # Only check cross-region pairs (prod in region A, DR in region B)
+                        if ($space1.Location -eq $space2.Location) { continue }
+                        # Skip same VNet
+                        if ($space1.VNetId -eq $space2.VNetId) { continue }
+
+                        try {
+                            $isOverlap = Test-CIDROverlap -CIDR1 $space1.AddressPrefix -CIDR2 $space2.AddressPrefix
+                            if ($isOverlap) {
+                                $crossRegionOverlaps += @{
+                                    VNet1         = $space1.VNetName
+                                    VNet1Region   = $space1.Location
+                                    VNet1Prefix   = $space1.AddressPrefix
+                                    VNet2         = $space2.VNetName
+                                    VNet2Region   = $space2.Location
+                                    VNet2Prefix   = $space2.AddressPrefix
+                                }
+                            }
+                        }
+                        catch {
+                            # If CIDR parsing fails, skip this pair
+                        }
+                    }
+                }
+
+                $regionalAnalysis = $regionGroups | ForEach-Object {
+                    @{
+                        Region    = $_.Name
+                        VNetCount = $_.Count
+                    }
+                }
+
+                if ($crossRegionOverlaps.Count -eq 0) {
+                    $status = [Status]::Implemented
+                    $estimatedPercentageApplied = 100
+                }
+                else {
+                    $status = [Status]::NotImplemented
+                    $estimatedPercentageApplied = 0
+                }
+
+                $rawData = @{
+                    "RegionalAnalysis"      = $regionalAnalysis
+                    "TotalRegions"          = ($regionGroups | Measure-Object).Count
+                    "CrossRegionOverlaps"   = $crossRegionOverlaps
+                    "OverlapCount"          = $crossRegionOverlaps.Count
+                    "TotalAddressSpaces"    = $vnetAddressSpaces.Count
+                    "Recommendations"       = @(
+                        "Ensure production and DR sites use non-overlapping IP ranges",
+                        "Consider Site Recovery networking requirements",
+                        "Document IP allocation strategy across regions"
+                    )
+                }
             }
         }
     }

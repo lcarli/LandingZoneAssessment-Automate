@@ -49,7 +49,7 @@
 
 ### NetworkTopologyandConnectivity.ps1 — ~5 stubs
 
-- [ ] **#10** — Implementar checks: D01.09, D01.10, D03.01, D03.04
+- [x] **#10** — Implementar checks: D01.09, D01.10, D03.01, D03.04
 
 ### Management.ps1 — 2 stubs
 
