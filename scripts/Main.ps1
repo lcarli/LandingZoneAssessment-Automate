@@ -89,90 +89,132 @@ function Main {
 
     $designAreas = $config.DesignAreas
 
-    # Execute assessments based on configuration
-    if ($designAreas.Billing) {
-        Write-Output "Running Azure Billing and Microsoft Entra ID Tenants Assessment..."
-        try {     
-            $generalResult.Billing = Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment -Checklist $global:Checklist -ContractType $contractType
-            Write-Output "Billing assessment completed"
-        }
-        catch {
-            Write-Output "Billing assessment failed: $($_.Exception.Message)"
-        }
-    }    
-    if ($designAreas.IAM) {
-        Write-Output "Running Identity and Access Management Assessment..."
-        try {
-            $generalResult.IAM = Invoke-IdentityandAccessManagementAssessment -Checklist $global:Checklist
-            Write-Output "Identity and Access Management assessment completed"
-        }
-        catch {
-            Write-Output "Identity and Access Management assessment failed: $($_.Exception.Message)"
+    # Build data-driven assessment task list from configuration
+    $assessmentDefs = @(
+        @{ ConfigKey = 'Billing';              ResultKey = 'Billing';              Label = 'Azure Billing and Microsoft Entra ID Tenants'; Script = 'AzureBillingandMicrosoftEntraIDTenants.ps1'; Function = 'Invoke-AzureBillingandMicrosoftEntraIDTenantsAssessment'; UseContractType = $true }
+        @{ ConfigKey = 'IAM';                  ResultKey = 'IAM';                  Label = 'Identity and Access Management';               Script = 'IdentityandAccessManagement.ps1';                       Function = 'Invoke-IdentityandAccessManagementAssessment';         UseContractType = $false }
+        @{ ConfigKey = 'ResourceOrganization'; ResultKey = 'ResourceOrganization'; Label = 'Resource Organization';                        Script = 'ResourceOrganization.ps1';                              Function = 'Invoke-ResourceOrganizationAssessment';                UseContractType = $false }
+        @{ ConfigKey = 'Network';              ResultKey = 'Network';              Label = 'Network Topology and Connectivity';            Script = 'NetworkTopologyandConnectivity.ps1';                    Function = 'Invoke-NetworkTopologyandConnectivityAssessment';      UseContractType = $false }
+        @{ ConfigKey = 'Governance';           ResultKey = 'Governance';           Label = 'Governance';                                   Script = 'Governance.ps1';                                        Function = 'Invoke-GovernanceAssessment';                          UseContractType = $false }
+        @{ ConfigKey = 'Security';             ResultKey = 'Security';             Label = 'Security';                                     Script = 'Security.ps1';                                          Function = 'Invoke-SecurityAssessment';                            UseContractType = $false }
+        @{ ConfigKey = 'DevOps';               ResultKey = 'DevOps';              Label = 'Platform Automation and DevOps';               Script = 'PlatformAutomationandDevOps.ps1';                       Function = 'Invoke-PlatformAutomationandDevOpsAssessment';         UseContractType = $false }
+        @{ ConfigKey = 'Management';           ResultKey = 'Management';           Label = 'Management';                                   Script = 'Management.ps1';                                        Function = 'Invoke-ManagementAssessment';                          UseContractType = $false }
+    )
+
+    # Filter to only enabled design areas
+    $enabledAssessments = @()
+    foreach ($def in $assessmentDefs) {
+        if ($designAreas.($def.ConfigKey)) {
+            $enabledAssessments += $def
         }
     }
-    
-    if ($designAreas.ResourceOrganization) {
-        Write-Output "Running Resource Organization Assessment..."
-        try {
-            $generalResult.ResourceOrganization = Invoke-ResourceOrganizationAssessment -Checklist $global:Checklist
-            Write-Output "Resource Organization assessment completed"
-        }
-        catch {
-            Write-Output "Resource Organization assessment failed: $($_.Exception.Message)"
-        }
+
+    if ($enabledAssessments.Count -eq 0) {
+        Write-Output "No design areas enabled in configuration. Skipping assessments."
     }
-    
-    if ($designAreas.Network) {
-        Write-Output "Running Network Topology and Connectivity Assessment..."
-        try {
-            $generalResult.Network = Invoke-NetworkTopologyandConnectivityAssessment -Checklist $global:Checklist
-            Write-Output "Network assessment completed"
+    else {
+        # Determine if parallel execution is available (PowerShell 7+)
+        $canParallel = ($PSVersionTable.PSVersion.Major -ge 7) -and ($enabledAssessments.Count -gt 1)
+
+        if ($canParallel) {
+            Write-Output ""
+            Write-Output "PowerShell 7+ detected - running $($enabledAssessments.Count) assessments in parallel (ThrottleLimit: 4)..."
+            Write-Output ""
+
+            $assessmentStartTime = Get-Date
+
+            # Capture paths and globals for parallel runspaces (via $using:)
+            $scriptRoot = $PSScriptRoot
+            $sharedEnumsPath       = [System.IO.Path]::GetFullPath("$PSScriptRoot/../shared/Enums.ps1")
+            $sharedErrorPath       = [System.IO.Path]::GetFullPath("$PSScriptRoot/../shared/ErrorHandling.ps1")
+            $sharedFunctionsPath   = [System.IO.Path]::GetFullPath("$PSScriptRoot/../shared/SharedFunctions.ps1")
+            $functionsDir          = [System.IO.Path]::GetFullPath("$PSScriptRoot/../functions")
+
+            $azData          = $global:AzData
+            $graphData       = $global:GraphData
+            $graphConnected  = $global:GraphConnected
+            $tenantId        = $global:TenantId
+            $checklist       = $global:Checklist
+            $ctType          = $contractType
+
+            $parallelResults = $enabledAssessments | ForEach-Object -Parallel {
+                $task = $_
+
+                # Retrieve parent-scope variables
+                $sr               = $using:scriptRoot
+                $enumsPath        = $using:sharedEnumsPath
+                $errorPath        = $using:sharedErrorPath
+                $funcPath         = $using:sharedFunctionsPath
+                $fnDir            = $using:functionsDir
+
+                # Set up globals in this runspace
+                $global:AzData         = $using:azData
+                $global:GraphData      = $using:graphData
+                $global:GraphConnected = $using:graphConnected
+                $global:TenantId       = $using:tenantId
+                $global:Checklist      = $using:checklist
+
+                # Dot-source shared dependencies (all 3 files explicitly)
+                . $enumsPath
+                . $errorPath
+                . $funcPath
+
+                # Dot-source the specific assessment module
+                $moduleFile = Join-Path $fnDir $task.Script
+                . $moduleFile
+
+                # Build parameters
+                $params = @{ Checklist = $global:Checklist }
+                if ($task.UseContractType) {
+                    $params['ContractType'] = $using:ctType
+                }
+
+                $taskStart = Get-Date
+                try {
+                    $result = & $task.Function @params
+                    $elapsed = (Get-Date) - $taskStart
+                    Write-Host "$($task.Label) assessment completed in $($elapsed.ToString('mm\:ss\.fff'))"
+                    [PSCustomObject]@{ Key = $task.ResultKey; Data = $result; Success = $true }
+                }
+                catch {
+                    $elapsed = (Get-Date) - $taskStart
+                    Write-Host "$($task.Label) assessment FAILED after $($elapsed.ToString('mm\:ss\.fff')): $($_.Exception.Message)"
+                    [PSCustomObject]@{ Key = $task.ResultKey; Data = @(); Success = $false }
+                }
+            } -ThrottleLimit 4
+
+            # Collect parallel results into generalResult
+            foreach ($pr in $parallelResults) {
+                if ($null -ne $pr -and $pr -is [PSCustomObject] -and $null -ne $pr.PSObject.Properties['Key']) {
+                    $generalResult.($pr.Key) = $pr.Data
+                }
+            }
+
+            $totalElapsed = (Get-Date) - $assessmentStartTime
+            Write-Output ""
+            Write-Output "All parallel assessments completed in $($totalElapsed.ToString('mm\:ss\.fff'))"
         }
-        catch {
-            Write-Output "Network assessment failed: $($_.Exception.Message)"
-        }
-    }
-    
-    if ($designAreas.Governance) {
-        Write-Output "Running Governance Assessment..."
-        try {     
-            $generalResult.Governance = Invoke-GovernanceAssessment -Checklist $global:Checklist
-            Write-Output "Governance assessment completed"
-        }
-        catch {
-            Write-Output "Governance assessment failed: $($_.Exception.Message)"        }
-    }
-    
-    if ($designAreas.Security) {
-        Write-Output "Running Security Assessment..."
-        try {
-            $generalResult.Security = Invoke-SecurityAssessment -Checklist $global:Checklist
-            Write-Output "Security assessment completed"
-        }
-        catch {
-            Write-Output "Security assessment failed: $($_.Exception.Message)"
-        }
-    }
-    
-    if ($designAreas.DevOps) {
-        Write-Output "Running Platform Automation and DevOps Assessment..."
-        try {
-            $generalResult.DevOps = Invoke-PlatformAutomationandDevOpsAssessment -Checklist $global:Checklist
-            Write-Output "DevOps assessment completed"
-        }
-        catch {
-            Write-Output "DevOps assessment failed: $($_.Exception.Message)"
-        }
-    }
-    
-    if ($designAreas.Management) {
-        Write-Output "Running Management Assessment..."
-        try {
-            $generalResult.Management = Invoke-ManagementAssessment -Checklist $global:Checklist
-            Write-Output "Management assessment completed"
-        }
-        catch {
-            Write-Output "Management assessment failed: $($_.Exception.Message)"
+        else {
+            # Sequential execution (PS 5.1 compatible, or single assessment)
+            if ($PSVersionTable.PSVersion.Major -lt 7) {
+                Write-Output "PowerShell 5.x detected - running assessments sequentially."
+            }
+            Write-Output ""
+
+            foreach ($task in $enabledAssessments) {
+                Write-Output "Running $($task.Label) Assessment..."
+                try {
+                    $params = @{ Checklist = $global:Checklist }
+                    if ($task.UseContractType) {
+                        $params['ContractType'] = $contractType
+                    }
+                    $generalResult.($task.ResultKey) = & $task.Function @params
+                    Write-Output "$($task.Label) assessment completed"
+                }
+                catch {
+                    Write-Output "$($task.Label) assessment failed: $($_.Exception.Message)"
+                }
+            }
         }
     }
 

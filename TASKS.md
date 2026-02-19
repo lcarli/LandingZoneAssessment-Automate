@@ -110,7 +110,7 @@
 
 ## 🚀 FUNCIONALIDADES NOVAS
 
-- [ ] **#25** — Adicionar execução paralela dos assessments — `Main.ps1`  
+- [x] **#25** — Adicionar execução paralela dos assessments — `Main.ps1`  
   As 8 áreas rodam sequencialmente. Usar `ForEach-Object -Parallel` (PS 7+) para acelerar.
 
 - [ ] **#26** — Consumir `Weight` e `Score` no report/dashboard  
