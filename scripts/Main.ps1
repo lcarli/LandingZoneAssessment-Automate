@@ -133,10 +133,15 @@ function Main {
         # Determine if parallel execution is available (PowerShell 7+)
         $canParallel = ($PSVersionTable.PSVersion.Major -ge 7) -and ($enabledAssessments.Count -gt 1)
 
+        $progressId = 1
+        $totalSteps = $enabledAssessments.Count + 1  # +1 for report generation
+
         if ($canParallel) {
             Write-Output ""
             Write-Output "PowerShell 7+ detected - running $($enabledAssessments.Count) assessments in parallel (ThrottleLimit: 4)..."
             Write-Output ""
+
+            Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "Running $($enabledAssessments.Count) assessments in parallel..." -PercentComplete 0
 
             $assessmentStartTime = Get-Date
 
@@ -208,6 +213,13 @@ function Main {
             }
 
             $totalElapsed = (Get-Date) - $assessmentStartTime
+
+            # Update progress: count successes/failures
+            $succeeded = @($parallelResults | Where-Object { $_.Success -eq $true }).Count
+            $failed = $enabledAssessments.Count - $succeeded
+            $pctDone = [math]::Round(($enabledAssessments.Count / $totalSteps) * 100)
+            Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "Assessments complete ($succeeded OK, $failed failed)" -PercentComplete $pctDone
+
             Write-Output ""
             Write-Output "All parallel assessments completed in $($totalElapsed.ToString('mm\:ss\.fff'))"
         }
@@ -218,7 +230,11 @@ function Main {
             }
             Write-Output ""
 
+            $stepIndex = 0
             foreach ($task in $enabledAssessments) {
+                $stepIndex++
+                $pctDone = [math]::Round((($stepIndex - 1) / $totalSteps) * 100)
+                Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "[$stepIndex/$($enabledAssessments.Count)] $($task.Label)" -PercentComplete $pctDone
                 Write-Output "Running $($task.Label) Assessment..."
                 try {
                     $params = @{ Checklist = $global:Checklist }
@@ -232,6 +248,9 @@ function Main {
                     Write-Output "$($task.Label) assessment failed: $($_.Exception.Message)"
                 }
             }
+
+            $pctDone = [math]::Round(($enabledAssessments.Count / $totalSteps) * 100)
+            Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "All assessments completed" -PercentComplete $pctDone
         }
     }
 
@@ -241,6 +260,10 @@ function Main {
     Write-Output "======================= REPORT GENERATION ======================================"
     Write-Output "=================================================================================="
     Write-Output ""
+
+    if ($enabledAssessments.Count -gt 0) {
+        Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "Generating reports..." -PercentComplete 95
+    }
     
     try {
         Measure-ExecutionTime -ScriptBlock {
@@ -250,6 +273,11 @@ function Main {
     }
     catch {
         Write-Output "Report generation failed: $($_.Exception.Message)"
+    }
+
+    # Complete the progress bar
+    if ($enabledAssessments.Count -gt 0) {
+        Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "Complete" -PercentComplete 100 -Completed
     }
 }
 

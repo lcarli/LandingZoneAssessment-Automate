@@ -134,7 +134,7 @@
 - [ ] **#32** — Gerar resumo executivo no relatório  
   Percentual geral de compliance, top riscos por severidade, comparação com execuções anteriores.
 
-- [ ] **#33** — Adicionar progress bar no `Main.ps1`  
+- [x] **#33** — Adicionar progress bar no `Main.ps1`  
   Usar `Write-Progress` para feedback visual durante a execução dos 8 módulos.
 
 ---
