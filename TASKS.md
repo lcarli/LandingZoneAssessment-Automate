@@ -122,7 +122,7 @@
 - [ ] **#28** — Melhorar o `exceptions.json`  
   Apenas um exemplo comentado. Documentar e permitir override por `guid` além de `id`.
 
-- [ ] **#29** — Corrigir `DebugFunctions.ps1`  
+- [x] **#29** — Corrigir `DebugFunctions.ps1`  
   Faltam 3 dos 8 módulos (Security, ResourceOrg, PlatformAutomation); usa `Invoke-Expression` (risco de segurança); mock hardcoded.
 
 - [ ] **#30** — Corrigir `CompareChecklist.ps1`  
@@ -130,9 +130,6 @@
 
 - [x] **#31** — Adicionar validação do `config.json` na inicialização  
   Não valida campos obrigatórios, formatos, ou se o TenantId é um GUID válido.
-
-- [ ] **#32** — Gerar resumo executivo no relatório  
-  Percentual geral de compliance, top riscos por severidade, comparação com execuções anteriores.
 
 - [x] **#33** — Adicionar progress bar no `Main.ps1`  
   Usar `Write-Progress` para feedback visual durante a execução dos 8 módulos.
