@@ -87,7 +87,7 @@
 - [x] **#19** — Melhorar heurísticas frágeis (naming-based) — Diversos  
   DCs, break-glass accounts, Entra Connect detectados só por nome de VM — falso-positivos/negativos.
 
-- [ ] **#20** — Padronizar filtro `$_.Type` vs `$_.ResourceType` — `NetworkTopologyandConnectivity.ps1`  
+- [x] **#20** — Padronizar filtro `$_.Type` vs `$_.ResourceType` — `NetworkTopologyandConnectivity.ps1`  
   Inconsistente ao filtrar `$global:AzData.Resources`.
 
 - [ ] **#21** — Corrigir `switch` statement confuso no weight — `SharedFunctions.ps1`  

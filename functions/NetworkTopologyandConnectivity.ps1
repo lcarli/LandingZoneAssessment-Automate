@@ -1,4 +1,4 @@
-# NetworkTopologyandConnectivity.ps1
+﻿# NetworkTopologyandConnectivity.ps1
 
 <#
 .SYNOPSIS
@@ -92,8 +92,8 @@ function Invoke-NetworkTopologyandConnectivityAssessment {
         $results = @()
 
         # Use cached data instead of direct Search-AzGraph calls
-        $virtualWans = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualWans' }
-        $azureFirewalls = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/azureFirewalls' }
+        $virtualWans = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualWans' }
+        $azureFirewalls = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/azureFirewalls' }
         
         $virtualWANPresent = ($virtualWans | Measure-Object).Count -gt 0
         $azureFirewallPresent = ($azureFirewalls | Measure-Object).Count -gt 0
@@ -184,7 +184,7 @@ function Test-QuestionD0101 {
         $estimatedPercentageApplied = 0
         
         # Use cached data instead of direct Search-AzGraph call
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/virtualnetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/virtualnetworks' }
         
         foreach ($vnet in $virtualNetworks) {
             # Check if the virtual network has peerings
@@ -205,7 +205,7 @@ function Test-QuestionD0101 {
             $vnetSpecialSubnets = $maxPeeringsVnet.Properties.subnets | Where-Object { $_.Name -eq "GatewaySubnet" -or $_.Name -eq "AzureFirewallSubnet" }
             
             # Check for devices with IP forwarding using cached data
-            $networkInterfaces = $global:AzData.Resources | Where-Object { $_.Type -eq "microsoft.network/networkinterfaces" -and $_.Properties.enableIPForwarding -eq $true }
+            $networkInterfaces = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "microsoft.network/networkinterfaces" -and $_.Properties.enableIPForwarding -eq $true }
             $vnetDevicesWithIPForwarding = @()
             
             foreach ($nic in $networkInterfaces) {
@@ -268,11 +268,11 @@ function Test-QuestionD0102 {
         $hubVirtualNetworkId = $rawDataD0101.MaxPeeringsVnet.id
         
         # Use cached data instead of direct Search-AzGraph call
-        $expressRouteGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/expressRouteGateways' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
-        $vpnGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/vpnGateways' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
-        $azureFirewalls = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/azureFirewalls' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
-        $networkInterfaces = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkInterfaces' -and $_.Properties.enableIPForwarding -eq $true }
-        $privateDnsResolvers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/privateDnsResolvers' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
+        $expressRouteGateways = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/expressRouteGateways' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
+        $vpnGateways = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/vpnGateways' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
+        $azureFirewalls = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/azureFirewalls' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
+        $networkInterfaces = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/networkInterfaces' -and $_.Properties.enableIPForwarding -eq $true }
+        $privateDnsResolvers = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/privateDnsResolvers' -and $_.Properties.virtualNetwork.id -eq $hubVirtualNetworkId }
         
         # Filter NICs that are in the hub VNet
         $nvasInHub = @()
@@ -355,7 +355,7 @@ function Test-QuestionD0103 {
         $estimatedPercentageApplied = 0
         
         # Use cached data instead of direct Search-AzGraph call
-        $publicIPs = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/publicIPAddresses' }
+        $publicIPs = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/publicIPAddresses' }
 
         $protectedIPs = 0
         $totalIPs = $publicIPs.Count
@@ -371,7 +371,7 @@ function Test-QuestionD0103 {
                     $subnetId = $ipConfigId.Substring(0, $ipConfigId.LastIndexOf("/"))
                     $vnetId = $subnetId.Substring(0, $subnetId.IndexOf("/subnets/"))
                     
-                    $virtualNetwork = $global:AzData.Resources | Where-Object { $_.Id -eq $vnetId -and $_.Type -eq 'microsoft.network/virtualnetworks' } | Select-Object -First 1
+                    $virtualNetwork = $global:AzData.Resources | Where-Object { $_.Id -eq $vnetId -and $_.ResourceType -eq 'microsoft.network/virtualnetworks' } | Select-Object -First 1
                     if ($virtualNetwork -and $virtualNetwork.Properties.enableDdosProtection -eq $true) {
                         $protectedIPs++
                     }
@@ -426,7 +426,7 @@ function Test-QuestionD0103HS {
         $estimatedPercentageApplied = 0
 
         # Use cached data to check for NVAs (Network Virtual Appliances)
-        $networkInterfaces = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkInterfaces' -and $_.Properties.enableIPForwarding -eq $true }
+        $networkInterfaces = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/networkInterfaces' -and $_.Properties.enableIPForwarding -eq $true }
         $nvaPresent = ($networkInterfaces | Measure-Object).Count -gt 0
 
         if ($nvaPresent) {
@@ -468,8 +468,8 @@ function Test-QuestionD0104 {
         $estimatedPercentageApplied = 0
 
         # Use cached data instead of direct Search-AzGraph call
-        $expressRouteGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/expressRouteGateways' }
-        $vpnGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/vpnGateways' }
+        $expressRouteGateways = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/expressRouteGateways' }
+        $vpnGateways = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/vpnGateways' }
 
         $routeServerPotentialVnets = @()
 
@@ -522,7 +522,7 @@ function Test-QuestionD0106 {
         $estimatedPercentageApplied = 0
         
         # Use cached data instead of direct Search-AzGraph call
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/virtualnetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/virtualnetworks' }
         $vnetPairs = @()
         
         foreach ($vnet in $virtualNetworks) {
@@ -532,7 +532,7 @@ function Test-QuestionD0106 {
                 foreach ($peering in $peerings) {
 
                     $peeredVnetId = $peering.Properties.remoteVirtualNetwork.id
-                    $peeredVnet = $global:AzData.Resources | Where-Object { $_.Id -eq $peeredVnetId -and $_.Type -eq 'microsoft.network/virtualnetworks' } | Select-Object -First 1
+                    $peeredVnet = $global:AzData.Resources | Where-Object { $_.Id -eq $peeredVnetId -and $_.ResourceType -eq 'microsoft.network/virtualnetworks' } | Select-Object -First 1
                     
                     if ($peeredVnet -and $peeredVnet.Location -eq $vnet.Location) {
                         $vnetPairs += @{
@@ -579,9 +579,9 @@ function Test-QuestionD0107 {
         $estimatedPercentageApplied = 0
         
         # Use cached data instead of direct Search-AzGraph call
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/virtualnetworks' }
-        $nsgs = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/networksecuritygroups' }
-        $flowLogs = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/networkwatchers/flowlogs' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/virtualnetworks' }
+        $nsgs = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/networksecuritygroups' }
+        $flowLogs = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/networkwatchers/flowlogs' }
 
         $enabledFlowLogsResources = @()
         $disabledFlowLogsResources = @()
@@ -656,7 +656,7 @@ function Test-QuestionD0108 {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         # Get all virtual networks with Route Server subnets
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -795,7 +795,7 @@ function Test-QuestionD0109 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -956,7 +956,7 @@ function Test-QuestionD0110 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
 
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -967,12 +967,12 @@ function Test-QuestionD0110 {
             $vnetRegions = @($virtualNetworks | ForEach-Object { $_.Location } | Sort-Object -Unique)
 
             # Check for Network Watcher and related monitoring resources
-            $networkWatchers = @($global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers' })
-            $connectionMonitors = @($global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers/connectionMonitors' })
-            $flowLogs = @($global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkWatchers/flowLogs' })
+            $networkWatchers = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/networkWatchers' })
+            $connectionMonitors = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/networkWatchers/connectionMonitors' })
+            $flowLogs = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/networkWatchers/flowLogs' })
 
             # Count NSGs with flow logs enabled via properties
-            $nsgs = @($global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/networkSecurityGroups' })
+            $nsgs = @($global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/networkSecurityGroups' })
             $nsgsWithFlowLogs = @()
             foreach ($nsg in $nsgs) {
                 if ($nsg.Properties.flowLogs) {
@@ -1060,7 +1060,7 @@ function Test-QuestionD0111 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1150,7 +1150,7 @@ function Test-QuestionD0112 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $routeTables = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/routeTables' }
+        $routeTables = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/routeTables' }
         
         if (($routeTables | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1228,7 +1228,7 @@ function Test-QuestionD0113 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1315,7 +1315,7 @@ function Test-QuestionD0114 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $loadBalancers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/loadBalancers' }
+        $loadBalancers = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/loadBalancers' }
         
         if (($loadBalancers | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1413,7 +1413,7 @@ function Test-QuestionD0115 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $loadBalancers = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/loadBalancers' }
+        $loadBalancers = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/loadBalancers' }
         
         if (($loadBalancers | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1507,7 +1507,7 @@ function Test-QuestionD0201 {
         $estimatedPercentageApplied = 0
         
         # Check for ExpressRoute Direct circuits with MACsec configuration
-        $expressRouteDirectCircuits = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/expressrouteports' }
+        $expressRouteDirectCircuits = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/expressrouteports' }
         
         if ($expressRouteDirectCircuits.Count -gt 0) {
             $macsecEnabledCount = 0
@@ -1580,13 +1580,13 @@ function Test-QuestionD0202 {
     $estimatedPercentageApplied = 0
     try {
         # Use cached data instead of direct Search-AzGraph call
-        $expressRouteDirectCircuits = $global:AzData.Resources | Where-Object { $_.Type -eq 'microsoft.network/expressrouteports' }
+        $expressRouteDirectCircuits = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/expressrouteports' }
         
         if ($expressRouteDirectCircuits.Count -eq 0) {
-            $expressRouteGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/expressRouteGateways' }
+            $expressRouteGateways = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/expressRouteGateways' }
             
             if ($expressRouteGateways.Count -gt 0) {
-                $vpnGateways = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/vpnGateways' }
+                $vpnGateways = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/vpnGateways' }
                 $vpnGatewayPresent = $vpnGateways | Where-Object { $_.Properties.virtualNetwork.id -eq $expressRouteGateways[0].Properties.virtualNetwork.id } | Measure-Object | Select-Object -ExpandProperty Count -gt 0
                 
                 if ($vpnGatewayPresent) {
@@ -1638,7 +1638,7 @@ function Test-QuestionD0301 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1747,7 +1747,7 @@ function Test-QuestionD0302 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1858,7 +1858,7 @@ function Test-QuestionD0303 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1965,7 +1965,7 @@ function Test-QuestionD0304 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -2089,7 +2089,7 @@ function Test-QuestionD0305 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $publicIPs = $global:AzData.Resources | Where-Object { $_.Type -eq 'Microsoft.Network/publicIPAddresses' }
+        $publicIPs = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/publicIPAddresses' }
         
         if (($publicIPs | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
