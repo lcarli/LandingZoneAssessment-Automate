@@ -20,7 +20,7 @@
 - [x] **#4** — Corrigir retorno inconsistente no B03.07 — `IdentityandAccessManagement.ps1`  
   Um path de erro retorna hashtable raw ao invés de usar `Set-EvaluationResultObject`.
 
-- [ ] **#5** — Corrigir uso de `$_` ao invés de `$checklistItem` — `AzureBillingandMicrosoftEntraIDTenants.ps1`  
+- [x] **#5** — Corrigir uso de `$_` ao invés de `$checklistItem` — `AzureBillingandMicrosoftEntraIDTenants.ps1`  
   Check A01.01 passa variável errada no return.
 
 ---

@@ -154,7 +154,7 @@ function Test-QuestionA0101 {
     }
 
     # Return result object using Set-EvaluationResultObject
-    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $_ -rawData $rawData
+    return Set-EvaluationResultObject -status $status.ToString() -estimatedPercentageApplied $estimatedPercentageApplied -checklistItem $checklistItem -rawData $rawData
 }
 
 function Test-QuestionA0102 {
