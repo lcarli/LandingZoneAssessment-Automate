@@ -24,6 +24,9 @@ param (
 . "$PSScriptRoot/../functions/Governance.ps1"
 . "$PSScriptRoot/../functions/NetworkTopologyandConnectivity.ps1"
 . "$PSScriptRoot/../functions/Management.ps1"
+. "$PSScriptRoot/../functions/ResourceOrganization.ps1"
+. "$PSScriptRoot/../functions/Security.ps1"
+. "$PSScriptRoot/../functions/PlatformAutomationandDevOps.ps1"
 . "$PSScriptRoot/../scripts/Initialize.ps1"
 . "$PSScriptRoot/../shared/ErrorHandling.ps1"
 

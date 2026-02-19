@@ -14,7 +14,7 @@
 - [x] **#2** — Corrigir `Write-Warning -ForegroundColor` — `Security.ps1`  
   `-ForegroundColor` não é parâmetro válido de `Write-Warning`. Vai dar erro em runtime.
 
-- [ ] **#3** — Corrigir lógica quebrada no C03.01 — `ResourceOrganization.ps1`  
+- [x] **#3** — Corrigir lógica quebrada no C03.01 — `ResourceOrganization.ps1`  
   `ForEach-Object` sempre retorna `$false` — security baseline nunca reporta compliance.
 
 - [ ] **#4** — Corrigir retorno inconsistente no B03.07 — `IdentityandAccessManagement.ps1`  

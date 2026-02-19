@@ -759,10 +759,11 @@ function Test-QuestionC0301 {
         )
         $assignedPolicies = $global:AzData.Policies | Where-Object {
             $policyName = $_.Properties.DisplayName
-            $securityBaselineInitiatives | ForEach-Object { 
-                if ($policyName -match $_) { return $true }
+            $matched = $false
+            foreach ($baseline in $securityBaselineInitiatives) {
+                if ($policyName -match $baseline) { $matched = $true; break }
             }
-            return $false
+            $matched
         }
 
         if ($assignedPolicies -and $assignedPolicies.Count -gt 0) {

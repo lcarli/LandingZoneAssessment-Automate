@@ -5,10 +5,10 @@
     "AlzChecklist": "alz_checklist.en.json",
     "DefaultRegion": "canadaeast",  // Default Azure region for assessment queries
     "DesignAreas": {
-        "Billing": false,
+        "Billing": true,
         "IAM": false,
         "ResourceOrganization": false,
-        "Network": true,
+        "Network": false,
         "Governance": false,
         "Security": false,
         "DevOps": false,

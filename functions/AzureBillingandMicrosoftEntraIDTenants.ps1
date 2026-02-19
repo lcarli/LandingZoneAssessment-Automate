@@ -231,10 +231,10 @@ function Test-QuestionA0103 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/multi-tenant/lighthouse
 
         # Get managed services definitions for Azure Lighthouse
-        $lighthouseDefinitions = Get-AzManagedServicesDefinition
+        $lighthouseDefinitions = Get-AzManagedServicesDefinition -ErrorAction Stop
 
         # Get managed services assignments for Azure Lighthouse
-        $lighthouseAssignments = Get-AzManagedServicesAssignment
+        $lighthouseAssignments = Get-AzManagedServicesAssignment -ErrorAction Stop
 
         if ($lighthouseDefinitions.Count -eq 0 -or $lighthouseAssignments.Count -eq 0) {
             $status = [Status]::NotImplemented
@@ -335,7 +335,7 @@ function Test-QuestionA0201 {
         }
         else {
             # Check if Azure Lighthouse is used for partner access
-            $lighthouseAssignments = Get-AzManagedServicesAssignment
+            $lighthouseAssignments = Get-AzManagedServicesAssignment -ErrorAction Stop
 
             if ($lighthouseAssignments.Count -eq 0) {
                 # Azure Lighthouse is not used
@@ -533,7 +533,7 @@ function Test-QuestionA0301 {
         # Reference: https://learn.microsoft.com/azure/cost-management-billing/manage/direct-ea-administration#manage-notification-contacts
 
         # Get the billing accounts
-        $billingAccounts = Get-AzBillingAccount
+        $billingAccounts = Get-AzBillingAccount -ErrorAction Stop
 
         if ($billingAccounts.Count -eq 0) {
             # No billing accounts found
@@ -635,7 +635,7 @@ function Test-QuestionA0302 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-considerations
 
         # Get the billing accounts
-        $billingAccounts = Get-AzBillingAccount
+        $billingAccounts = Get-AzBillingAccount -ErrorAction Stop
 
         if ($billingAccounts.Count -eq 0) {
             # No billing accounts found
@@ -727,7 +727,7 @@ function Test-QuestionA0303 {
         $totalBudgets = 0
 
         # Get Enterprise Agreement billing accounts if available
-        $billingAccounts = Get-AzBillingAccount
+        $billingAccounts = Get-AzBillingAccount -ErrorAction Stop
 
         if ($billingAccounts) {
             foreach ($billingAccount in $billingAccounts) {
@@ -890,7 +890,7 @@ function Test-QuestionA0304 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/azure-billing-enterprise-agreement#design-recommendations
 
         # Get the billing accounts (EA Enrollment) and relevant scopes
-        $billingAccounts = Get-AzBillingAccount
+        $billingAccounts = Get-AzBillingAccount -ErrorAction Stop
 
         if ($billingAccounts.Count -eq 0) {
             # No billing accounts found
@@ -1096,7 +1096,7 @@ function Test-QuestionA0401 {
         # Reference: https://learn.microsoft.com/azure/cost-management-billing/manage/mca-setup-account
 
         # Get the billing accounts
-        $billingAccounts = Get-AzBillingAccount
+        $billingAccounts = Get-AzBillingAccount -ErrorAction Stop
 
         if ($billingAccounts.Count -eq 0) {
             # No billing accounts found
@@ -1183,7 +1183,7 @@ function Test-QuestionA0402 {
         # Reference: https://learn.microsoft.com/azure/cost-management-billing/manage/mca-section-invoice
 
         # Get the billing accounts
-        $billingAccounts = Get-AzBillingAccount
+        $billingAccounts = Get-AzBillingAccount -ErrorAction Stop
 
         if ($billingAccounts.Count -eq 0) {
             # No billing accounts found
