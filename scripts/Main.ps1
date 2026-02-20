@@ -12,9 +12,38 @@
     lramoscostah@microsoft.com
 #>
 
+# Ensure module autoloading is enabled (may have been disabled by a previous run)
+$global:PSModuleAutoLoadingPreference = 'All'
+
 # Start transcript
-$transcriptPath = "$PSScriptRoot/../logs/LandingZone-Assessment_$(Get-Date -Format 'yyyyMMdd_HHmmss')_transcript.log"
-Start-Transcript -Path $transcriptPath
+$logsDir = "$PSScriptRoot/../logs"
+if (-not (Test-Path $logsDir)) {
+    New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+}
+$transcriptPath = "$logsDir/LandingZone-Assessment_$(Get-Date -Format 'yyyyMMdd_HHmmss')_transcript.log"
+$global:TranscriptActive = $false
+try {
+    Start-Transcript -Path $transcriptPath -ErrorAction Stop
+    $global:TranscriptActive = $true
+}
+catch {
+    Write-Warning "Start-Transcript not supported in this host ($($Host.Name)). Logging to file instead."
+    # Fallback: redirect all output streams to log file via Tee
+    $global:LogFilePath = $transcriptPath
+    "=== LandingZone Assessment Log ===" | Out-File -FilePath $transcriptPath -Encoding utf8
+    "Started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $transcriptPath -Append -Encoding utf8
+    "Host: $($Host.Name) | PS $($PSVersionTable.PSVersion)" | Out-File -FilePath $transcriptPath -Append -Encoding utf8
+    "===================================" | Out-File -FilePath $transcriptPath -Append -Encoding utf8
+}
+
+# Helper: Write-Log outputs to console AND log file when transcript is not active
+function Write-Log {
+    param([string]$Message)
+    Write-Output $Message
+    if (-not $global:TranscriptActive -and $global:LogFilePath) {
+        $Message | Out-File -FilePath $global:LogFilePath -Append -Encoding utf8
+    }
+}
 
 # Import necessary modules
 . "$PSScriptRoot/Initialize.ps1"
@@ -130,128 +159,63 @@ function Main {
         Write-Output "No design areas enabled in configuration. Skipping assessments."
     }
     else {
-        # Determine if parallel execution is available (PowerShell 7+)
-        $canParallel = ($PSVersionTable.PSVersion.Major -ge 7) -and ($enabledAssessments.Count -gt 1)
-
+        # Sequential execution — parallel runspaces cause .NET assembly conflicts
+        # with Az modules (different versions of the same DLL cannot coexist in one process)
         $progressId = 1
         $totalSteps = $enabledAssessments.Count + 1  # +1 for report generation
+        $assessmentStartTime = Get-Date
 
-        if ($canParallel) {
-            Write-Output ""
-            Write-Output "PowerShell 7+ detected - running $($enabledAssessments.Count) assessments in parallel (ThrottleLimit: 4)..."
-            Write-Output ""
+        Write-Output "Running $($enabledAssessments.Count) assessment(s) sequentially..."
+        Write-Output ""
 
-            Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "Running $($enabledAssessments.Count) assessments in parallel..." -PercentComplete 0
+        $stepIndex = 0
+        $succeeded = 0
+        $failed = 0
 
-            $assessmentStartTime = Get-Date
+        foreach ($task in $enabledAssessments) {
+            $stepIndex++
+            $pctDone = [math]::Round((($stepIndex - 1) / $totalSteps) * 100)
 
-            # Capture paths and globals for parallel runspaces (via $using:)
-            $scriptRoot = $PSScriptRoot
-            $sharedEnumsPath       = [System.IO.Path]::GetFullPath("$PSScriptRoot/../shared/Enums.ps1")
-            $sharedErrorPath       = [System.IO.Path]::GetFullPath("$PSScriptRoot/../shared/ErrorHandling.ps1")
-            $sharedFunctionsPath   = [System.IO.Path]::GetFullPath("$PSScriptRoot/../shared/SharedFunctions.ps1")
-            $functionsDir          = [System.IO.Path]::GetFullPath("$PSScriptRoot/../functions")
+            # Update progress bar with current assessment name
+            Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" `
+                -Status "[$stepIndex/$($enabledAssessments.Count)] Running: $($task.Label)..." `
+                -PercentComplete $pctDone
 
-            $azData          = $global:AzData
-            $graphData       = $global:GraphData
-            $graphConnected  = $global:GraphConnected
-            $tenantId        = $global:TenantId
-            $checklist       = $global:Checklist
-            $ctType          = $contractType
+            Write-Output "===================="
+            Write-Output "[$stepIndex/$($enabledAssessments.Count)] Starting: $($task.Label)"
+            Write-Output "===================="
 
-            $parallelResults = $enabledAssessments | ForEach-Object -Parallel {
-                $task = $_
-
-                # Retrieve parent-scope variables
-                $sr               = $using:scriptRoot
-                $enumsPath        = $using:sharedEnumsPath
-                $errorPath        = $using:sharedErrorPath
-                $funcPath         = $using:sharedFunctionsPath
-                $fnDir            = $using:functionsDir
-
-                # Set up globals in this runspace
-                $global:AzData         = $using:azData
-                $global:GraphData      = $using:graphData
-                $global:GraphConnected = $using:graphConnected
-                $global:TenantId       = $using:tenantId
-                $global:Checklist      = $using:checklist
-
-                # Dot-source shared dependencies (all 3 files explicitly)
-                . $enumsPath
-                . $errorPath
-                . $funcPath
-
-                # Dot-source the specific assessment module
-                $moduleFile = Join-Path $fnDir $task.Script
-                . $moduleFile
-
-                # Build parameters
+            $taskStart = Get-Date
+            try {
                 $params = @{ Checklist = $global:Checklist }
                 if ($task.UseContractType) {
-                    $params['ContractType'] = $using:ctType
+                    $params['ContractType'] = $contractType
                 }
+                $generalResult.($task.ResultKey) = & $task.Function @params
 
-                $taskStart = Get-Date
-                try {
-                    $result = & $task.Function @params
-                    $elapsed = (Get-Date) - $taskStart
-                    Write-Host "$($task.Label) assessment completed in $($elapsed.ToString('mm\:ss\.fff'))"
-                    [PSCustomObject]@{ Key = $task.ResultKey; Data = $result; Success = $true }
-                }
-                catch {
-                    $elapsed = (Get-Date) - $taskStart
-                    Write-Host "$($task.Label) assessment FAILED after $($elapsed.ToString('mm\:ss\.fff')): $($_.Exception.Message)"
-                    [PSCustomObject]@{ Key = $task.ResultKey; Data = @(); Success = $false }
-                }
-            } -ThrottleLimit 4
-
-            # Collect parallel results into generalResult
-            foreach ($pr in $parallelResults) {
-                if ($null -ne $pr -and $pr -is [PSCustomObject] -and $null -ne $pr.PSObject.Properties['Key']) {
-                    $generalResult.($pr.Key) = $pr.Data
-                }
+                $elapsed = (Get-Date) - $taskStart
+                $succeeded++
+                Write-Output "[$stepIndex/$($enabledAssessments.Count)] Completed: $($task.Label) ($($elapsed.ToString('mm\:ss\.fff')))"
             }
-
-            $totalElapsed = (Get-Date) - $assessmentStartTime
-
-            # Update progress: count successes/failures
-            $succeeded = @($parallelResults | Where-Object { $_.Success -eq $true }).Count
-            $failed = $enabledAssessments.Count - $succeeded
-            $pctDone = [math]::Round(($enabledAssessments.Count / $totalSteps) * 100)
-            Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "Assessments complete ($succeeded OK, $failed failed)" -PercentComplete $pctDone
-
-            Write-Output ""
-            Write-Output "All parallel assessments completed in $($totalElapsed.ToString('mm\:ss\.fff'))"
-        }
-        else {
-            # Sequential execution (PS 5.1 compatible, or single assessment)
-            if ($PSVersionTable.PSVersion.Major -lt 7) {
-                Write-Output "PowerShell 5.x detected - running assessments sequentially."
+            catch {
+                $elapsed = (Get-Date) - $taskStart
+                $failed++
+                Write-Output "[$stepIndex/$($enabledAssessments.Count)] FAILED: $($task.Label) ($($elapsed.ToString('mm\:ss\.fff')))"
+                Write-Warning "  Error: $($_.Exception.Message)"
             }
             Write-Output ""
-
-            $stepIndex = 0
-            foreach ($task in $enabledAssessments) {
-                $stepIndex++
-                $pctDone = [math]::Round((($stepIndex - 1) / $totalSteps) * 100)
-                Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "[$stepIndex/$($enabledAssessments.Count)] $($task.Label)" -PercentComplete $pctDone
-                Write-Output "Running $($task.Label) Assessment..."
-                try {
-                    $params = @{ Checklist = $global:Checklist }
-                    if ($task.UseContractType) {
-                        $params['ContractType'] = $contractType
-                    }
-                    $generalResult.($task.ResultKey) = & $task.Function @params
-                    Write-Output "$($task.Label) assessment completed"
-                }
-                catch {
-                    Write-Output "$($task.Label) assessment failed: $($_.Exception.Message)"
-                }
-            }
-
-            $pctDone = [math]::Round(($enabledAssessments.Count / $totalSteps) * 100)
-            Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" -Status "All assessments completed" -PercentComplete $pctDone
         }
+
+        $totalElapsed = (Get-Date) - $assessmentStartTime
+
+        $pctDone = [math]::Round(($enabledAssessments.Count / $totalSteps) * 100)
+        Write-Progress -Id $progressId -Activity "Azure Landing Zone Assessment" `
+            -Status "Assessments complete ($succeeded OK, $failed failed)" `
+            -PercentComplete $pctDone
+
+        Write-Output "===================="
+        Write-Output "All assessments completed in $($totalElapsed.ToString('mm\:ss\.fff')) ($succeeded OK, $failed failed)"
+        Write-Output "===================="
     }
 
     # Generate reports
@@ -329,5 +293,11 @@ finally {
     }
     
     # Stop transcript
-    Stop-Transcript
+    if ($global:TranscriptActive) {
+        try { Stop-Transcript } catch { }
+    }
+    elseif ($global:LogFilePath) {
+        "===================================" | Out-File -FilePath $global:LogFilePath -Append -Encoding utf8
+        "Finished: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $global:LogFilePath -Append -Encoding utf8
+    }
 }

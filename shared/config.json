@@ -6,12 +6,12 @@
     "DefaultRegion": "canadaeast",  // Default Azure region for assessment queries
     "DesignAreas": {
         "Billing": true,
-        "IAM": false,
-        "ResourceOrganization": false,
-        "Network": false,
-        "Governance": false,
-        "Security": false,
-        "DevOps": false,
-        "Management": false
+        "IAM": true,
+        "ResourceOrganization": true,
+        "Network": true,
+        "Governance": true,
+        "Security": true,
+        "DevOps": true,
+        "Management": true
     }
 }
