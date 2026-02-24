@@ -90,8 +90,9 @@ function Test-QuestionF0101 {
             $allWorkspaces = @()
 
             foreach ($subscription in $subscriptions) {
+                Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId -ErrorAction SilentlyContinue | Out-Null
                 $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzOperationalInsightsWorkspace -SubscriptionId $subscription.Id -ErrorAction Stop
+                    Get-AzOperationalInsightsWorkspace -ErrorAction Stop
                 } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
 
                 $allWorkspaces += $workspaces
@@ -211,8 +212,9 @@ function Test-QuestionF0102 {
             $totalWorkspaces = 0
 
             foreach ($subscription in $subscriptions) {
+                Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId -ErrorAction SilentlyContinue | Out-Null
                 $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzOperationalInsightsWorkspace -SubscriptionId $subscription.Id -ErrorAction Stop
+                    Get-AzOperationalInsightsWorkspace -ErrorAction Stop
                 } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
                 
                 $allWorkspaces += $workspaces
@@ -305,8 +307,9 @@ function Test-QuestionF0103 {
             $totalWorkspacesChecked = 0
 
             foreach ($subscription in $subscriptions) {
+                Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId -ErrorAction SilentlyContinue | Out-Null
                 $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzOperationalInsightsWorkspace -SubscriptionId $subscription.Id -ErrorAction Stop
+                    Get-AzOperationalInsightsWorkspace -ErrorAction Stop
                 } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
 
                 foreach ($workspace in $workspaces) {
