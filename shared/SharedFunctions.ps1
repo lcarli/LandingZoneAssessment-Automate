@@ -12,6 +12,60 @@
     maximeroy@microsoft.com
 #>
 
+# ========================================
+# RESOURCE TYPES THAT DO NOT SUPPORT DIAGNOSTIC SETTINGS
+# ========================================
+# These types return "The resource type '<type>' does not support diagnostic settings."
+# when queried with Get-AzDiagnosticSetting. Pre-filtering avoids thousands of
+# unnecessary (and failing) API calls per assessment run.
+$global:DiagnosticSettingsUnsupportedTypes = @(
+    "microsoft.alertsmanagement/smartdetectoralertrules"
+    "microsoft.app/managedenvironments/certificates"
+    "microsoft.automation/automationaccounts/runbooks"
+    "microsoft.azurearcdata/sqlserverinstances"
+    "microsoft.azurearcdata/sqlserverinstances/databases"
+    "microsoft.communication/emailservices"
+    "microsoft.communication/emailservices/domains"
+    "microsoft.compute/galleries"
+    "microsoft.compute/galleries/images"
+    "microsoft.compute/galleries/images/versions"
+    "microsoft.compute/images"
+    "microsoft.compute/restorepointcollections"
+    "microsoft.compute/snapshots"
+    "microsoft.compute/sshpublickeys"
+    "microsoft.compute/virtualmachines/extensions"
+    "microsoft.containerregistry/registries/replications"
+    "microsoft.devtestlab/schedules"
+    "microsoft.hybridcompute/machines"
+    "microsoft.hybridcompute/machines/extensions"
+    "microsoft.insights/actiongroups"
+    "microsoft.insights/datacollectionendpoints"
+    "microsoft.insights/metricalerts"
+    "microsoft.insights/scheduledqueryrules"
+    "microsoft.insights/workbooks"
+    "microsoft.migrate/assessmentprojects"
+    "microsoft.migrate/migrateprojects"
+    "microsoft.migrate/movecollections"
+    "microsoft.network/dnsresolvers/inboundendpoints"
+    "microsoft.network/dnsresolvers/outboundendpoints"
+    "microsoft.network/localnetworkgateways"
+    "microsoft.network/privatednszones/virtualnetworklinks"
+    "microsoft.network/privateendpoints"
+    "microsoft.network/routetables"
+    "microsoft.offazure/mastersites"
+    "microsoft.offazure/vmwaresites"
+    "microsoft.operationalinsights/querypacks"
+    "microsoft.operationsmanagement/solutions"
+    "microsoft.portal/dashboards"
+    "microsoft.resources/templatespecs"
+    "microsoft.resources/templatespecs/versions"
+    "microsoft.saas/resources"
+    "microsoft.security/automations"
+    "microsoft.sentinelplatformservices/sentinelplatformservices"
+    "microsoft.visualstudio/account"
+    "microsoft.web/certificates"
+)
+
 function Invoke-AzGraphQueryWithPagination {
     [CmdletBinding()]
     param (

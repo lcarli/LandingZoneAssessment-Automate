@@ -1307,7 +1307,7 @@ function Test-QuestionB0311 {
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/identity-access#prerequisites-for-a-landing-zone---design-recommendations
 
         # Get all custom role definitions
-        $customRoles = Get-AzRoleDefinition | Where-Object { $_.IsCustom -eq $true }
+        $customRoles = Get-AzRoleDefinition -WarningAction SilentlyContinue | Where-Object { $_.IsCustom -eq $true }
 
         if ($customRoles.Count -eq 0) {
             $status = [Status]::NotImplemented

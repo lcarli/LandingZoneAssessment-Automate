@@ -97,47 +97,46 @@
 
 ## Performance / Volume Excessivo de Erros
 
-- [ ] **#12 — `Get-AzDiagnosticSetting` em resource types não suportados** (~8.216 ocorrências)  
+- [x] **#12 — `Get-AzDiagnosticSetting` em resource types não suportados** (~8.216 ocorrências)  
   - **Seção:** [8/8] Management (F01.11 a F02.01) e [6/8] Security  
   - **Arquivos:** `functions/Management.ps1`, `functions/Security.ps1`  
   - **Erro:** `The resource type '<type>' does not support diagnostic settings.`  
   - **Causa:** O código itera TODOS os Azure resources e tenta obter diagnostic settings — mas 46+ resource types não suportam.  
-  - **Sugestão:** Manter uma lista de resource types que suportam diagnostic settings e filtrar antes de chamar o cmdlet.  
-  - **Resource types afetados (exemplos):** `microsoft.compute/images`, `microsoft.network/privateendpoints`, `microsoft.insights/actiongroups`, `microsoft.operationalinsights/querypacks`, etc.
+  - **Correção:** Adicionada lista de exclusão `$global:DiagnosticSettingsUnsupportedTypes` em SharedFunctions.ps1 com 46 resource types. Filtrado em F0111, F0112, F0115, F0118.
 
-- [ ] **#13 — `Get-AzMetricAlertRuleV2` — NotFound massivo** (~546 ocorrências)  
+- [x] **#13 — `Get-AzMetricAlertRuleV2` — NotFound massivo** (~546 ocorrências)  
   - **Seção:** [8/8] Management (questão F01.12)  
   - **Arquivo:** `functions/Management.ps1`  
   - **Erro:** `Exception type: ErrorResponseException, Status code: NotFound, Reason phrase: Not Found`  
-  - **Causa:** Consulta metric alert rules em subscriptions onde certos recursos não existem mais.  
-  - **Sugestão:** Tratar `404/NotFound` silenciosamente com `-ErrorAction SilentlyContinue`.
+  - **Causa:** Consulta metric alert rules em RGs que não existem mais.  
+  - **Correção:** Resolvido pela correção do `Invoke-AzCmdletSafely` (Issue #5). Erro é capturado e retorna fallback `@()` sem pipeline pollution.
 
 ---
 
 ## Warnings (Baixa Prioridade)
 
-- [ ] **#14 — WARNING: `Get-AzDiagnosticSetting` breaking changes** (~8.042 ocorrências)  
+- [x] **#14 — WARNING: `Get-AzDiagnosticSetting` breaking changes** (~8.042 ocorrências)  
   - **Seção:** [6/8] Security e [8/8] Management  
   - **Warning:** `Upcoming breaking changes: The types of the properties Log and Metric will be changed from single object or fixed array to 'List'. Takes effect Az.Monitor 7.0.0`  
   - **Causa:** Az.Monitor module deprecation notice emitido a cada chamada.  
-  - **Sugestão:** Preparar código para a mudança futura. Suprimir warnings com `$WarningPreference = 'SilentlyContinue'` durante as chamadas, ou usar `-WarningAction SilentlyContinue`.
+  - **Correção:** Adicionado `-WarningAction SilentlyContinue` em todas as 6 chamadas de `Get-AzDiagnosticSetting` (4 em Management.ps1, 2 em Security.ps1).
 
-- [ ] **#15 — WARNING: `Get-AzRoleDefinition` breaking changes** (1 ocorrência)  
+- [x] **#15 — WARNING: `Get-AzRoleDefinition` breaking changes** (1 ocorrência)  
   - **Seção:** [2/8] Identity  
   - **Warning:** `Upcoming breaking changes in the cmdlet 'Get-AzRoleDefinition'`  
-  - **Sugestão:** Baixa prioridade — apenas um aviso de deprecação.
+  - **Correção:** Adicionado `-WarningAction SilentlyContinue` em `IdentityandAccessManagement.ps1`.
 
 ---
 
 ## Erros na Governance
 
-- [ ] **#16 — `Get-AzPolicyDefinition` com ID vazio** (~4 ocorrências)  
+- [x] **#16 — `Get-AzPolicyDefinition` com ID vazio** (~4 ocorrências)  
   - **Seção:** [5/8] Governance (questão E01.06)  
   - **Arquivo:** `functions/Governance.ps1`  
   - **Erro:** `Cannot bind argument to parameter 'Id' because it is an empty string.`  
   - **Warning associado:** `Failed to get policy definition for assignment : Cannot bind argument to parameter 'Id' because it is an empty string.`  
   - **Causa:** Policy assignments com `PolicyDefinitionId` nulo ou vazio.  
-  - **Sugestão:** Validar que `$assignment.Properties.PolicyDefinitionId` não é nulo/vazio antes de chamar `Get-AzPolicyDefinition -Id`.
+  - **Correção:** Adicionada validação `[string]::IsNullOrWhiteSpace()` antes de chamar `Get-AzPolicyDefinition -Id`.
 
 ---
 

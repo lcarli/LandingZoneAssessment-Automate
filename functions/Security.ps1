@@ -780,7 +780,7 @@ function Test-QuestionG0208 {
                         $currentSubId = $kv.SubscriptionId
                     }
                     $diagSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                        Get-AzDiagnosticSetting -ResourceId $kv.ResourceId -ErrorAction SilentlyContinue
+                        Get-AzDiagnosticSetting -ResourceId $kv.ResourceId -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
                     } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue @()
 
                     $hasLogAnalytics = $false
@@ -1138,7 +1138,7 @@ function Test-QuestionG0302 {
                         $currentSubId = $sub.Id
                     }
                     $diagSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                        Get-AzDiagnosticSetting -ResourceId "/subscriptions/$($sub.Id)" -ErrorAction SilentlyContinue
+                        Get-AzDiagnosticSetting -ResourceId "/subscriptions/$($sub.Id)" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
                     } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue @()
 
                     $hasExport = $false

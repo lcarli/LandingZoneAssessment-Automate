@@ -360,6 +360,11 @@ function Test-QuestionE0106 {
 
             foreach ($assignment in $policyAssignments) {
                 try {
+                    # Skip assignments with null/empty PolicyDefinitionId
+                    if ([string]::IsNullOrWhiteSpace($assignment.Properties.PolicyDefinitionId)) {
+                        continue
+                    }
+
                     $policyDefinition = Get-AzPolicyDefinition -Id $assignment.Properties.PolicyDefinitionId -ErrorAction Stop
 
                     if ($policyDefinition -and $policyDefinition.Properties -and $policyDefinition.Properties.PolicyRule) {

@@ -972,7 +972,8 @@ function Test-QuestionF0111 {
         $totalServices = 0
 
         $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
+            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers" -and
+            $_.ResourceType.ToLower() -notin $global:DiagnosticSettingsUnsupportedTypes
         }
 
         $totalServices = ($resources | Measure-Object).Count
@@ -984,7 +985,7 @@ function Test-QuestionF0111 {
         } else {
             foreach ($resource in $resources) {
                 $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop
+                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop -WarningAction SilentlyContinue
                 } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
 
                 if ($diagnosticSettings) {
@@ -1045,7 +1046,8 @@ function Test-QuestionF0112 {
         $totalResources = 0
 
         $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
+            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers" -and
+            $_.ResourceType.ToLower() -notin $global:DiagnosticSettingsUnsupportedTypes
         }
 
         $totalResources = ($resources | Measure-Object).Count
@@ -1067,7 +1069,7 @@ function Test-QuestionF0112 {
 
             foreach ($resource in $resources) {
                 $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop
+                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop -WarningAction SilentlyContinue
                 } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
 
                 if ($diagnosticSettings) {
@@ -1312,7 +1314,8 @@ function Test-QuestionF0115 {
         $totalResources = 0
 
         $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
+            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers" -and
+            $_.ResourceType.ToLower() -notin $global:DiagnosticSettingsUnsupportedTypes
         }
 
         $totalResources = ($resources | Measure-Object).Count
@@ -1324,7 +1327,7 @@ function Test-QuestionF0115 {
         } else {
             foreach ($resource in $resources) {
                 $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop
+                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop -WarningAction SilentlyContinue
                 } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
 
                 if ($diagnosticSettings) {
@@ -1546,7 +1549,8 @@ function Test-QuestionF0118 {
         $totalResources = 0
 
         $resources = $global:AzData.Resources | Where-Object {
-            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers"
+            $_.ResourceType -notmatch "Microsoft.Network/networkWatchers" -and
+            $_.ResourceType.ToLower() -notin $global:DiagnosticSettingsUnsupportedTypes
         }
 
         $totalResources = ($resources | Measure-Object).Count
@@ -1568,7 +1572,7 @@ function Test-QuestionF0118 {
 
             foreach ($resource in $resources) {
                 $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop
+                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop -WarningAction SilentlyContinue
                 } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
 
                 if ($diagnosticSettings) {
