@@ -69,7 +69,7 @@ function Test-QuestionAzureResourceGraph {
         [Object]$checklistItem
     )
 
-    Write-Output "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
+    Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
     $status = [Status]::Unknown
     $estimatedPercentageApplied = 0
 
@@ -122,7 +122,7 @@ function Measure-ExecutionTime {
     
     # Calculate and output the duration
     $executionTime = $endTime - $startTime
-    Write-Output "Function '$FunctionName' Execution Time: $($executionTime.TotalSeconds) seconds"
+    Write-Host "Function '$FunctionName' Execution Time: $($executionTime.TotalSeconds) seconds" -ForegroundColor Cyan
 }
 
 # Helper function to test if a cmdlet is available
@@ -167,12 +167,12 @@ function Invoke-AzCmdletSafely {
             return & $ScriptBlock
         }
         catch {
-            Write-Output "  Warning: $WarningMessage - $($_.Exception.Message)"
+            Write-Host "  Warning: $WarningMessage - $($_.Exception.Message)" -ForegroundColor Yellow
             return $FallbackValue
         }
     }
     else {
-        Write-Output "  Warning: $CmdletName not available. Install module: $ModuleName"
+        Write-Host "  Warning: $CmdletName not available. Install module: $ModuleName" -ForegroundColor Yellow
         return $FallbackValue
     }
 }

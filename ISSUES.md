@@ -40,37 +40,40 @@
 
 ## Erros de Recursos Não Encontrados (Resource Groups deletados/movidos)
 
-- [ ] **#5 — `Get-AzVMExtension` falha com ResourceGroupNotFound** (~96 ocorrências)  
+- [x] **#5 — `Get-AzVMExtension` falha com ResourceGroupNotFound** (~96 ocorrências)  
   - **Seção:** [8/8] Management (questão F01.04)  
   - **Arquivo:** `functions/Management.ps1`  
   - **Erro:** `Resource group '<RG_NAME>' could not be found. ErrorCode: ResourceGroupNotFound, StatusCode: 404`  
   - **Causa:** VMs listadas no Azure Resource Graph referenciam Resource Groups que foram deletados ou movidos (32 RGs distintos).  
-  - **Sugestão:** Adicionar validação prévia da existência do RG antes de chamar `Get-AzVMExtension`, ou usar `-ErrorAction SilentlyContinue`.
+  - **Correção:** Bug em `Invoke-AzCmdletSafely` (SharedFunctions.ps1) — `Write-Output` poluía o pipeline de retorno. Corrigido para `Write-Host -ForegroundColor Yellow`.
 
-- [ ] **#6 — `Get-AzStorageAccount` — NotFound** (~197 ocorrências)  
+- [x] **#6 — `Get-AzStorageAccount` — NotFound** (~197 ocorrências)  
   - **Seção:** [2/8] Identity (B04.02-B04.04) e [8/8] Management  
   - **Arquivos:** `functions/IdentityandAccessManagement.ps1`, `functions/Management.ps1`  
   - **Erro:** `Operation returned an invalid status code 'NotFound'` com `ErrorActionPreference` em Stop.  
   - **Causa:** Stale data — storage accounts em subscriptions/RGs que não existem mais.  
-  - **Sugestão:** Usar `-ErrorAction SilentlyContinue` ou `try/catch` granular para cada subscription.
+  - **Correção:** Resolvido pela mesma correção do #5 — `Invoke-AzCmdletSafely` já trata o erro com fallback. Pipeline pollution corrigido.
 
-- [ ] **#7 — `Get-AzRecoveryServicesVault` — NotFound** (~23 ocorrências)  
+- [x] **#7 — `Get-AzRecoveryServicesVault` — NotFound** (~23 ocorrências)  
   - **Seção:** [8/8] Management (questão F02.02)  
   - **Arquivo:** `functions/Management.ps1`  
   - **Erro:** `Operation failed. One or more errors occurred. (Operation returned an invalid status code 'NotFound')`  
-  - **Causa:** Recovery Services vaults em resource groups que não existem mais.
+  - **Causa:** Recovery Services vaults em resource groups que não existem mais.  
+  - **Correção:** Resolvido pela mesma correção do #5 — `Invoke-AzCmdletSafely` pipeline fix.
 
-- [ ] **#8 — `Get-AzDataProtectionBackupVault` — RG not found** (~5 ocorrências)  
+- [x] **#8 — `Get-AzDataProtectionBackupVault` — RG not found** (~5 ocorrências)  
   - **Seção:** [8/8] Management (questão F02.02)  
   - **Arquivo:** `functions/Management.ps1`  
   - **Erro:** `Resource group '<RG_NAME>' could not be found.`  
-  - **RGs afetados:** `RG-BackupFortinet-Cace-Prd`, `RG-BackupFortinet-Caea-Prd`, `RG-BackupStorageAccount-Caea-Prd`, `GR-DataLake-CRC-Avaya-Prd`
+  - **RGs afetados:** `RG-BackupFortinet-Cace-Prd`, `RG-BackupFortinet-Caea-Prd`, `RG-BackupStorageAccount-Caea-Prd`, `GR-DataLake-CRC-Avaya-Prd`  
+  - **Correção:** Resolvido pela mesma correção do #5 — `Invoke-AzCmdletSafely` pipeline fix.
 
-- [ ] **#9 — `Get-AzWebApp` — NotFound** (~15 ocorrências)  
+- [x] **#9 — `Get-AzWebApp` — NotFound** (~15 ocorrências)  
   - **Seção:** [8/8] Management (questão F01.04)  
   - **Arquivo:** `functions/Management.ps1`  
   - **Erro:** `Operation returned an invalid status code 'NotFound'`  
-  - **Causa:** Web apps em subscriptions/RGs que não existem mais.
+  - **Causa:** Web apps em subscriptions/RGs que não existem mais.  
+  - **Correção:** Resolvido pela mesma correção do #5 — `Invoke-AzCmdletSafely` pipeline fix.
 
 ---
 
