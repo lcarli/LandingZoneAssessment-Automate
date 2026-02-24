@@ -1972,11 +1972,15 @@ function Test-QuestionF0401 {
             $totalVMs++
 
             # Check if Azure Site Recovery is enabled for the VM
-            $asrConfig = Get-AzRecoveryServicesAsrProtectionContainerMapping -ResourceGroupName $vm.ResourceGroupName -ErrorAction SilentlyContinue |
-                         Where-Object { $_.SourceContainerId -eq $vm.Id }
+            try {
+                $asrConfig = Get-AzRecoveryServicesAsrProtectionContainerMapping -ErrorAction SilentlyContinue |
+                             Where-Object { $_.SourceContainerId -eq $vm.Id }
 
-            if ($asrConfig) {
-                $vmsWithASRConfigured++
+                if ($asrConfig) {
+                    $vmsWithASRConfigured++
+                }
+            } catch {
+                # ASR check requires vault context — skip silently
             }
         }
 

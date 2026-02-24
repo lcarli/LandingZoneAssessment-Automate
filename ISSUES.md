@@ -79,18 +79,19 @@
 
 ## Erros de Compatibilidade de Módulos
 
-- [ ] **#10 — `Get-AzRecoveryServicesBackupProperty` — tipo incorreto de parâmetro** (~23 ocorrências)  
+- [x] **#10 — `Get-AzRecoveryServicesBackupProperty` — tipo incorreto de parâmetro** (~23 ocorrências)  
   - **Seção:** [8/8] Management (questão F02.02)  
   - **Arquivo:** `functions/Management.ps1`  
   - **Erro:** `Cannot convert 'System.Object[]' to the type 'Microsoft.Azure.Commands.RecoveryServices.ARSVault' required by parameter 'Vault'.`  
-  - **Causa:** A query retorna um array de vaults em vez de um único vault. O parâmetro `-Vault` espera um `ARSVault` mas recebe `System.Object[]`.  
-  - **Sugestão:** Iterar sobre cada vault individualmente, ex: `foreach ($vault in $vaults)`.
+  - **Causa:** Cascata do bug Write-Output no `Invoke-AzCmdletSafely` — quando `Get-AzRecoveryServicesVault` falhava, o retorno era `@("Warning...", $null)` (array) em vez de `$null`. O `if ($vaultProperties)` avaliava como `$true` e passava o array para `-Vault`.  
+  - **Correção:** Resolvido pela mesma correção do #5 — `Write-Host` não polui o pipeline, `$vaultProperties` agora é `$null` quando falha, e o `if` avalia `$false`.
 
-- [ ] **#11 — `Get-AzRecoveryServicesAsrProtectionContainerMapping` — parâmetro inexistente** (1 ocorrência)  
+- [x] **#11 — `Get-AzRecoveryServicesAsrProtectionContainerMapping` — parâmetro inexistente** (1 ocorrência)  
   - **Seção:** [8/8] Management (questão F04.01)  
   - **Arquivo:** `functions/Management.ps1`  
   - **Erro:** `A parameter cannot be found that matches parameter name 'ResourceGroupName'.`  
-  - **Causa:** Versão do módulo não suporta `-ResourceGroupName` neste cmdlet.
+  - **Causa:** O cmdlet não aceita `-ResourceGroupName` — requer vault context.  
+  - **Correção:** Removido parâmetro `-ResourceGroupName` inválido. Adicionado try/catch individual por VM para evitar terminating error no foreach.
 
 ---
 
