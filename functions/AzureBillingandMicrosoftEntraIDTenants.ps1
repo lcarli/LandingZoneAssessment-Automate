@@ -998,30 +998,18 @@ function Test-QuestionA0305 {
             "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
         )
 
-        # Get the access token ONCE before the loop (N+1 fix)
-        $accessTokenResult = Get-AzAccessToken
-        if ($accessTokenResult.Token -is [SecureString]) {
-            $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
-            )
-        } else {
-            $plainAccessToken = $accessTokenResult.Token
-        }
-        $headers = @{
-            Authorization = "Bearer $plainAccessToken"
-            'Content-Type' = 'application/json'
-        }
-
         foreach ($subscription in $subscriptions) {
             try {
                 $subscriptionId = $subscription.Id
-                $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2022-12-01"
-                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue
+                $restResult = Invoke-AzRestMethod -Path "/subscriptions/${subscriptionId}?api-version=2022-12-01" -Method GET -ErrorAction SilentlyContinue
 
-                if ($response -and $response.properties -and $response.properties.subscriptionPolicies) {
-                    $quotaId = $response.properties.subscriptionPolicies.quotaId
-                    if ($devTestOfferIds -contains $quotaId) {
-                        $devTestSubscriptions++
+                if ($restResult -and $restResult.StatusCode -eq 200) {
+                    $response = $restResult.Content | ConvertFrom-Json
+                    if ($response.properties -and $response.properties.subscriptionPolicies) {
+                        $quotaId = $response.properties.subscriptionPolicies.quotaId
+                        if ($devTestOfferIds -contains $quotaId) {
+                            $devTestSubscriptions++
+                        }
                     }
                 }
             }
@@ -1281,30 +1269,18 @@ function Test-QuestionA0403 {
             "MS-AZR-0149P"   # Enterprise Dev/Test Pay-As-You-Go
         )
 
-        # Get the access token ONCE before the loop (N+1 fix)
-        $accessTokenResult = Get-AzAccessToken
-        if ($accessTokenResult.Token -is [SecureString]) {
-            $plainAccessToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessTokenResult.Token)
-            )
-        } else {
-            $plainAccessToken = $accessTokenResult.Token
-        }
-        $headers = @{
-            Authorization = "Bearer $plainAccessToken"
-            'Content-Type' = 'application/json'
-        }
-
         foreach ($subscription in $subscriptions) {
             try {
                 $subscriptionId = $subscription.Id
-                $uri = "https://management.azure.com/subscriptions/$subscriptionId?api-version=2022-12-01"
-                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction SilentlyContinue
+                $restResult = Invoke-AzRestMethod -Path "/subscriptions/${subscriptionId}?api-version=2022-12-01" -Method GET -ErrorAction SilentlyContinue
 
-                if ($response -and $response.properties -and $response.properties.subscriptionPolicies) {
-                    $quotaId = $response.properties.subscriptionPolicies.quotaId
-                    if ($devTestQuotaIds -contains $quotaId) {
-                        $devTestSubscriptions++
+                if ($restResult -and $restResult.StatusCode -eq 200) {
+                    $response = $restResult.Content | ConvertFrom-Json
+                    if ($response.properties -and $response.properties.subscriptionPolicies) {
+                        $quotaId = $response.properties.subscriptionPolicies.quotaId
+                        if ($devTestQuotaIds -contains $quotaId) {
+                            $devTestSubscriptions++
+                        }
                     }
                 }
             }
