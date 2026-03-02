@@ -496,6 +496,7 @@ function Collect-AzData {
         StorageAccounts       = @()   # Get-AzStorageAccount full details
         SqlServers            = @()   # Get-AzSqlServer full details
         SqlAdministrators     = @{}   # hashtable: "rg/serverName" -> AD admin object
+        VirtualNetworks       = @()   # Get-AzVirtualNetwork full details (includes subnets, peerings)
     }
 
     # Get Management Groups
@@ -574,6 +575,12 @@ function Collect-AzData {
                     }
                 }
             } catch { Write-Warning "  SqlServers [$($sub.Name)]: $($_.Exception.Message)" }
+
+            # Virtual Networks with full details — subnets, peerings, etc. (used by Network functions)
+            try {
+                $vnets = Get-AzVirtualNetwork -ErrorAction SilentlyContinue
+                if ($vnets) { $global:AzData.VirtualNetworks += $vnets }
+            } catch { Write-Warning "  VirtualNetworks [$($sub.Name)]: $($_.Exception.Message)" }
         }
         catch {
             Write-Warning "  Failed: $($_.Exception.Message)"

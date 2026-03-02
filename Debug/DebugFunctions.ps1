@@ -95,6 +95,7 @@ catch {
             StorageAccounts       = @()
             SqlServers            = @()
             SqlAdministrators     = @{}
+            VirtualNetworks       = @()
         }
         Write-Host "  AzData: empty mock (no Azure connection)" -ForegroundColor Yellow
     }

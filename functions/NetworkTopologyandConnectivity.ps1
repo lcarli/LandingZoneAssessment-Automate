@@ -1,4 +1,4 @@
-﻿# NetworkTopologyandConnectivity.ps1
+# NetworkTopologyandConnectivity.ps1
 
 <#
 .SYNOPSIS
@@ -184,7 +184,7 @@ function Test-QuestionD0101 {
         $estimatedPercentageApplied = 0
         
         # Use cached data instead of direct Search-AzGraph call
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/virtualnetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         
         foreach ($vnet in $virtualNetworks) {
             # Check if the virtual network has peerings
@@ -522,7 +522,7 @@ function Test-QuestionD0106 {
         $estimatedPercentageApplied = 0
         
         # Use cached data instead of direct Search-AzGraph call
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/virtualnetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         $vnetPairs = @()
         
         foreach ($vnet in $virtualNetworks) {
@@ -579,7 +579,7 @@ function Test-QuestionD0107 {
         $estimatedPercentageApplied = 0
         
         # Use cached data instead of direct Search-AzGraph call
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/virtualnetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         $nsgs = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/networksecuritygroups' }
         $flowLogs = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'microsoft.network/networkwatchers/flowlogs' }
 
@@ -656,85 +656,65 @@ function Test-QuestionD0108 {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
         # Get all virtual networks with Route Server subnets
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         
+        $routeServerSubnets = @()
+        $compliantSubnets = 0
+        $totalRouteServerSubnets = 0
+
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
             $rawData = "No virtual networks found"
         }
         else {
-            $routeServerSubnets = @()
-            $compliantSubnets = 0
-            $totalRouteServerSubnets = 0
-
             foreach ($vnet in $virtualNetworks) {
-                # Add comprehensive null checking for VNet object
-                if (-not $vnet) {
-                    Write-AssessmentProgress "Skipping null VNet object"
-                    continue
-                }
+                if (-not $vnet) { continue }
+
+                # Get-AzVirtualNetwork returns SDK objects with .Subnets collection
+                $subnets = if ($vnet.Subnets) { $vnet.Subnets } elseif ($vnet.Properties -and $vnet.Properties.subnets) { $vnet.Properties.subnets } else { @() }
                 
-                if (-not $vnet.Properties) {
-                    Write-AssessmentProgress "Skipping VNet with no Properties: $($vnet.Name)"
-                    continue
-                }
-                
-                if (-not $vnet.Properties.subnets) {
-                    Write-AssessmentProgress "Skipping VNet with no subnets: $($vnet.Name)"
-                    continue
-                }
-                
-                $subnets = $vnet.Properties.subnets
                 foreach ($subnet in $subnets) {
-                    # Add comprehensive null checking for subnet object
-                    if (-not $subnet) {
-                        Write-AssessmentProgress "Skipping null subnet object"
-                        continue
-                    }
-                    
-                    if (-not $subnet.name) {
-                        Write-AssessmentProgress "Skipping subnet with no name"
-                        continue
-                    }
-                    
-                    if ($subnet.name -eq "RouteServerSubnet") {
+                    if (-not $subnet) { continue }
+
+                    $subnetName = if ($subnet.Name) { $subnet.Name } elseif ($subnet.name) { $subnet.name } else { $null }
+                    if (-not $subnetName) { continue }
+
+                    if ($subnetName -eq "RouteServerSubnet") {
                         $totalRouteServerSubnets++
-                        
-                        # Check if addressPrefix exists and is not null
-                        $addressPrefix = "Unknown"
-                        if ($subnet.properties -and [bool]($subnet.properties.PSObject.Properties['addressPrefix']) -and $subnet.properties.addressPrefix) {
-                            $addressPrefix = $subnet.properties.addressPrefix.ToString()
-                        }
-                        # Initialize defaults
+
+                        # AddressPrefix from SDK object or from JSON-style Properties
+                        $addressPrefix = if ($subnet.AddressPrefix) {
+                            $subnet.AddressPrefix
+                        } elseif ($subnet.properties -and $subnet.properties.addressPrefix) {
+                            $subnet.properties.addressPrefix.ToString()
+                        } else { "Unknown" }
+
                         $prefixLength = 0
                         $isCompliant = $false
-                        
-                        # Only process if we have a valid address prefix that contains a slash
-                        if ($addressPrefix -and $addressPrefix -ne "Unknown" -and $addressPrefix -is [string] -and $addressPrefix.Length -gt 0) {
+
+                        if ($addressPrefix -and $addressPrefix -ne "Unknown" -and $addressPrefix -is [string]) {
                             try {
-                                # Double check the string is valid before calling methods
                                 $addressPrefixStr = $addressPrefix.ToString().Trim()
                                 if ($addressPrefixStr -and $addressPrefixStr.IndexOf("/") -gt -1) {
                                     $splitResult = $addressPrefixStr -split '/'
                                     if ($splitResult -and $splitResult.Length -eq 2 -and $splitResult[1] -match '^\d+$') {
                                         $prefixLength = [int]$splitResult[1]
                                         $isCompliant = $prefixLength -le 27
-                                        if ($isCompliant) {
-                                            $compliantSubnets++
-                                        }
+                                        if ($isCompliant) { $compliantSubnets++ }
                                     }
                                 }
                             }
                             catch {
-                                # If any parsing fails, keep defaults and log
                                 Write-AssessmentProgress "Failed to parse address prefix '$addressPrefix': $($_.Exception.Message)"
                                 $prefixLength = 0
                                 $isCompliant = $false
                             }
-                        }                        $routeServerSubnets += @{
-                            VNetName      = if ($vnet -and $vnet.Name) { $vnet.Name.ToString() } else { "Unknown" }
-                            VNetId        = if ($vnet -and $vnet.Id) { $vnet.Id.ToString() } else { "Unknown" }
-                            SubnetName    = if ($subnet -and $subnet.name) { $subnet.name.ToString() } else { "RouteServerSubnet" }
+                        }
+
+                        $routeServerSubnets += @{
+                            VNetName      = if ($vnet.Name) { $vnet.Name.ToString() } else { "Unknown" }
+                            VNetId        = if ($vnet.Id) { $vnet.Id.ToString() } else { "Unknown" }
+                            SubnetName    = $subnetName
                             AddressPrefix = if ($addressPrefix) { $addressPrefix.ToString() } else { "Unknown" }
                             PrefixLength  = $prefixLength
                             IsCompliant   = $isCompliant
@@ -795,7 +775,7 @@ function Test-QuestionD0109 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -956,7 +936,7 @@ function Test-QuestionD0110 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
 
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1060,7 +1040,7 @@ function Test-QuestionD0111 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1228,7 +1208,7 @@ function Test-QuestionD0113 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1638,7 +1618,7 @@ function Test-QuestionD0301 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1747,7 +1727,7 @@ function Test-QuestionD0302 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1858,7 +1838,7 @@ function Test-QuestionD0303 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
@@ -1965,7 +1945,7 @@ function Test-QuestionD0304 {
     try {
         Write-AssessmentProgress "Assessing question: $($checklistItem.id) - $($checklistItem.text)"
 
-        $virtualNetworks = $global:AzData.Resources | Where-Object { $_.ResourceType -eq 'Microsoft.Network/virtualNetworks' }
+        $virtualNetworks = $global:AzData.VirtualNetworks
         
         if (($virtualNetworks | Measure-Object).Count -eq 0) {
             $status = [Status]::NotApplicable
