@@ -76,8 +76,24 @@ function Invoke-AzGraphQueryWithPagination {
     $results = @()
     $skipToken = $null
 
+    # Scope to known subscriptions to avoid tenant-level auth (MFA/Conditional Access issues)
+    $subscriptionIds = if ($global:AzData -and $global:AzData.Subscriptions) {
+        @($global:AzData.Subscriptions | ForEach-Object { $_.Id } | Where-Object { $_ })
+    } else { @() }
+
+    # If no subscriptions are available, skip the query to avoid unauthenticated tenant calls
+    if ($subscriptionIds.Count -eq 0) {
+        return @()
+    }
+
     do {
-        $response = Search-AzGraph -Query "$Query" -First $PageSize -SkipToken $skipToken
+        $graphParams = @{
+            Query        = $Query
+            First        = $PageSize
+            Subscription = $subscriptionIds
+        }
+        if ($skipToken) { $graphParams['SkipToken'] = $skipToken }
+        $response = Search-AzGraph @graphParams
         $results += $response.Data
         $skipToken = $response.SkipToken
     } while ($skipToken)
