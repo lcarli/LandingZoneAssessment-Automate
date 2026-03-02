@@ -1006,7 +1006,9 @@ function Test-QuestionE0202 {
             Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId -ErrorAction SilentlyContinue | Out-Null
 
             # Get all budgets for the subscription
-            $budgets = Invoke-AzCmdletSafely -CmdletName "Get-AzConsumptionBudget" -Parameters @{} -ErrorAction SilentlyContinue
+            $budgets = Invoke-AzCmdletSafely -ScriptBlock {
+                Get-AzConsumptionBudget -ErrorAction SilentlyContinue
+            } -CmdletName "Get-AzConsumptionBudget" -ModuleName "Az.CostManagement" -WarningMessage "Could not get budgets for subscription $($subscription.Name)"
 
             if (-not $budgets -or ($budgets | Measure-Object).Count -eq 0) {
                 Write-Warning "No budgets found for subscription: $($subscription.Name)"
