@@ -372,31 +372,22 @@ function Test-QuestionB0303 {
             $totalAssignments = 0
             $groupAssignments = 0
 
-            # Loop through each subscription
+            # Loop through each subscription — read from cache (populated by Collect-AzData)
             foreach ($subscription in $subscriptions) {
                 $subscriptionId = $subscription.Id
 
-                try {
-                    # Set the context to the current subscription
-                    Set-AzContext -SubscriptionId $subscriptionId -TenantId $global:TenantId -WarningAction SilentlyContinue | Out-Null
+                $roleAssignments = if ($global:AzData.RoleAssignments -and $global:AzData.RoleAssignments.ContainsKey($subscriptionId)) {
+                    $global:AzData.RoleAssignments[$subscriptionId]
+                } else { @() }
 
-                    Write-AssessmentInfo "Checking role assignments for Subscription ID: $subscriptionId"
+                Write-AssessmentInfo "Checking role assignments for Subscription ID: $subscriptionId"
 
-                    # Get all role assignments for the current subscription
-                    $roleAssignments = Get-AzRoleAssignment -Scope "/subscriptions/$subscriptionId" -WarningAction SilentlyContinue
+                $totalAssignments += $roleAssignments.Count
 
-                    # Count total role assignments in this subscription
-                    $totalAssignments += $roleAssignments.Count
-
-                    # Loop through each role assignment and check if it's assigned to a group
-                    foreach ($assignment in $roleAssignments) {
-                        if ($assignment.ObjectType -eq "Group") {
-                            $groupAssignments++
-                        }
+                foreach ($assignment in $roleAssignments) {
+                    if ($assignment.ObjectType -eq "Group") {
+                        $groupAssignments++
                     }
-                }
-                catch {
-                    Write-AssessmentWarning "Could not check role assignments for subscription $subscriptionId - $($_.Exception.Message)"
                 }
             }
 
@@ -1311,8 +1302,8 @@ function Test-QuestionB0311 {
         # Question: Use Azure custom RBAC roles for the following key roles to provide fine-grain access across your ALZ: Azure platform owner, network management, security operations, subscription owner, application owner. Align these roles to teams and responsibilities within your business.
         # Reference: https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/identity-access#prerequisites-for-a-landing-zone---design-recommendations
 
-        # Get all custom role definitions (scope "/" ensures tenant-wide query including management group scopes)
-        $customRoles = Get-AzRoleDefinition -Scope "/" -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Where-Object { $_.IsCustom -eq $true }
+        # Read custom role definitions from cache (populated by Collect-AzData)
+        $customRoles = if ($global:AzData.CustomRoleDefinitions) { $global:AzData.CustomRoleDefinitions } else { @() }
 
         if ($customRoles.Count -eq 0) {
             $status = [Status]::NotImplemented
@@ -2197,21 +2188,21 @@ function Test-QuestionB0402 {
                 try {
                     switch ($resource.ResourceType) {
                         "Microsoft.KeyVault/vaults" {
-                            # Check if RBAC is enabled for Key Vault
-                            $keyVault = Invoke-AzCmdletSafely -ScriptBlock {
-                                Get-AzKeyVault -VaultName $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue
-                            } -CmdletName "Get-AzKeyVault" -ModuleName "Az.KeyVault" -WarningMessage "Could not check Key Vault RBAC for $($resource.Name)"
-                            
+                            # Read from cache (populated by Collect-AzData)
+                            $keyVault = if ($global:AzData.KeyVaults) {
+                                $global:AzData.KeyVaults | Where-Object { $_.VaultName -eq $resource.Name -and $_.ResourceGroupName -eq $resource.ResourceGroupName } | Select-Object -First 1
+                            } else { $null }
+
                             if ($keyVault -and $keyVault.EnableRbacAuthorization -eq $true) {
                                 $resourcesUsingRBAC++
                             }
                         }
                         "Microsoft.Storage/storageAccounts" {
-                            # Check if RBAC is enabled for Storage Account
-                            $storageAccount = Invoke-AzCmdletSafely -ScriptBlock {
-                                Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction SilentlyContinue
-                            } -CmdletName "Get-AzStorageAccount" -ModuleName "Az.Storage" -WarningMessage "Could not check Storage Account RBAC for $($resource.Name)"
-                            
+                            # Read from cache (populated by Collect-AzData)
+                            $storageAccount = if ($global:AzData.StorageAccounts) {
+                                $global:AzData.StorageAccounts | Where-Object { $_.StorageAccountName -eq $resource.Name -and $_.ResourceGroupName -eq $resource.ResourceGroupName } | Select-Object -First 1
+                            } else { $null }
+
                             if ($storageAccount -and ($storageAccount.EnableAzureActiveDirectoryDomainServicesForFile -or 
                                 $storageAccount.EnableAzureActiveDirectoryKerberosForFile -or 
                                 $storageAccount.EnableHierarchicalNamespace)) {
@@ -2219,17 +2210,17 @@ function Test-QuestionB0402 {
                             }
                         }
                         "Microsoft.Sql/servers" {
-                            # Check if Azure AD authentication is enabled for SQL
-                            $sqlServer = Invoke-AzCmdletSafely -ScriptBlock {
-                                Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name -ErrorAction SilentlyContinue
-                            } -CmdletName "Get-AzSqlServer" -ModuleName "Az.Sql" -WarningMessage "Could not check SQL Server for $($resource.Name)"
-                            
+                            # Read server and AD admin from cache (populated by Collect-AzData)
+                            $sqlServer = if ($global:AzData.SqlServers) {
+                                $global:AzData.SqlServers | Where-Object { $_.ServerName -eq $resource.Name -and $_.ResourceGroupName -eq $resource.ResourceGroupName } | Select-Object -First 1
+                            } else { $null }
+
                             if ($sqlServer) {
-                                $adAdmins = Invoke-AzCmdletSafely -ScriptBlock {
-                                    Get-AzSqlServerActiveDirectoryAdministrator -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name -ErrorAction SilentlyContinue
-                                } -CmdletName "Get-AzSqlServerActiveDirectoryAdministrator" -ModuleName "Az.Sql"
-                                
-                                if ($adAdmins) {
+                                $adAdmin = if ($global:AzData.SqlAdministrators) {
+                                    $global:AzData.SqlAdministrators["$($resource.ResourceGroupName)/$($resource.Name)"]
+                                } else { $null }
+
+                                if ($adAdmin) {
                                     $resourcesUsingRBAC++
                                 }
                             }

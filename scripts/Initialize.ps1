@@ -484,11 +484,18 @@ function Import-RequiredModules {
 function Collect-AzData {
     # Collect Azure data (modules should already be imported at this point)
     $global:AzData = [PSCustomObject]@{
-        Tenant = Get-AzTenant -TenantId $global:TenantId
-        ManagementGroups = @()
-        Subscriptions = Get-AzSubscription -TenantId $global:TenantId
-        Resources = @()
-        Policies = @()
+        Tenant                = Get-AzTenant -TenantId $global:TenantId
+        ManagementGroups      = @()
+        Subscriptions         = Get-AzSubscription -TenantId $global:TenantId
+        Resources             = @()
+        Policies              = @()
+        RoleAssignments       = @{}   # hashtable: subscriptionId -> @(role assignments)
+        CustomRoleDefinitions = @()   # Azure RBAC custom role definitions (tenant-wide)
+        Budgets               = @{}   # hashtable: subscriptionId -> @(budgets)
+        KeyVaults             = @()   # Get-AzKeyVault full details (includes EnableRbacAuthorization)
+        StorageAccounts       = @()   # Get-AzStorageAccount full details
+        SqlServers            = @()   # Get-AzSqlServer full details
+        SqlAdministrators     = @{}   # hashtable: "rg/serverName" -> AD admin object
     }
 
     # Get Management Groups
@@ -529,12 +536,59 @@ function Collect-AzData {
             Set-AzContext -Subscription $sub.Id -Tenant $global:TenantId -ErrorAction Stop | Out-Null
             $resources = Get-AzResource -ErrorAction SilentlyContinue
             if ($resources) { $global:AzData.Resources += $resources }
+
+            # RBAC Role Assignments (used by B03.03)
+            try {
+                $roleAssignments = Get-AzRoleAssignment -Scope "/subscriptions/$($sub.Id)" -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
+                $global:AzData.RoleAssignments[$sub.Id] = if ($roleAssignments) { @($roleAssignments) } else { @() }
+            } catch { $global:AzData.RoleAssignments[$sub.Id] = @() }
+
+            # Budget Alerts (used by E02.02)
+            try {
+                $budgets = Get-AzConsumptionBudget -ErrorAction SilentlyContinue
+                $global:AzData.Budgets[$sub.Id] = if ($budgets) { @($budgets) } else { @() }
+            } catch { $global:AzData.Budgets[$sub.Id] = @() }
+
+            # Key Vaults with full config (used by B04.02 — EnableRbacAuthorization)
+            try {
+                $kvs = Get-AzKeyVault -ErrorAction SilentlyContinue
+                if ($kvs) { $global:AzData.KeyVaults += $kvs }
+            } catch { Write-Warning "  KeyVaults [$($sub.Name)]: $($_.Exception.Message)" }
+
+            # Storage Accounts with full config (used by B04.02 — AAD/RBAC properties)
+            try {
+                $sas = Get-AzStorageAccount -ErrorAction SilentlyContinue
+                if ($sas) { $global:AzData.StorageAccounts += $sas }
+            } catch { Write-Warning "  StorageAccounts [$($sub.Name)]: $($_.Exception.Message)" }
+
+            # SQL Servers + AD Administrators (used by B04.02)
+            try {
+                $sqls = Get-AzSqlServer -ErrorAction SilentlyContinue
+                if ($sqls) {
+                    $global:AzData.SqlServers += $sqls
+                    foreach ($sql in $sqls) {
+                        $admin = Get-AzSqlServerActiveDirectoryAdministrator -ResourceGroupName $sql.ResourceGroupName -ServerName $sql.ServerName -ErrorAction SilentlyContinue
+                        if ($admin) {
+                            $global:AzData.SqlAdministrators["$($sql.ResourceGroupName)/$($sql.ServerName)"] = $admin
+                        }
+                    }
+                }
+            } catch { Write-Warning "  SqlServers [$($sub.Name)]: $($_.Exception.Message)" }
         }
         catch {
             Write-Warning "  Failed: $($_.Exception.Message)"
         }
     }
     
+    # Custom Azure RBAC Role Definitions — tenant-wide, collected once (used by B03.11)
+    try {
+        $customRoles = Get-AzRoleDefinition -Scope "/" -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Where-Object { $_.IsCustom -eq $true }
+        $global:AzData.CustomRoleDefinitions = if ($customRoles) { @($customRoles) } else { @() }
+    }
+    catch {
+        Write-Warning "Custom role definitions: $($_.Exception.Message)"
+    }
+
     Write-Output "Azure data: $($global:AzData.Resources.Count) resources, $($global:AzData.Subscriptions.Count) subscriptions"
 }
 

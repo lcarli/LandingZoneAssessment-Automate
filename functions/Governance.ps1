@@ -1003,15 +1003,13 @@ function Test-QuestionE0202 {
         }
 
         foreach ($subscription in $subscriptions) {
-            Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId -ErrorAction SilentlyContinue | Out-Null
+            # Read from cache (populated by Collect-AzData)
+            $budgets = if ($global:AzData.Budgets -and $global:AzData.Budgets.ContainsKey($subscription.Id)) {
+                $global:AzData.Budgets[$subscription.Id]
+            } else { @() }
 
-            # Get all budgets for the subscription
-            $budgets = Invoke-AzCmdletSafely -ScriptBlock {
-                Get-AzConsumptionBudget -ErrorAction SilentlyContinue
-            } -CmdletName "Get-AzConsumptionBudget" -ModuleName "Az.CostManagement" -WarningMessage "Could not get budgets for subscription $($subscription.Name)"
-
-            if (-not $budgets -or ($budgets | Measure-Object).Count -eq 0) {
-                Write-Warning "No budgets found for subscription: $($subscription.Name)"
+            if (-not $budgets -or $budgets.Count -eq 0) {
+                Write-AssessmentWarning "No budgets found for subscription: $($subscription.Name)"
                 continue
             }
 

@@ -83,11 +83,18 @@ catch {
     # Mock AzData with proper structure (matches Collect-AzData in Initialize.ps1)
     if (-not $global:AzData) {
         $global:AzData = [PSCustomObject]@{
-            Tenant           = $null
-            ManagementGroups = @()
-            Subscriptions    = @()
-            Resources        = @()
-            Policies         = @()
+            Tenant                = $null
+            ManagementGroups      = @()
+            Subscriptions         = @()
+            Resources             = @()
+            Policies              = @()
+            RoleAssignments       = @{}
+            CustomRoleDefinitions = @()
+            Budgets               = @{}
+            KeyVaults             = @()
+            StorageAccounts       = @()
+            SqlServers            = @()
+            SqlAdministrators     = @{}
         }
         Write-Host "  AzData: empty mock (no Azure connection)" -ForegroundColor Yellow
     }
