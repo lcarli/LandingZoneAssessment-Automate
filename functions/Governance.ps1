@@ -520,7 +520,10 @@ function Test-QuestionE0108 {
 
         $managementGroups = $global:AzData.ManagementGroups
         $subscriptions = $global:AzData.Subscriptions
-        $roleAssignments = Get-AzRoleAssignment
+        $roleAssignments = @()
+        foreach ($subId in $global:AzData.RoleAssignments.Keys) {
+            $roleAssignments += $global:AzData.RoleAssignments[$subId]
+        }
 
         if (-not $roleAssignments -or $roleAssignments.Count -eq 0) {
             $status = [Status]::NotImplemented
