@@ -565,7 +565,7 @@ function Collect-AzData {
 
                     # Key Vault Keys (used by F01.09)
                     try {
-                        $keys = Get-AzKeyVaultKey -VaultName $kv.VaultName -ErrorAction SilentlyContinue
+                        $keys = Get-AzKeyVaultKey -VaultName $kv.VaultName -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
                         $global:AzData.KeyVaultKeys[$kv.VaultName] = if ($keys) { @($keys) } else { @() }
                     } catch { $global:AzData.KeyVaultKeys[$kv.VaultName] = @() }
 
