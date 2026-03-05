@@ -483,6 +483,7 @@ function Import-RequiredModules {
 
 function Collect-AzData {
     # Collect Azure data (modules should already be imported at this point)
+    $global:AzCache = @{}  # Lazy-load cache for on-demand API calls during assessment
     $global:AzData = [PSCustomObject]@{
         Tenant                = Get-AzTenant -TenantId $global:TenantId
         ManagementGroups      = @()

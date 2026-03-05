@@ -125,6 +125,7 @@ catch {
     }
 
     $global:GraphConnected = $false
+    if (-not $global:AzCache) { $global:AzCache = @{} }
 }
 
 # List mode: show all available Test-Question* and Invoke-*Assessment functions

@@ -248,6 +248,62 @@ function Invoke-AzCmdletSafely {
 }
 
 # ========================================
+# LAZY-LOAD CACHE FUNCTIONS
+# ========================================
+
+<#
+.SYNOPSIS
+    Generic lazy-load cache for Azure API calls.
+.DESCRIPTION
+    Checks $global:AzCache[CacheName][CacheKey] first. On cache miss,
+    executes the fetch via Invoke-AzCmdletSafely, stores and returns the result.
+    Prevents repeated API calls and token expiry errors during assessment.
+#>
+function Get-CachedAzData {
+    param(
+        [Parameter(Mandatory)][string]$CacheKey,
+        [Parameter(Mandatory)][string]$CacheName,
+        [Parameter(Mandatory)][scriptblock]$FetchScript,
+        [string]$CmdletName,
+        [string]$ModuleName,
+        [object]$FallbackValue = $null,
+        [string]$WarningMessage = ""
+    )
+
+    if (-not $global:AzCache) { $global:AzCache = @{} }
+    if (-not $global:AzCache.ContainsKey($CacheName)) { $global:AzCache[$CacheName] = @{} }
+
+    if (-not $global:AzCache[$CacheName].ContainsKey($CacheKey)) {
+        $global:AzCache[$CacheName][$CacheKey] = Invoke-AzCmdletSafely -ScriptBlock $FetchScript `
+            -CmdletName $CmdletName -ModuleName $ModuleName `
+            -FallbackValue $FallbackValue -WarningMessage $WarningMessage
+    }
+
+    return $global:AzCache[$CacheName][$CacheKey]
+}
+
+function Get-CachedDiagnosticSetting {
+    param([Parameter(Mandatory)][string]$ResourceId, [string]$ResourceName = "")
+    return Get-CachedAzData -CacheKey $ResourceId -CacheName "DiagnosticSettings" -FetchScript {
+        Get-AzDiagnosticSetting -ResourceId $ResourceId -ErrorAction Stop -WarningAction SilentlyContinue
+    } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -WarningMessage "Could not get diagnostic settings for $ResourceName"
+}
+
+function Get-CachedMetricAlertRules {
+    param([Parameter(Mandatory)][string]$ResourceGroupName)
+    return Get-CachedAzData -CacheKey $ResourceGroupName -CacheName "MetricAlertRules" -FetchScript {
+        Get-AzMetricAlertRuleV2 -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+    } -CmdletName "Get-AzMetricAlertRuleV2" -ModuleName "Az.Monitor" -FallbackValue @() -WarningMessage "Could not get alert rules for RG $ResourceGroupName"
+}
+
+function Get-CachedVMExtensions {
+    param([Parameter(Mandatory)][string]$ResourceGroupName, [Parameter(Mandatory)][string]$VMName)
+    return Get-CachedAzData -CacheKey "$ResourceGroupName/$VMName" -CacheName "VMExtensions" -FetchScript {
+        Get-AzVMExtension -ResourceGroupName $ResourceGroupName -VMName $VMName -ErrorAction Stop
+    } -CmdletName "Get-AzVMExtension" -ModuleName "Az.Compute" -FallbackValue @() -WarningMessage "Could not get VM extensions for $VMName"
+}
+
+# ========================================
 # STANDARDIZED LOGGING FUNCTIONS
 # ========================================
 

@@ -300,7 +300,7 @@ function Test-QuestionF0103 {
                     $workspacesExceedingRetention += $workspace
 
                     # Check if workspace has export rules to Azure Storage
-                    $exportRules = Invoke-AzCmdletSafely -ScriptBlock {
+                    $exportRules = Get-CachedAzData -CacheKey "$($workspace.ResourceGroupName)/$($workspace.Name)" -CacheName "DataExportRules" -FetchScript {
                         Get-AzOperationalInsightsDataExport -ResourceGroupName $workspace.ResourceGroupName -WorkspaceName $workspace.Name -ErrorAction Stop
                     } -CmdletName "Get-AzOperationalInsightsDataExport" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not check data export rules for workspace $($workspace.Name)"
 
@@ -317,7 +317,7 @@ function Test-QuestionF0103 {
 
                             if ($storageAccount) {
                                 # Check for immutable storage policies (WORM)
-                                $immutablePolicies = Invoke-AzCmdletSafely -ScriptBlock {
+                                $immutablePolicies = Get-CachedAzData -CacheKey "$($storageAccount.ResourceGroupName)/$($storageAccount.StorageAccountName)" -CacheName "ImmutabilityPolicies" -FetchScript {
                                     Get-AzRmStorageContainerImmutabilityPolicy -ResourceGroupName $storageAccount.ResourceGroupName -StorageAccountName $storageAccount.StorageAccountName -ErrorAction Stop
                                 } -CmdletName "Get-AzRmStorageContainerImmutabilityPolicy" -ModuleName "Az.Storage" -FallbackValue @() -WarningMessage "Could not check immutability policies for storage account $($storageAccount.StorageAccountName)"
 
@@ -417,9 +417,7 @@ function Test-QuestionF0104 {
                 }
 
                 # Check for VM extensions related to guest configuration
-                $extensions = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzVMExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -ErrorAction Stop
-                } -CmdletName "Get-AzVMExtension" -ModuleName "Az.Compute" -FallbackValue @() -WarningMessage "Could not check VM extensions for $($vm.Name)"
+                $extensions = Get-CachedVMExtensions -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name
 
                 $hasGuestConfigExtension = $extensions | Where-Object {
                     $_.ExtensionType -in @("ConfigurationForLinux", "ConfigurationForWindows", "GuestConfiguration")
@@ -705,7 +703,7 @@ function Test-QuestionF0107 {
                             }
                         }
                         "Microsoft.Web/sites" {
-                            $webApp = Invoke-AzCmdletSafely -ScriptBlock {
+                            $webApp = Get-CachedAzData -CacheKey "$($resource.ResourceGroupName)/$($resource.Name)" -CacheName "WebApps" -FetchScript {
                                 Get-AzWebApp -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction Stop
                             } -CmdletName "Get-AzWebApp" -ModuleName "Az.Websites" -WarningMessage "Could not check Web App HTTPS for $($resource.Name)"
                             
@@ -956,9 +954,7 @@ function Test-QuestionF0111 {
             $rawData = "No monitorable resources found"
         } else {
             foreach ($resource in $resources) {
-                $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop -WarningAction SilentlyContinue
-                } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
+                $diagnosticSettings = Get-CachedDiagnosticSetting -ResourceId $resource.Id -ResourceName $resource.Name
 
                 if ($diagnosticSettings) {
                     $hasServiceHealth = $diagnosticSettings.Logs | Where-Object {
@@ -1029,20 +1025,15 @@ function Test-QuestionF0112 {
             $estimatedPercentageApplied = 0
             $rawData = "No monitorable resources found"
         } else {
-            # Batch fetch all metric alert rules per resource group (avoid N+1)
+            # Batch fetch all metric alert rules per resource group (cached)
             $allAlertRules = @()
             $resourceGroups = @($resources | ForEach-Object { $_.ResourceGroupName } | Sort-Object -Unique)
             foreach ($rg in $resourceGroups) {
-                $rgAlerts = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzMetricAlertRuleV2 -ResourceGroupName $rg -ErrorAction Stop
-                } -CmdletName "Get-AzMetricAlertRuleV2" -ModuleName "Az.Monitor" -FallbackValue @() -WarningMessage "Could not get alert rules for RG $rg"
-                $allAlertRules += $rgAlerts
+                $allAlertRules += Get-CachedMetricAlertRules -ResourceGroupName $rg
             }
 
             foreach ($resource in $resources) {
-                $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop -WarningAction SilentlyContinue
-                } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
+                $diagnosticSettings = Get-CachedDiagnosticSetting -ResourceId $resource.Id -ResourceName $resource.Name
 
                 if ($diagnosticSettings) {
                     $hasLogsAndMetrics = $diagnosticSettings.Logs | Where-Object {
@@ -1217,9 +1208,7 @@ function Test-QuestionF0114 {
             }
 
             foreach ($vm in $virtualMachines) {
-                $extensions = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzVMExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -ErrorAction Stop
-                } -CmdletName "Get-AzVMExtension" -ModuleName "Az.Compute" -FallbackValue @() -WarningMessage "Could not check VM extensions for $($vm.Name)"
+                $extensions = Get-CachedVMExtensions -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name
 
                 $hasDiagnosticExtension = $extensions | Where-Object {
                     $_.ExtensionType -in @("IaaSDiagnostics", "LinuxDiagnostic", "Microsoft.Azure.Diagnostics")
@@ -1292,9 +1281,7 @@ function Test-QuestionF0115 {
             $rawData = "No monitorable resources found"
         } else {
             foreach ($resource in $resources) {
-                $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop -WarningAction SilentlyContinue
-                } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
+                $diagnosticSettings = Get-CachedDiagnosticSetting -ResourceId $resource.Id -ResourceName $resource.Name
 
                 if ($diagnosticSettings) {
                     $logsConfigured = $diagnosticSettings.Logs | Where-Object {
@@ -1450,14 +1437,11 @@ function Test-QuestionF0117 {
             $estimatedPercentageApplied = 0
             $rawData = "No monitorable resources found"
         } else {
-            # Batch fetch all metric alert rules per resource group (avoid N+1)
+            # Batch fetch all metric alert rules per resource group (cached)
             $allAlertRules = @()
             $resourceGroups = @($resources | ForEach-Object { $_.ResourceGroupName } | Sort-Object -Unique)
             foreach ($rg in $resourceGroups) {
-                $rgAlerts = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzMetricAlertRuleV2 -ResourceGroupName $rg -ErrorAction Stop
-                } -CmdletName "Get-AzMetricAlertRuleV2" -ModuleName "Az.Monitor" -FallbackValue @() -WarningMessage "Could not get alert rules for RG $rg"
-                $allAlertRules += $rgAlerts
+                $allAlertRules += Get-CachedMetricAlertRules -ResourceGroupName $rg
             }
 
             foreach ($resource in $resources) {
@@ -1526,20 +1510,15 @@ function Test-QuestionF0118 {
             $estimatedPercentageApplied = 0
             $rawData = "No monitorable resources found"
         } else {
-            # Batch fetch all metric alert rules per resource group (avoid N+1)
+            # Batch fetch all metric alert rules per resource group (cached)
             $allAlertRules = @()
             $resourceGroups = @($resources | ForEach-Object { $_.ResourceGroupName } | Sort-Object -Unique)
             foreach ($rg in $resourceGroups) {
-                $rgAlerts = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzMetricAlertRuleV2 -ResourceGroupName $rg -ErrorAction Stop
-                } -CmdletName "Get-AzMetricAlertRuleV2" -ModuleName "Az.Monitor" -FallbackValue @() -WarningMessage "Could not get alert rules for RG $rg"
-                $allAlertRules += $rgAlerts
+                $allAlertRules += Get-CachedMetricAlertRules -ResourceGroupName $rg
             }
 
             foreach ($resource in $resources) {
-                $diagnosticSettings = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzDiagnosticSetting -ResourceId $resource.Id -ErrorAction Stop -WarningAction SilentlyContinue
-                } -CmdletName "Get-AzDiagnosticSetting" -ModuleName "Az.Monitor" -FallbackValue $null -WarningMessage "Could not get diagnostic settings for $($resource.Name)"
+                $diagnosticSettings = Get-CachedDiagnosticSetting -ResourceId $resource.Id -ResourceName $resource.Name
 
                 if ($diagnosticSettings) {
                     $logsConfigured = $diagnosticSettings.Logs | Where-Object {
@@ -1669,13 +1648,13 @@ function Test-QuestionF0202 {
                 $vaultProperties = $null
                 
                 if ($vault.ResourceType -eq "Microsoft.RecoveryServices/vaults") {
-                    $vaultProperties = Invoke-AzCmdletSafely -ScriptBlock {
+                    $vaultProperties = Get-CachedAzData -CacheKey "$($vault.ResourceGroupName)/$($vault.Name)" -CacheName "RecoveryServicesVaults" -FetchScript {
                         Get-AzRecoveryServicesVault -ResourceGroupName $vault.ResourceGroupName -Name $vault.Name -ErrorAction Stop
                     } -CmdletName "Get-AzRecoveryServicesVault" -ModuleName "Az.RecoveryServices" -WarningMessage "Could not check Recovery Services Vault $($vault.Name)"
                     
                     if ($vaultProperties) {
                         # Get backup storage redundancy
-                        $backupStorageRedundancy = Invoke-AzCmdletSafely -ScriptBlock {
+                        $backupStorageRedundancy = Get-CachedAzData -CacheKey "$($vault.ResourceGroupName)/$($vault.Name)" -CacheName "RecoveryServicesBackupProps" -FetchScript {
                             Get-AzRecoveryServicesBackupProperty -Vault $vaultProperties -ErrorAction Stop
                         } -CmdletName "Get-AzRecoveryServicesBackupProperty" -ModuleName "Az.RecoveryServices" -WarningMessage "Could not check backup properties for $($vault.Name)"
                         
@@ -1694,7 +1673,7 @@ function Test-QuestionF0202 {
                     }
                 } elseif ($vault.ResourceType -eq "Microsoft.DataProtection/backupVaults") {
                     # For DataProtection backup vaults, check storage settings
-                    $vaultProperties = Invoke-AzCmdletSafely -ScriptBlock {
+                    $vaultProperties = Get-CachedAzData -CacheKey "$($vault.ResourceGroupName)/$($vault.Name)" -CacheName "DataProtectionVaults" -FetchScript {
                         Get-AzDataProtectionBackupVault -ResourceGroupName $vault.ResourceGroupName -VaultName $vault.Name -ErrorAction Stop
                     } -CmdletName "Get-AzDataProtectionBackupVault" -ModuleName "Az.DataProtection" -WarningMessage "Could not check Data Protection Vault $($vault.Name)"
                     
@@ -1855,11 +1834,13 @@ function Test-QuestionF0302 {
             }
         }
 
-        # Batch fetch automation accounts per unique RG (N+1 fix)
+        # Batch fetch automation accounts per unique RG (cached)
         $uniqueRGs = $vms | Select-Object -ExpandProperty ResourceGroupName -Unique
         $allAutomationAccounts = @()
         foreach ($rg in $uniqueRGs) {
-            $rgAccounts = Invoke-AzCmdletSafely -CmdletName "Get-AzAutomationAccount" -Parameters @{ ResourceGroupName = $rg } -ErrorAction SilentlyContinue
+            $rgAccounts = Get-CachedAzData -CacheKey $rg -CacheName "AutomationAccounts" -FetchScript {
+                Get-AzAutomationAccount -ResourceGroupName $rg -ErrorAction SilentlyContinue
+            } -CmdletName "Get-AzAutomationAccount" -ModuleName "Az.Automation" -FallbackValue @()
             if ($rgAccounts) {
                 $allAutomationAccounts += $rgAccounts
             }
@@ -1943,10 +1924,13 @@ function Test-QuestionF0401 {
 
             # Check if Azure Site Recovery is enabled for the VM
             try {
-                $asrConfig = Get-AzRecoveryServicesAsrProtectionContainerMapping -ErrorAction SilentlyContinue |
-                             Where-Object { $_.SourceContainerId -eq $vm.Id }
+                $asrConfig = Get-CachedAzData -CacheKey "all" -CacheName "AsrMappings" -FetchScript {
+                    Get-AzRecoveryServicesAsrProtectionContainerMapping -ErrorAction SilentlyContinue
+                } -CmdletName "Get-AzRecoveryServicesAsrProtectionContainerMapping" -ModuleName "Az.RecoveryServices" -FallbackValue @()
 
-                if ($asrConfig) {
+                $vmAsrConfig = $asrConfig | Where-Object { $_.SourceContainerId -eq $vm.Id }
+
+                if ($vmAsrConfig) {
                     $vmsWithASRConfigured++
                 }
             } catch {
@@ -2014,17 +1998,23 @@ function Test-QuestionF0402 {
 
             # Check for disaster recovery configuration (e.g., failover groups, geo-replication)
             if ($resource.ResourceType -eq "Microsoft.Sql/servers") {
-                $failoverGroups = Get-AzSqlDatabaseFailoverGroup -ServerName $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue
+                $failoverGroups = Get-CachedAzData -CacheKey "$($resource.ResourceGroupName)/$($resource.Name)" -CacheName "SqlFailoverGroups" -FetchScript {
+                    Get-AzSqlDatabaseFailoverGroup -ServerName $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue
+                } -CmdletName "Get-AzSqlDatabaseFailoverGroup" -ModuleName "Az.Sql" -FallbackValue @()
                 if ($failoverGroups) {
                     $resourcesWithDRConfigured++
                 }
             } elseif ($resource.ResourceType -eq "Microsoft.DocumentDB/databaseAccounts") {
-                $account = Get-AzCosmosDBAccount -Name $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue
+                $account = Get-CachedAzData -CacheKey "$($resource.ResourceGroupName)/$($resource.Name)" -CacheName "CosmosDBAccounts" -FetchScript {
+                    Get-AzCosmosDBAccount -Name $resource.Name -ResourceGroupName $resource.ResourceGroupName -ErrorAction SilentlyContinue
+                } -CmdletName "Get-AzCosmosDBAccount" -ModuleName "Az.CosmosDB"
                 if ($account.ConsistencyPolicy.DefaultConsistencyLevel -ne "Strong") {
                     $resourcesWithDRConfigured++
                 }
             } elseif ($resource.ResourceType -eq "Microsoft.Web/sites") {
-                $siteConfig = Get-AzWebAppSlot -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction SilentlyContinue
+                $siteConfig = Get-CachedAzData -CacheKey "$($resource.ResourceGroupName)/$($resource.Name)" -CacheName "WebAppSlots" -FetchScript {
+                    Get-AzWebAppSlot -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction SilentlyContinue
+                } -CmdletName "Get-AzWebAppSlot" -ModuleName "Az.Websites" -FallbackValue @()
                 if ($siteConfig.Location -ne $resource.Location) {
                     $resourcesWithDRConfigured++
                 }
@@ -2092,8 +2082,7 @@ function Test-QuestionF0601 {
         }
 
         foreach ($service in $wafServices) {
-            # Wrap in Invoke-AzCmdletSafely to handle errors gracefully
-            $diagnosticSettings = Invoke-AzCmdletSafely -CmdletName "Get-AzDiagnosticSetting" -Parameters @{ ResourceId = $service.Id } -ErrorAction SilentlyContinue
+            $diagnosticSettings = Get-CachedDiagnosticSetting -ResourceId $service.Id -ResourceName $service.Name
             $matchingDiag = $diagnosticSettings | Where-Object {
                 $_.Logs.Category -contains "ApplicationGatewayAccessLog" -or $_.Logs.Category -contains "FrontDoorAccessLog"
             }
@@ -2166,8 +2155,7 @@ function Test-QuestionF0602 {
         }
 
         foreach ($service in $wafServices) {
-            # Wrap in Invoke-AzCmdletSafely to handle errors gracefully
-            $diagnosticSettings = Invoke-AzCmdletSafely -CmdletName "Get-AzDiagnosticSetting" -Parameters @{ ResourceId = $service.Id } -ErrorAction SilentlyContinue
+            $diagnosticSettings = Get-CachedDiagnosticSetting -ResourceId $service.Id -ResourceName $service.Name
             $matchingDiag = $diagnosticSettings | Where-Object {
                 $null -ne $_.WorkspaceId -and $_.WorkspaceId -match "Microsoft Sentinel"
             }
