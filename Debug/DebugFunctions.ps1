@@ -92,10 +92,13 @@ catch {
             CustomRoleDefinitions = @()
             Budgets               = @{}
             KeyVaults             = @()
+            KeyVaultKeys          = @{}
+            KeyVaultCertificates  = @{}
             StorageAccounts       = @()
             SqlServers            = @()
             SqlAdministrators     = @{}
             VirtualNetworks       = @()
+            Workspaces            = @()
         }
         Write-Host "  AzData: empty mock (no Azure connection)" -ForegroundColor Yellow
     }

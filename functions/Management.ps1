@@ -87,16 +87,7 @@ function Test-QuestionF0101 {
         } else {
             $totalWorkspaces = 0
             $justifiedWorkspaces = 0
-            $allWorkspaces = @()
-
-            foreach ($subscription in $subscriptions) {
-                Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId -ErrorAction SilentlyContinue | Out-Null
-                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzOperationalInsightsWorkspace -ErrorAction Stop
-                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
-
-                $allWorkspaces += $workspaces
-            }
+            $allWorkspaces = @($global:AzData.Workspaces)
 
             $totalWorkspaces = $allWorkspaces.Count
 
@@ -116,16 +107,19 @@ function Test-QuestionF0101 {
                 # Check data retention settings
                 $retentionValues = $allWorkspaces | Select-Object -ExpandProperty RetentionInDays -Unique
 
-                # For RBAC, collect role assignments per workspace
+                # For RBAC, collect role assignments per workspace from pre-fetched data
                 $rbacAssignments = @{}
                 $rbacJustified = $false
 
+                # Aggregate all pre-fetched role assignments
+                $allRoleAssignments = @()
+                foreach ($subId in $global:AzData.RoleAssignments.Keys) {
+                    $allRoleAssignments += $global:AzData.RoleAssignments[$subId]
+                }
+
                 foreach ($workspace in $allWorkspaces) {
                     $workspaceId = $workspace.ResourceId
-                    $roleAssignments = Invoke-AzCmdletSafely -ScriptBlock {
-                        Get-AzRoleAssignment -Scope $workspaceId -ErrorAction Stop
-                    } -CmdletName "Get-AzRoleAssignment" -ModuleName "Az.Resources" -FallbackValue @() -WarningMessage "Could not get role assignments for workspace $($workspace.Name)"
-                    
+                    $roleAssignments = @($allRoleAssignments | Where-Object { $_.Scope -eq $workspaceId -or $_.Scope -like "$workspaceId/*" })
                     $rbacAssignments[$workspaceId] = $roleAssignments
                 }
 
@@ -208,18 +202,7 @@ function Test-QuestionF0102 {
             $status = [Status]::NotApplicable
             $estimatedPercentageApplied = 100
         } else {
-            $allWorkspaces = @()
-            $totalWorkspaces = 0
-
-            foreach ($subscription in $subscriptions) {
-                Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId -ErrorAction SilentlyContinue | Out-Null
-                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzOperationalInsightsWorkspace -ErrorAction Stop
-                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
-                
-                $allWorkspaces += $workspaces
-            }
-
+            $allWorkspaces = @($global:AzData.Workspaces)
             $totalWorkspaces = $allWorkspaces.Count
 
             if ($totalWorkspaces -eq 0) {
@@ -306,63 +289,54 @@ function Test-QuestionF0103 {
             $workspacesNonCompliant = 0
             $totalWorkspacesChecked = 0
 
-            foreach ($subscription in $subscriptions) {
-                Set-AzContext -Subscription $subscription.Id -Tenant $global:TenantId -ErrorAction SilentlyContinue | Out-Null
-                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzOperationalInsightsWorkspace -ErrorAction Stop
-                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get workspaces for subscription $($subscription.Id)"
+            foreach ($workspace in $global:AzData.Workspaces) {
+                $totalWorkspacesChecked++
 
-                foreach ($workspace in $workspaces) {
-                    $totalWorkspacesChecked++
+                $retentionInDays = $workspace.RetentionInDays
+                $archiveRetentionInDays = if ($workspace.ArchivedDataRetentionInDays) { $workspace.ArchivedDataRetentionInDays } else { 0 }
+                $totalRetention = $retentionInDays + $archiveRetentionInDays
 
-                    $retentionInDays = $workspace.RetentionInDays
-                    $archiveRetentionInDays = if ($workspace.ArchivedDataRetentionInDays) { $workspace.ArchivedDataRetentionInDays } else { 0 }
-                    $totalRetention = $retentionInDays + $archiveRetentionInDays
+                if ($totalRetention -gt 4380) { # 12 years = 4380 days
+                    $workspacesExceedingRetention += $workspace
 
-                    if ($totalRetention -gt 4380) { # 12 years = 4380 days
-                        $workspacesExceedingRetention += $workspace
+                    # Check if workspace has export rules to Azure Storage
+                    $exportRules = Invoke-AzCmdletSafely -ScriptBlock {
+                        Get-AzOperationalInsightsDataExport -ResourceGroupName $workspace.ResourceGroupName -WorkspaceName $workspace.Name -ErrorAction Stop
+                    } -CmdletName "Get-AzOperationalInsightsDataExport" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not check data export rules for workspace $($workspace.Name)"
 
-                        # Check if workspace has export rules to Azure Storage
-                        $exportRules = Invoke-AzCmdletSafely -ScriptBlock {
-                            Get-AzOperationalInsightsDataExport -ResourceGroupName $workspace.ResourceGroupName -WorkspaceName $workspace.Name -ErrorAction Stop
-                        } -CmdletName "Get-AzOperationalInsightsDataExport" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not check data export rules for workspace $($workspace.Name)"
+                    $storageExportConfigured = $false
+                    $storageCompliant = $false
 
-                        $storageExportConfigured = $false
-                        $storageCompliant = $false
+                    foreach ($rule in $exportRules) {
+                        if ($rule.Destination -like "/subscriptions/*/resourceGroups/*/providers/Microsoft.Storage/storageAccounts/*") {
+                            $storageExportConfigured = $true
 
-                        foreach ($rule in $exportRules) {
-                            if ($rule.Destination -like "/subscriptions/*/resourceGroups/*/providers/Microsoft.Storage/storageAccounts/*") {
-                                $storageExportConfigured = $true
+                            # Lookup storage account from pre-fetched data
+                            $storageAccountId = $rule.Destination
+                            $storageAccount = $global:AzData.StorageAccounts | Where-Object { $_.Id -eq $storageAccountId } | Select-Object -First 1
 
-                                # Get the storage account to check for immutable storage (WORM)
-                                $storageAccountId = $rule.Destination
-                                $storageAccount = Invoke-AzCmdletSafely -ScriptBlock {
-                                    Get-AzStorageAccount -ResourceId $storageAccountId -ErrorAction Stop
-                                } -CmdletName "Get-AzStorageAccount" -ModuleName "Az.Storage" -WarningMessage "Could not check Storage Account for WORM: $storageAccountId"
+                            if ($storageAccount) {
+                                # Check for immutable storage policies (WORM)
+                                $immutablePolicies = Invoke-AzCmdletSafely -ScriptBlock {
+                                    Get-AzRmStorageContainerImmutabilityPolicy -ResourceGroupName $storageAccount.ResourceGroupName -StorageAccountName $storageAccount.StorageAccountName -ErrorAction Stop
+                                } -CmdletName "Get-AzRmStorageContainerImmutabilityPolicy" -ModuleName "Az.Storage" -FallbackValue @() -WarningMessage "Could not check immutability policies for storage account $($storageAccount.StorageAccountName)"
 
-                                if ($storageAccount) {
-                                    # Check for immutable storage policies (WORM)
-                                    $immutablePolicies = Invoke-AzCmdletSafely -ScriptBlock {
-                                        Get-AzRmStorageContainerImmutabilityPolicy -ResourceGroupName $storageAccount.ResourceGroupName -StorageAccountName $storageAccount.StorageAccountName -ErrorAction Stop
-                                    } -CmdletName "Get-AzRmStorageContainerImmutabilityPolicy" -ModuleName "Az.Storage" -FallbackValue @() -WarningMessage "Could not check immutability policies for storage account $($storageAccount.StorageAccountName)"
-
-                                    if ($immutablePolicies.Count -gt 0) {
-                                        $storageCompliant = $true
-                                        break
-                                    }
+                                if ($immutablePolicies.Count -gt 0) {
+                                    $storageCompliant = $true
+                                    break
                                 }
                             }
                         }
-
-                        if ($storageExportConfigured -and $storageCompliant) {
-                            $workspacesCompliant++
-                        } else {
-                            $workspacesNonCompliant++
-                        }
-                    } else {
-                        # Workspace retention does not exceed 12 years - compliant by default
-                        $workspacesCompliant++
                     }
+
+                    if ($storageExportConfigured -and $storageCompliant) {
+                        $workspacesCompliant++
+                    } else {
+                        $workspacesNonCompliant++
+                    }
+                } else {
+                    # Workspace retention does not exceed 12 years - compliant by default
+                    $workspacesCompliant++
                 }
             }
 
@@ -722,9 +696,9 @@ function Test-QuestionF0107 {
                 try {
                     switch ($resource.ResourceType) {
                         "Microsoft.Sql/servers" {
-                            $sqlServer = Invoke-AzCmdletSafely -ScriptBlock {
-                                Get-AzSqlServer -ResourceGroupName $resource.ResourceGroupName -ServerName $resource.Name -ErrorAction Stop
-                            } -CmdletName "Get-AzSqlServer" -ModuleName "Az.Sql" -WarningMessage "Could not check SQL Server TLS for $($resource.Name)"
+                            $sqlServer = $global:AzData.SqlServers | Where-Object {
+                                $_.ResourceGroupName -eq $resource.ResourceGroupName -and $_.ServerName -eq $resource.Name
+                            } | Select-Object -First 1
                             
                             if ($sqlServer -and $sqlServer.MinimalTlsVersion -ge "1.2") {
                                 $resourcesCompliant++
@@ -740,9 +714,9 @@ function Test-QuestionF0107 {
                             }
                         }
                         "Microsoft.Storage/storageAccounts" {
-                            $storageAccount = Invoke-AzCmdletSafely -ScriptBlock {
-                                Get-AzStorageAccount -ResourceGroupName $resource.ResourceGroupName -Name $resource.Name -ErrorAction Stop
-                            } -CmdletName "Get-AzStorageAccount" -ModuleName "Az.Storage" -WarningMessage "Could not check Storage Account TLS for $($resource.Name)"
+                            $storageAccount = $global:AzData.StorageAccounts | Where-Object {
+                                $_.ResourceGroupName -eq $resource.ResourceGroupName -and $_.StorageAccountName -eq $resource.Name
+                            } | Select-Object -First 1
                             
                             if ($storageAccount -and $storageAccount.MinimumTlsVersion -eq "TLS1_2") {
                                 $resourcesCompliant++
@@ -800,12 +774,11 @@ function Test-QuestionF0108 {
         # Question: Use Azure Key Vault to store and manage access to secrets, keys, and certificates securely.
         # Reference: https://learn.microsoft.com/azure/key-vault/general/basic-concepts
 
-        $keyVaults = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.KeyVault/vaults" }
+        $keyVaults = $global:AzData.KeyVaults
         $compliantVaults = 0
 
         foreach ($keyVault in $keyVaults) {
-            $properties = Get-AzKeyVault -VaultName $keyVault.Name -ResourceGroupName $keyVault.ResourceGroupName
-            if ($properties.EnableSoftDelete -and $properties.EnablePurgeProtection) {
+            if ($keyVault.EnableSoftDelete -and $keyVault.EnablePurgeProtection) {
                 $compliantVaults++
             }
         }
@@ -853,13 +826,12 @@ function Test-QuestionF0109 {
         # Question: Regularly rotate secrets, keys, and certificates stored in Azure Key Vault.
         # Reference: https://learn.microsoft.com/azure/key-vault/general/overview
 
-        $keyVaults = $global:AzData.Resources | Where-Object { $_.ResourceType -eq "Microsoft.KeyVault/vaults" }
+        $keyVaults = $global:AzData.KeyVaults
         $vaultsWithRotationPolicy = 0
 
         foreach ($keyVault in $keyVaults) {
-            $keys = Invoke-AzCmdletSafely -ScriptBlock {
-                Get-AzKeyVaultKey -VaultName $keyVault.Name -ErrorAction SilentlyContinue
-            } -CmdletName "Get-AzKeyVaultKey" -ModuleName "Az.KeyVault" -FallbackValue @() -WarningMessage "Could not check Key Vault keys for $($keyVault.Name)"
+            $vaultName = if ($keyVault.VaultName) { $keyVault.VaultName } else { $keyVault.Name }
+            $keys = if ($global:AzData.KeyVaultKeys.ContainsKey($vaultName)) { $global:AzData.KeyVaultKeys[$vaultName] } else { @() }
             
             foreach ($key in $keys) {
                 if ($key.Attributes.Expires -and ($key.Attributes.Expires -gt (Get-Date))) {
@@ -1134,13 +1106,7 @@ function Test-QuestionF0113 {
             $rawData = "No subscriptions found"
         }
         else {
-            $allWorkspaces = @()
-            foreach ($subscription in $subscriptions) {
-                $workspaces = Invoke-AzCmdletSafely -ScriptBlock {
-                    Get-AzOperationalInsightsWorkspace -ErrorAction Stop
-                } -CmdletName "Get-AzOperationalInsightsWorkspace" -ModuleName "Az.OperationalInsights" -FallbackValue @() -WarningMessage "Could not get Log Analytics workspaces"
-                $allWorkspaces += $workspaces
-            }
+            $allWorkspaces = @($global:AzData.Workspaces)
 
             $hasWorkspaces = $allWorkspaces.Count -gt 0
 

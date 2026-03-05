@@ -492,11 +492,14 @@ function Collect-AzData {
         RoleAssignments       = @{}   # hashtable: subscriptionId -> @(role assignments)
         CustomRoleDefinitions = @()   # Azure RBAC custom role definitions (tenant-wide)
         Budgets               = @{}   # hashtable: subscriptionId -> @(budgets)
-        KeyVaults             = @()   # Get-AzKeyVault full details (includes EnableRbacAuthorization)
+        KeyVaults             = @()   # Get-AzKeyVault full details (includes EnableRbacAuthorization, SoftDelete, PurgeProtection)
+        KeyVaultKeys          = @{}   # hashtable: vaultName -> @(keys)
+        KeyVaultCertificates  = @{}   # hashtable: vaultName -> @(certificates)
         StorageAccounts       = @()   # Get-AzStorageAccount full details
         SqlServers            = @()   # Get-AzSqlServer full details
         SqlAdministrators     = @{}   # hashtable: "rg/serverName" -> AD admin object
         VirtualNetworks       = @()   # Get-AzVirtualNetwork full details (includes subnets, peerings)
+        Workspaces            = @()   # Get-AzOperationalInsightsWorkspace full details
     }
 
     # Get Management Groups
@@ -550,10 +553,27 @@ function Collect-AzData {
                 $global:AzData.Budgets[$sub.Id] = if ($budgets) { @($budgets) } else { @() }
             } catch { $global:AzData.Budgets[$sub.Id] = @() }
 
-            # Key Vaults with full config (used by B04.02 — EnableRbacAuthorization)
+            # Key Vaults with full config (used by B04.02, F01.08, F01.09)
             try {
-                $kvs = Get-AzKeyVault -ErrorAction SilentlyContinue
-                if ($kvs) { $global:AzData.KeyVaults += $kvs }
+                $kvList = Get-AzKeyVault -ErrorAction SilentlyContinue
+                foreach ($kv in $kvList) {
+                    try {
+                        $kvDetail = Get-AzKeyVault -VaultName $kv.VaultName -ResourceGroupName $kv.ResourceGroupName -ErrorAction SilentlyContinue
+                        if ($kvDetail) { $global:AzData.KeyVaults += $kvDetail }
+                    } catch { $global:AzData.KeyVaults += $kv }
+
+                    # Key Vault Keys (used by F01.09)
+                    try {
+                        $keys = Get-AzKeyVaultKey -VaultName $kv.VaultName -ErrorAction SilentlyContinue
+                        $global:AzData.KeyVaultKeys[$kv.VaultName] = if ($keys) { @($keys) } else { @() }
+                    } catch { $global:AzData.KeyVaultKeys[$kv.VaultName] = @() }
+
+                    # Key Vault Certificates (used by G02.04, G02.11)
+                    try {
+                        $certs = Get-AzKeyVaultCertificate -VaultName $kv.VaultName -ErrorAction SilentlyContinue
+                        $global:AzData.KeyVaultCertificates[$kv.VaultName] = if ($certs) { @($certs) } else { @() }
+                    } catch { $global:AzData.KeyVaultCertificates[$kv.VaultName] = @() }
+                }
             } catch { Write-Warning "  KeyVaults [$($sub.Name)]: $($_.Exception.Message)" }
 
             # Storage Accounts with full config (used by B04.02 — AAD/RBAC properties)
@@ -581,6 +601,12 @@ function Collect-AzData {
                 $vnets = Get-AzVirtualNetwork -ErrorAction SilentlyContinue
                 if ($vnets) { $global:AzData.VirtualNetworks += $vnets }
             } catch { Write-Warning "  VirtualNetworks [$($sub.Name)]: $($_.Exception.Message)" }
+
+            # Log Analytics Workspaces (used by F01.01, F01.02, F01.03, F01.13)
+            try {
+                $ws = Get-AzOperationalInsightsWorkspace -ErrorAction SilentlyContinue
+                if ($ws) { $global:AzData.Workspaces += $ws }
+            } catch { Write-Warning "  Workspaces [$($sub.Name)]: $($_.Exception.Message)" }
         }
         catch {
             Write-Warning "  Failed: $($_.Exception.Message)"
